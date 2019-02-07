@@ -72,7 +72,7 @@ fn try_main() -> CliResult {
             .cmd("games", games_cmd)
             .cmd("game", game_cmd)
             .cmd("mods", mods_cmd)
-            .help(help_commands::plain),
+            .help(help_commands::with_embeds),
     );
     client.start()?;
     Ok(())

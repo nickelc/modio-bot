@@ -23,6 +23,7 @@ command!(
     options(opts) {
         opts.help_available = true;
         opts.desc = Some("Display or set the default game.".to_string());
+        opts.usage = Some("game [id|name-id]".to_string());
         opts.guild_only = true;
         opts.min_args = Some(0);
         opts.max_args = Some(1);
