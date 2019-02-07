@@ -99,7 +99,7 @@ impl fmt::Display for Error {
             Error::Io(e) => write!(fmt, "IO error: {}", e),
             Error::Serenity(e) => e.fmt(fmt),
             Error::Env(key, VarError::NotPresent) => {
-                write!(fmt, "environment variable '{}' not found", key)
+                write!(fmt, "Environment variable '{}' not found", key)
             }
             Error::Env(key, VarError::NotUnicode(_)) => {
                 write!(fmt, "Environment variable '{}' was not valid unicode", key)

@@ -85,7 +85,7 @@ where
                     Ok(())
                 })
                 .map_err(|e| {
-                    println!("{}", e);
+                    eprintln!("{}", e);
                 });
             self.executor.spawn(task);
         }
@@ -119,7 +119,7 @@ where
                     Ok(())
                 })
                 .map_err(|e| {
-                    println!("{}", e);
+                    eprintln!("{}", e);
                 });
             self.executor.spawn(task);
         }
@@ -145,7 +145,9 @@ where
                 let _ = channel.say(buf);
                 Ok(())
             })
-            .map_err(|_| ());
+            .map_err(|e| {
+                eprintln!("{}", e);
+            });
         self.executor.spawn(task);
         Ok(())
     }
@@ -188,7 +190,7 @@ where
                     Ok(())
                 })
                 .map_err(|e| {
-                    println!("{}", e);
+                    eprintln!("{}", e);
                 });
 
             self.executor.spawn(task);

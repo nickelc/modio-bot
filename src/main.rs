@@ -34,7 +34,14 @@ const MODIO_TOKEN: &str = "MODIO_TOKEN";
 
 const DEFAULT_MODIO_HOST: &str = "https://api.mod.io/v1";
 
-fn main() -> CliResult {
+fn main() {
+    if let Err(e) = try_main() {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
+}
+
+fn try_main() -> CliResult {
     dotenv().ok();
 
     let token = var(DISCORD_BOT_TOKEN)?;
