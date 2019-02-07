@@ -1,67 +1,33 @@
 use std::fmt::Write;
-use std::sync::Arc;
 
 use futures::Future;
 use modio::filter::Operator;
 use modio::games::GamesListOptions;
-use modio::{Connect, Modio};
+use modio::Connect;
 use serenity::client::Context;
-use serenity::framework::standard::{Args, Command, CommandError, CommandOptions};
+use serenity::framework::standard::CommandError;
 use serenity::model::channel::Message;
-use tokio::runtime::TaskExecutor;
 
 use crate::util::{GameKey, Identifier};
 
 type CommandResult = Result<(), CommandError>;
 
-// Macro: command {{{
-macro_rules! command {
-    ($cmd:ident) => {
-        pub struct $cmd<C>
-        where
-            C: Clone + Connect + 'static,
-        {
-            modio: Modio<C>,
-            executor: TaskExecutor,
-        }
-
-        impl<C> $cmd<C>
-        where
-            C: Clone + Connect + 'static,
-        {
-            pub fn new(modio: Modio<C>, executor: TaskExecutor) -> Self {
-                Self { modio, executor }
-            }
-        }
-    };
-}
-// }}}
-
-command!(Game);
-command!(ListGames);
-command!(ListMods);
-
-impl<C> Command for Game<C>
-where
-    C: Clone + Connect + 'static,
-{
-    fn execute(&self, ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+command!(
+    Game(self, ctx, msg, args) {
         match args.single::<Identifier>().ok() {
             Some(id) => self.set_game(ctx, msg, id),
             None => self.game(ctx, msg),
-        }
+        }?;
     }
 
-    fn options(&self) -> Arc<CommandOptions> {
-        let mut opts = CommandOptions::default();
+    options(opts) {
         opts.help_available = true;
         opts.desc = Some("Display or set the default game.".to_string());
         opts.guild_only = true;
         opts.min_args = Some(0);
         opts.max_args = Some(1);
-        Arc::new(opts)
     }
-}
+);
 
 impl<C> Game<C>
 where
@@ -126,12 +92,8 @@ where
         Ok(())
     }
 }
-
-impl<C> Command for ListGames<C>
-where
-    C: Clone + Connect + 'static,
-{
-    fn execute(&self, _ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
+command!(
+    ListGames(self, _ctx, msg) {
         let channel = msg.channel_id;
         let task = self
             .modio
@@ -149,23 +111,17 @@ where
                 eprintln!("{}", e);
             });
         self.executor.spawn(task);
-        Ok(())
     }
 
-    fn options(&self) -> Arc<CommandOptions> {
-        let mut opts = CommandOptions::default();
+    options(opts) {
         opts.help_available = true;
         opts.desc = Some("List all games on <https://mod.io>".to_string());
         opts.max_args = Some(0);
-        Arc::new(opts)
     }
-}
+);
 
-impl<C> Command for ListMods<C>
-where
-    C: Clone + Connect + 'static,
-{
-    fn execute(&self, ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
+command!(
+    ListMods(self, ctx, msg) {
         let channel = msg.channel_id;
         let game_id = msg.guild_id.and_then(|id| {
             let data = ctx.data.lock();
@@ -197,14 +153,12 @@ where
         } else {
             let _ = channel.say("default game is not set.");
         }
-        Ok(())
     }
 
-    fn options(&self) -> Arc<CommandOptions> {
-        let mut opts = CommandOptions::default();
+    options(opts) {
         opts.desc = Some("List mods of the default game".to_string());
-        opts.usage = Some("usage str".to_string());
+        opts.usage = Some("mods".to_string());
+        opts.guild_only = true;
         opts.max_args = Some(0);
-        Arc::new(opts)
     }
-}
+);

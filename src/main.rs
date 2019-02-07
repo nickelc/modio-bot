@@ -21,6 +21,9 @@ use serenity::framework::standard::{help_commands, StandardFramework};
 use serenity::prelude::*;
 use tokio::runtime::Runtime;
 
+#[macro_use]
+mod macros;
+
 mod commands;
 mod util;
 
