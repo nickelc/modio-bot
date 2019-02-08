@@ -93,6 +93,7 @@ where
         Ok(())
     }
 }
+
 command!(
     ListGames(self, _ctx, msg) {
         let channel = msg.channel_id;
@@ -102,8 +103,12 @@ command!(
             .list(&Default::default())
             .and_then(move |list| {
                 let mut buf = String::new();
-                for (n, game) in list.into_iter().enumerate() {
-                    let _ = writeln!(&mut buf, "{:02}. {}", n + 1, game.name);
+                for game in list {
+                    let _ = writeln!(
+                        &mut buf,
+                        "{}. {}  *(name-id='{}')*",
+                        game.id, game.name, game.name_id,
+                    );
                 }
                 let _ = channel.say(buf);
                 Ok(())
@@ -140,8 +145,8 @@ command!(
                         let _ = channel.say("no mods found.");
                     }
                     let mut buf = String::new();
-                    for (n, m) in list.into_iter().enumerate() {
-                        let _ = writeln!(&mut buf, "{:02}. {}", n + 1, m.name);
+                    for m in list {
+                        let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
                     }
                     let _ = channel.say(buf);
                     Ok(())
