@@ -10,7 +10,9 @@ keywords = ["modio", "discord"]
 edition = "2018"
 
 [dependencies]
+chrono = "0.4"
 dotenv = "0.13"
+either = "1.5"
 futures = "0.1"
 serenity = "0.5"
 tokio = "0.1"

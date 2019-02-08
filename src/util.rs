@@ -4,6 +4,7 @@ use std::env::VarError;
 use std::fmt;
 use std::io::Error as IoError;
 
+use chrono::prelude::*;
 use modio::auth::Credentials;
 use serenity::client::EventHandler;
 use serenity::model::id::GuildId;
@@ -50,6 +51,10 @@ impl fmt::Display for Identifier {
     }
 }
 // }}}
+
+pub fn format_timestamp(seconds: i64) -> impl fmt::Display {
+    NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M:%S")
+}
 
 pub fn var(key: &'static str) -> Result<String> {
     env::var(key).map_err(|e| Error::Env(key, e))

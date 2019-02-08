@@ -13,6 +13,10 @@ use crate::util::{GameKey, Identifier};
 
 type CommandResult = Result<(), CommandError>;
 
+mod info;
+
+pub use info::ModInfo;
+
 command!(
     Game(self, ctx, msg, args) {
         match args.single::<Identifier>().ok() {
