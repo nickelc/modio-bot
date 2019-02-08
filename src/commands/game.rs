@@ -1,16 +1,7 @@
-use futures::Future;
-use modio::filter::Operator;
 use modio::games::GamesListOptions;
-use modio::users::User;
-use modio::Connect;
-use serenity::builder::{CreateEmbedAuthor, CreateMessage};
-use serenity::client::Context;
-use serenity::model::channel::Message;
 
-use crate::commands::CommandResult;
-use crate::util::{GameKey, Identifier};
+use crate::commands::prelude::*;
 
-type EmbedField = (&'static str, String, bool);
 type Stats = (u32, u32, u32);
 
 command!(
@@ -110,21 +101,6 @@ where
             self.executor.spawn(task);
         }
         Ok(())
-    }
-}
-
-trait UserExt {
-    fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
-}
-
-impl UserExt for User {
-    fn create_author(&self, mut a: CreateEmbedAuthor) -> CreateEmbedAuthor {
-        a = a.name(&self.username).url(&self.profile_url.to_string());
-        if let Some(avatar) = &self.avatar {
-            let icon = avatar.original.to_string();
-            a = a.icon_url(&icon);
-        }
-        a
     }
 }
 

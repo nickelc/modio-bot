@@ -2,17 +2,48 @@ use std::fmt::Write;
 
 use futures::Future;
 use modio::mods::ModsListOptions;
+use modio::users::User;
+use serenity::builder::CreateEmbedAuthor;
 use serenity::framework::standard::CommandError;
 
 use crate::util::{GameKey, Identifier};
 
-type CommandResult = Result<(), CommandError>;
+pub type CommandResult = Result<(), CommandError>;
+pub type EmbedField = (&'static str, String, bool);
+
+pub mod prelude {
+    pub use futures::Future;
+    pub use modio::filter::Operator;
+    pub use modio::users::User;
+    pub use modio::Connect;
+    pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};
+    pub use serenity::client::Context;
+    pub use serenity::model::channel::Message;
+
+    pub use super::{CommandResult, EmbedField, UserExt};
+    pub use crate::util::{format_timestamp, GameKey, Identifier};
+}
 
 mod game;
 mod info;
 
 pub use game::Game;
 pub use info::ModInfo;
+
+pub trait UserExt {
+    fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
+}
+
+impl UserExt for User {
+    fn create_author(&self, mut a: CreateEmbedAuthor) -> CreateEmbedAuthor {
+        a = a.name(&self.username).url(&self.profile_url.to_string());
+        if let Some(avatar) = &self.avatar {
+            let icon = avatar.original.to_string();
+            a = a.icon_url(&icon);
+        }
+        a
+    }
+}
 
 command!(
     ListGames(self, _ctx, msg) {

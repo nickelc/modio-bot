@@ -1,11 +1,7 @@
 use either::Either;
-use futures::Future;
-use modio::filter::Operator;
 use modio::mods::{Mod, ModsListOptions, Statistics};
-use modio::users::User;
-use serenity::builder::{CreateEmbedAuthor, CreateMessage};
 
-use crate::util::{format_timestamp, GameKey, Identifier};
+use crate::commands::prelude::*;
 
 command!(
     ModInfo(self, ctx, msg, args) {
@@ -57,30 +53,15 @@ command!(
     }
 );
 
-trait UserExt {
-    fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
-}
-
-impl UserExt for User {
-    fn create_author(&self, mut a: CreateEmbedAuthor) -> CreateEmbedAuthor {
-        a = a.name(&self.username).url(&self.profile_url.to_string());
-        if let Some(avatar) = &self.avatar {
-            let icon = avatar.original.to_string();
-            a = a.icon_url(&icon);
-        }
-        a
-    }
-}
-
 trait ModExt {
     fn create_message(&self, _: CreateMessage) -> CreateMessage;
 
-    fn create_fields(&self) -> Vec<(&str, String, bool)>;
+    fn create_fields(&self) -> Vec<EmbedField>;
 }
 
 impl ModExt for Mod {
-    fn create_fields(&self) -> Vec<(&str, String, bool)> {
-        fn ratings(stats: &Statistics) -> (&str, String, bool) {
+    fn create_fields(&self) -> Vec<EmbedField> {
+        fn ratings(stats: &Statistics) -> EmbedField {
             (
                 "Ratings",
                 format!(
@@ -98,7 +79,7 @@ impl ModExt for Mod {
                 true,
             )
         }
-        fn dates(m: &Mod) -> (&str, String, bool) {
+        fn dates(m: &Mod) -> EmbedField {
             let added = format_timestamp(m.date_added as i64);
             let updated = format_timestamp(m.date_updated as i64);
             (
@@ -111,7 +92,7 @@ impl ModExt for Mod {
                 true,
             )
         }
-        fn info(m: &Mod) -> (&str, String, bool) {
+        fn info(m: &Mod) -> EmbedField {
             let homepage = if let Some(homepage) = &m.homepage_url {
                 Either::Left(format!("\nHomepage: {}\n", homepage))
             } else {
@@ -133,7 +114,7 @@ Download: {}"#,
                 true,
             )
         }
-        fn tags(m: &Mod) -> (&str, String, bool) {
+        fn tags(m: &Mod) -> EmbedField {
             let tags = m
                 .tags
                 .iter()
