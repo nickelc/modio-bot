@@ -116,7 +116,7 @@ impl ModExt for Mod {
                     r#"- Rank: {}/{}
 - Downloads: {}
 - Subscribers: {}
-- Votes: {}/{}"#,
+- Votes: +{}/-{}"#,
                     stats.popularity.rank_position,
                     stats.popularity.rank_total,
                     stats.downloads_total,
