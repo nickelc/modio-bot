@@ -94,7 +94,7 @@ command!(
     }
 
     options(opts) {
-        opts.desc = Some("Show mod details".to_string());
+        opts.desc = Some("Search mods or show the details for a single mod.".to_string());
         opts.usage = Some("mod <id|search>".to_string());
         opts.guild_only = true;
         opts.min_args = Some(1);

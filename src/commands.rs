@@ -23,6 +23,7 @@ pub mod prelude {
     pub use crate::util::{format_timestamp, GameKey, Identifier};
 }
 
+pub mod basic;
 mod game;
 mod mods;
 

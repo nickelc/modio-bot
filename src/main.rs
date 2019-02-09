@@ -70,16 +70,8 @@ fn try_main() -> CliResult {
     client.with_framework(
         StandardFramework::new()
             .configure(|c| c.prefix("~").on_mention(true))
-            .command("guide", |c| {
-                c.desc("Link to 'Getting Started' blog post.")
-                    .batch_known_as(&["tutorial", "getting-started"])
-                    .exec(|_, msg, _| {
-                        let _ = msg
-                            .channel_id
-                            .say("https://apps.mod.io/guides/getting-started");
-                        Ok(())
-                    })
-            })
+            .cmd("invite", commands::basic::Invite)
+            .cmd("guide", commands::basic::Guide)
             .cmd("games", games_cmd)
             .cmd("game", game_cmd)
             .cmd("mods", mods_cmd)
