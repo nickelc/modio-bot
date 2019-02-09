@@ -17,6 +17,7 @@ pub mod prelude {
     pub use serenity::client::Context;
     pub use serenity::framework::standard::ArgError;
     pub use serenity::model::channel::Message;
+    pub use serenity::model::id::ChannelId;
 
     pub use super::ModioListResponseExt;
     pub use super::{CommandResult, EmbedField, UserExt};
@@ -28,7 +29,7 @@ mod game;
 mod mods;
 
 pub use game::{Game, ListGames};
-pub use mods::{ListMods, ModInfo};
+pub use mods::{ListMods, ModInfo, Popular};
 
 pub trait UserExt {
     fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;

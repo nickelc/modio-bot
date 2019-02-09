@@ -27,7 +27,7 @@ mod macros;
 mod commands;
 mod util;
 
-use commands::{Game, ListGames, ListMods, ModInfo};
+use commands::{Game, ListGames, ListMods, ModInfo, Popular};
 use util::*;
 
 const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
@@ -60,6 +60,7 @@ fn try_main() -> CliResult {
     let game_cmd = Game::new(modio.clone(), rt.executor());
     let mods_cmd = ListMods::new(modio.clone(), rt.executor());
     let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
+    let popular_cmd = Popular::new(modio.clone(), rt.executor());
 
     let mut client = Client::new(&token, Handler)?;
     {
@@ -76,6 +77,7 @@ fn try_main() -> CliResult {
             .cmd("game", game_cmd)
             .cmd("mods", mods_cmd)
             .cmd("mod", mod_cmd)
+            .command("popular", |c| c.cmd_with_options(popular_cmd))
             .help(help_commands::with_embeds),
     );
     client.start()?;
