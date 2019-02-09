@@ -71,7 +71,7 @@ fn try_main() -> CliResult {
         StandardFramework::new()
             .configure(|c| c.prefix("~").on_mention(true))
             .cmd("invite", commands::basic::Invite)
-            .cmd("guide", commands::basic::Guide)
+            .command("guide", |c| c.cmd_with_options(commands::basic::Guide))
             .cmd("games", games_cmd)
             .cmd("game", game_cmd)
             .cmd("mods", mods_cmd)
