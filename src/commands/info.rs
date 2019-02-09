@@ -22,17 +22,21 @@ command!(
                 .game(game_id)
                 .mods()
                 .list(&opts)
-                .and_then(|mut list| Ok(list.shift()))
-                .and_then(move |m| {
-                    if let Some(mod_) = m {
-                        let r = channel.send_message(|m| {
-                            mod_.create_message(m)
-                        });
-                        if let Err(e) = r {
-                            eprintln!("{:?}", e);
+                .and_then(move |list| {
+                    let ret = match list.count {
+                        0 => {
+                            channel.say("no mods found.")
                         }
-                    } else {
-                        let _ = channel.say("no mods found.");
+                        1 => {
+                            let mod_ = &list[0];
+                            channel.send_message(|m| mod_.create_message(m))
+                        }
+                        _ => {
+                            channel.send_message(|m| list.create_message(m))
+                        }
+                    };
+                    if let Err(e) = ret {
+                        eprintln!("{:?}", e);
                     }
                     Ok(())
                 })
@@ -134,5 +138,19 @@ Download: {}"#,
                 .thumbnail(self.logo.thumb_640x360.to_string())
                 .fields(self.create_fields())
         })
+    }
+}
+
+trait ModioListResponseExt {
+    fn create_message(&self, m: CreateMessage) -> CreateMessage;
+}
+
+impl ModioListResponseExt for ModioListResponse<Mod> {
+    fn create_message(&self, m: CreateMessage) -> CreateMessage {
+        let mut buf = String::new();
+        for m in &self.data {
+            let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+        }
+        m.embed(|e| e.description(buf))
     }
 }

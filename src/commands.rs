@@ -11,10 +11,13 @@ pub type CommandResult = Result<(), CommandError>;
 pub type EmbedField = (&'static str, String, bool);
 
 pub mod prelude {
+    pub use std::fmt::Write;
+
     pub use futures::Future;
     pub use modio::filter::Operator;
     pub use modio::users::User;
     pub use modio::Connect;
+    pub use modio::ModioListResponse;
     pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};
     pub use serenity::client::Context;
     pub use serenity::framework::standard::ArgError;
