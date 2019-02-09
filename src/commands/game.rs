@@ -6,7 +6,12 @@ type Stats = (u32, u32, u32);
 
 command!(
     Game(self, ctx, msg, args) {
-        match args.single::<Identifier>().ok() {
+        let id = match args.single::<u32>() {
+            Ok(id) => Some(Identifier::Id(id)),
+            Err(ArgError::Parse(_)) => Some(Identifier::Search(args.rest().into())),
+            Err(ArgError::Eos) => None,
+        };
+        match id {
             Some(id) => self.set_game(ctx, msg, id),
             None => self.game(ctx, msg),
         }?;
@@ -15,10 +20,9 @@ command!(
     options(opts) {
         opts.help_available = true;
         opts.desc = Some("Display or set the default game.".to_string());
-        opts.usage = Some("game [id|name-id]".to_string());
+        opts.usage = Some("game [id|search]".to_string());
         opts.guild_only = true;
         opts.min_args = Some(0);
-        opts.max_args = Some(1);
     }
 );
 
@@ -77,7 +81,7 @@ where
             let mut opts = GamesListOptions::new();
             match id {
                 Identifier::Id(id) => opts.id(Operator::Equals, id),
-                Identifier::NameId(id) => opts.name_id(Operator::Equals, id),
+                Identifier::Search(id) => opts.fulltext(id),
             };
             let task = self
                 .modio

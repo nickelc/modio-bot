@@ -27,7 +27,7 @@ impl typemap::Key for GameKey {
 #[derive(Debug, Clone)]
 pub enum Identifier {
     Id(u32),
-    NameId(String),
+    Search(String),
 }
 
 // impl FromStr & Display for Identifier {{{
@@ -37,7 +37,7 @@ impl std::str::FromStr for Identifier {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.parse::<u32>() {
             Ok(id) => Ok(Identifier::Id(id)),
-            Err(_) => Ok(Identifier::NameId(String::from(s))),
+            Err(_) => Ok(Identifier::Search(String::from(s))),
         }
     }
 }
@@ -46,7 +46,7 @@ impl fmt::Display for Identifier {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Identifier::Id(id) => id.fmt(fmt),
-            Identifier::NameId(id) => id.fmt(fmt),
+            Identifier::Search(id) => id.fmt(fmt),
         }
     }
 }

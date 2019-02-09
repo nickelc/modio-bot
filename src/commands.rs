@@ -18,6 +18,7 @@ pub mod prelude {
     pub use modio::Connect;
     pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};
     pub use serenity::client::Context;
+    pub use serenity::framework::standard::ArgError;
     pub use serenity::model::channel::Message;
 
     pub use super::{CommandResult, EmbedField, UserExt};

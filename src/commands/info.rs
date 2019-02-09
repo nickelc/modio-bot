@@ -12,44 +12,43 @@ command!(
             map.get(&id).cloned()
         });
         if let Some(Identifier::Id(game_id)) = game_id {
-            if let Ok(id) = args.single::<Identifier>() {
-                let mut opts = ModsListOptions::new();
-                match id {
-                    Identifier::Id(id) => opts.id(Operator::Equals, id),
-                    Identifier::NameId(id) => opts.name_id(Operator::Equals, id),
-                };
-                let task = self
-                    .modio
-                    .game(game_id)
-                    .mods()
-                    .list(&opts)
-                    .and_then(|mut list| Ok(list.shift()))
-                    .and_then(move |m| {
-                        if let Some(mod_) = m {
-                            let r = channel.send_message(|m| {
-                                mod_.create_message(m)
-                            });
-                            if let Err(e) = r {
-                                eprintln!("{:?}", e);
-                            }
+            let mut opts = ModsListOptions::new();
+            match args.single::<u32>() {
+                Ok(id) => opts.id(Operator::Equals, id),
+                Err(_) => opts.fulltext(args.rest()),
+            };
+            let task = self
+                .modio
+                .game(game_id)
+                .mods()
+                .list(&opts)
+                .and_then(|mut list| Ok(list.shift()))
+                .and_then(move |m| {
+                    if let Some(mod_) = m {
+                        let r = channel.send_message(|m| {
+                            mod_.create_message(m)
+                        });
+                        if let Err(e) = r {
+                            eprintln!("{:?}", e);
                         }
-                        Ok(())
-                    })
-                    .map_err(|e| {
-                        eprintln!("{}", e)
-                    });
+                    } else {
+                        let _ = channel.say("no mods found.");
+                    }
+                    Ok(())
+                })
+                .map_err(|e| {
+                    eprintln!("{}", e)
+                });
 
-                self.executor.spawn(task);
-            }
+            self.executor.spawn(task);
         }
     }
 
     options(opts) {
         opts.desc = Some("Show mod details".to_string());
-        opts.usage = Some("mod id|name-id".to_string());
+        opts.usage = Some("mod <id|search>".to_string());
         opts.guild_only = true;
         opts.min_args = Some(1);
-        opts.max_args = Some(1);
     }
 );
 
