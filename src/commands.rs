@@ -1,11 +1,6 @@
-use std::fmt::Write;
-
-use futures::Future;
 use modio::users::User;
 use serenity::builder::{CreateEmbedAuthor, CreateMessage};
 use serenity::framework::standard::CommandError;
-
-use crate::util::{GameKey, Identifier};
 
 pub type CommandResult = Result<(), CommandError>;
 pub type EmbedField = (&'static str, String, bool);
@@ -29,10 +24,10 @@ pub mod prelude {
 }
 
 mod game;
-mod info;
+mod mods;
 
-pub use game::Game;
-pub use info::ModInfo;
+pub use game::{Game, ListGames};
+pub use mods::{ListMods, ModInfo};
 
 pub trait UserExt {
     fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
@@ -52,83 +47,3 @@ impl UserExt for User {
         a
     }
 }
-
-impl ModioListResponseExt for modio::ModioListResponse<modio::games::Game> {
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
-        let mut buf = String::new();
-        for g in &self.data {
-            let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
-        }
-        m.embed(|e| e.description(buf))
-    }
-}
-
-command!(
-    ListGames(self, _ctx, msg) {
-        let channel = msg.channel_id;
-        let task = self
-            .modio
-            .games()
-            .list(&Default::default())
-            .and_then(move |list| {
-                let ret = channel.send_message(|m| list.create_message(m));
-                if let Err(e) = ret {
-                    eprintln!("{:?}", e);
-                }
-                Ok(())
-            })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
-        self.executor.spawn(task);
-    }
-
-    options(opts) {
-        opts.help_available = true;
-        opts.desc = Some("List all games on <https://mod.io>".to_string());
-        opts.max_args = Some(0);
-    }
-);
-
-command!(
-    ListMods(self, ctx, msg) {
-        let channel = msg.channel_id;
-        let game_id = msg.guild_id.and_then(|id| {
-            let data = ctx.data.lock();
-            let map = data.get::<GameKey>().expect("failed to get map");
-            map.get(&id).cloned()
-        });
-        if let Some(Identifier::Id(id)) = game_id {
-            let task = self
-                .modio
-                .game(id)
-                .mods()
-                .list(&Default::default())
-                .and_then(move |list| {
-                    if list.count == 0 {
-                        let _ = channel.say("no mods found.");
-                    }
-                    let mut buf = String::new();
-                    for m in list {
-                        let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
-                    }
-                    let _ = channel.say(buf);
-                    Ok(())
-                })
-                .map_err(|e| {
-                    eprintln!("{}", e);
-                });
-
-            self.executor.spawn(task);
-        } else {
-            let _ = channel.say("default game is not set.");
-        }
-    }
-
-    options(opts) {
-        opts.desc = Some("List mods of the default game".to_string());
-        opts.usage = Some("mods".to_string());
-        opts.guild_only = true;
-        opts.max_args = Some(0);
-    }
-);

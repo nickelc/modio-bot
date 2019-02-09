@@ -4,6 +4,51 @@ use modio::mods::{Mod, ModsListOptions, Statistics};
 use crate::commands::prelude::*;
 
 command!(
+    ListMods(self, ctx, msg) {
+        let channel = msg.channel_id;
+        let game_id = msg.guild_id.and_then(|id| {
+            let data = ctx.data.lock();
+            let map = data.get::<GameKey>().expect("failed to get map");
+            map.get(&id).cloned()
+        });
+        if let Some(Identifier::Id(id)) = game_id {
+            let task = self
+                .modio
+                .game(id)
+                .mods()
+                .list(&Default::default())
+                .and_then(move |list| {
+                    let ret = if list.count == 0 {
+                        channel.say("no mods found.")
+                    } else {
+                        channel.send_message(|m| list.create_message(m))
+                    };
+
+                    if let Err(e) = ret {
+                        eprintln!("{:?}", e);
+                    }
+
+                    Ok(())
+                })
+                .map_err(|e| {
+                    eprintln!("{}", e);
+                });
+
+            self.executor.spawn(task);
+        } else {
+            let _ = channel.say("default game is not set.");
+        }
+    }
+
+    options(opts) {
+        opts.desc = Some("List mods of the default game".to_string());
+        opts.usage = Some("mods".to_string());
+        opts.guild_only = true;
+        opts.max_args = Some(0);
+    }
+);
+
+command!(
     ModInfo(self, ctx, msg, args) {
         let channel = msg.channel_id;
         let game_id = msg.guild_id.and_then(|id| {
