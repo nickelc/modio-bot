@@ -141,10 +141,6 @@ Download: {}"#,
     }
 }
 
-trait ModioListResponseExt {
-    fn create_message(&self, m: CreateMessage) -> CreateMessage;
-}
-
 impl ModioListResponseExt for ModioListResponse<Mod> {
     fn create_message(&self, m: CreateMessage) -> CreateMessage {
         let mut buf = String::new();

@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use futures::Future;
 use modio::users::User;
-use serenity::builder::CreateEmbedAuthor;
+use serenity::builder::{CreateEmbedAuthor, CreateMessage};
 use serenity::framework::standard::CommandError;
 
 use crate::util::{GameKey, Identifier};
@@ -23,6 +23,7 @@ pub mod prelude {
     pub use serenity::framework::standard::ArgError;
     pub use serenity::model::channel::Message;
 
+    pub use super::ModioListResponseExt;
     pub use super::{CommandResult, EmbedField, UserExt};
     pub use crate::util::{format_timestamp, GameKey, Identifier};
 }
@@ -37,6 +38,10 @@ pub trait UserExt {
     fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
 }
 
+pub trait ModioListResponseExt {
+    fn create_message(&self, m: CreateMessage) -> CreateMessage;
+}
+
 impl UserExt for User {
     fn create_author(&self, mut a: CreateEmbedAuthor) -> CreateEmbedAuthor {
         a = a.name(&self.username).url(&self.profile_url.to_string());
@@ -48,6 +53,16 @@ impl UserExt for User {
     }
 }
 
+impl ModioListResponseExt for modio::ModioListResponse<modio::games::Game> {
+    fn create_message(&self, m: CreateMessage) -> CreateMessage {
+        let mut buf = String::new();
+        for g in &self.data {
+            let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
+        }
+        m.embed(|e| e.description(buf))
+    }
+}
+
 command!(
     ListGames(self, _ctx, msg) {
         let channel = msg.channel_id;
@@ -56,15 +71,10 @@ command!(
             .games()
             .list(&Default::default())
             .and_then(move |list| {
-                let mut buf = String::new();
-                for game in list {
-                    let _ = writeln!(
-                        &mut buf,
-                        "{}. {}  *(name-id='{}')*",
-                        game.id, game.name, game.name_id,
-                    );
+                let ret = channel.send_message(|m| list.create_message(m));
+                if let Err(e) = ret {
+                    eprintln!("{:?}", e);
                 }
-                let _ = channel.say(buf);
                 Ok(())
             })
             .map_err(|e| {
