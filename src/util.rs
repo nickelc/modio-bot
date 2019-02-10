@@ -88,13 +88,48 @@ impl Settings {
         map.get(&guild).and_then(|s| s.game)
     }
 
-    pub fn set_game(ctx: &mut Context, guild: GuildId, game: u32) {
-        let mut data = ctx.data.lock();
-        data.get_mut::<Settings>()
-            .expect("failed to get settings map")
-            .entry(guild)
-            .or_insert_with(Default::default)
-            .game = Some(game);
+    pub fn set_game(ctx: &mut Context, guild_id: GuildId, game_id: u32) {
+        use crate::schema::settings::dsl::*;
+        {
+            let mut data = ctx.data.lock();
+            data.get_mut::<Settings>()
+                .expect("failed to get settings map")
+                .entry(guild_id)
+                .or_insert_with(Default::default)
+                .game = Some(game_id);
+        }
+        let data = ctx.data.lock();
+        let pool = data
+            .get::<PoolKey>()
+            .expect("failed to get connection pool");
+
+        let ret = pool.get().map_err(Error::from).and_then(|conn| {
+            let target = settings.filter(guild.eq(guild_id.0 as i64));
+            match diesel::update(target)
+                .set(game.eq(game_id as i32))
+                .execute(&conn)
+                .map_err(Error::from)
+            {
+                Ok(0) => {
+                    let values = (guild.eq(guild_id.0 as i64), game.eq(game_id as i32));
+                    let ret = diesel::insert_into(settings)
+                        .values(values)
+                        .execute(&conn)
+                        .map_err(Error::from);
+                    if let Err(e) = ret {
+                        eprintln!("{}", e);
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("{}", e);
+                }
+            }
+            Ok(())
+        });
+        if let Err(e) = ret {
+            eprintln!("{}", e);
+        }
     }
 
     pub fn prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
@@ -105,13 +140,48 @@ impl Settings {
         })
     }
 
-    pub fn set_prefix(ctx: &mut Context, guild: GuildId, prefix: Option<String>) {
-        let mut data = ctx.data.lock();
-        data.get_mut::<Settings>()
-            .expect("failed to get settings map")
-            .entry(guild)
-            .or_insert_with(Default::default)
-            .prefix = prefix;
+    pub fn set_prefix(ctx: &mut Context, guild_id: GuildId, value: Option<String>) {
+        use crate::schema::settings::dsl::*;
+        {
+            let mut data = ctx.data.lock();
+            data.get_mut::<Settings>()
+                .expect("failed to get settings map")
+                .entry(guild_id)
+                .or_insert_with(Default::default)
+                .prefix = value.clone();
+        }
+        let data = ctx.data.lock();
+        let pool = data
+            .get::<PoolKey>()
+            .expect("failed to get connection pool");
+
+        let ret = pool.get().map_err(Error::from).and_then(|conn| {
+            let target = settings.filter(guild.eq(guild_id.0 as i64));
+            match diesel::update(target)
+                .set(prefix.eq(&value))
+                .execute(&conn)
+                .map_err(Error::from)
+            {
+                Ok(0) => {
+                    let values = (guild.eq(guild_id.0 as i64), prefix.eq(&value));
+                    let ret = diesel::insert_into(settings)
+                        .values(values)
+                        .execute(&conn)
+                        .map_err(Error::from);
+                    if let Err(e) = ret {
+                        eprintln!("{}", e);
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("{}", e);
+                }
+            }
+            Ok(())
+        });
+        if let Err(e) = ret {
+            eprintln!("{}", e);
+        }
     }
 }
 
