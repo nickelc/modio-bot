@@ -4,12 +4,14 @@ use std::env::VarError;
 use std::fmt;
 
 use chrono::prelude::*;
+use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use modio::auth::Credentials;
 use serenity::client::EventHandler;
 use serenity::client::{Client, Context};
 use serenity::model::channel::Message;
+use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 
 use crate::error::Error;
@@ -17,16 +19,13 @@ use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub struct Handler;
+type Record = (i64, Option<i32>, Option<String>);
 
 #[derive(Default)]
 pub struct Settings {
     pub game: Option<u32>,
     pub prefix: Option<String>,
 }
-
-impl EventHandler for Handler {}
 
 impl typemap::Key for Settings {
     type Value = HashMap<GuildId, Settings>;
@@ -36,6 +35,50 @@ pub struct PoolKey;
 
 impl typemap::Key for PoolKey {
     type Value = Pool<ConnectionManager<SqliteConnection>>;
+}
+
+pub struct Handler;
+
+impl EventHandler for Handler {
+    fn ready(&self, ctx: Context, ready: Ready) {
+        use crate::schema::settings::dsl::*;
+
+        let map = {
+            let data = ctx.data.lock();
+            let pool = data
+                .get::<PoolKey>()
+                .expect("failed to get connection pool");
+
+            pool.get()
+                .map_err(Error::from)
+                .and_then(|conn| {
+                    let it = ready.guilds.iter().map(|g| g.id().0 as i64);
+                    let filter = settings.filter(guild.ne_all(it));
+                    match diesel::delete(filter).execute(&conn).map_err(Error::from) {
+                        Ok(num) => println!("Deleted {} guild(s).", num),
+                        Err(e) => eprintln!("{}", e),
+                    }
+                    Ok(conn)
+                })
+                .and_then(|conn| settings.load::<Record>(&conn).map_err(Error::from))
+                .and_then(|list| {
+                    let mut map = HashMap::new();
+                    for r in list {
+                        map.insert(
+                            GuildId(r.0 as u64),
+                            Settings {
+                                game: r.1.map(|id| id as u32),
+                                prefix: r.2,
+                            },
+                        );
+                    }
+                    Ok(map)
+                })
+                .unwrap_or_default()
+        };
+        let mut data = ctx.data.lock();
+        data.insert::<Settings>(map);
+    }
 }
 
 impl Settings {
@@ -148,7 +191,6 @@ pub fn discord() -> Result<Client> {
     {
         let mut data = client.data.lock();
         data.insert::<PoolKey>(pool);
-        data.insert::<Settings>(Default::default());
     }
 
     Ok(client)
