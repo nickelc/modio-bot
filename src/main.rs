@@ -15,6 +15,9 @@
 //! [`modio-rs`]: https://github.com/nickelc/modio-rs
 //! [`serenity`]: https://github.com/serenity-rs/serenity
 
+#[macro_use]
+extern crate diesel;
+
 use dotenv::dotenv;
 use modio::Modio;
 use serenity::framework::standard::{help_commands, StandardFramework};
@@ -25,6 +28,7 @@ mod macros;
 
 mod commands;
 mod error;
+mod schema;
 mod util;
 
 use commands::{Game, ListGames, ListMods, ModInfo, Popular};
