@@ -65,12 +65,18 @@ fn try_main() -> CliResult {
     let mut client = Client::new(&token, Handler)?;
     {
         let mut data = client.data.lock();
+        data.insert::<util::Settings>(Default::default());
         data.insert::<GameKey>(Default::default());
     }
 
     client.with_framework(
         StandardFramework::new()
-            .configure(|c| c.prefix("~").on_mention(true))
+            .configure(|c| {
+                c.prefix("~")
+                    .dynamic_prefix(util::Settings::prefix)
+                    .on_mention(true)
+            })
+            .cmd("prefix", commands::basic::Prefix)
             .cmd("invite", commands::basic::Invite)
             .command("guide", |c| c.cmd_with_options(commands::basic::Guide))
             .cmd("games", games_cmd)

@@ -6,6 +6,7 @@ use serenity::model::channel::Message;
 use serenity::model::permissions::Permissions;
 
 use crate::commands::CommandResult;
+use crate::util::Settings;
 
 pub struct Invite;
 
@@ -46,6 +47,31 @@ impl Command for Guide {
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
         msg.channel_id
             .say("https://apps.mod.io/guides/getting-started")?;
+        Ok(())
+    }
+}
+
+pub struct Prefix;
+
+impl Command for Prefix {
+    fn options(&self) -> Arc<CommandOptions> {
+        Arc::new(CommandOptions {
+            desc: Some("Set prefix for server".to_string()),
+            guild_only: true,
+            max_args: Some(1),
+            ..Default::default()
+        })
+    }
+
+    fn execute(&self, ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+        let prefix = args.single::<String>().ok();
+        match &prefix {
+            Some(prefix) => msg
+                .channel_id
+                .say(format!("Prefix is set to `{}`", prefix))?,
+            None => msg.channel_id.say("Prefix is set to `~`")?,
+        };
+        Settings::set_prefix(ctx, msg.guild_id.expect("guild only"), prefix);
         Ok(())
     }
 }

@@ -6,7 +6,9 @@ use std::io::Error as IoError;
 
 use chrono::prelude::*;
 use modio::auth::Credentials;
+use serenity::client::Context;
 use serenity::client::EventHandler;
+use serenity::model::channel::Message;
 use serenity::model::id::GuildId;
 use serenity::Error as SerenityError;
 
@@ -18,10 +20,38 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Handler;
 pub struct GameKey;
 
+#[derive(Default)]
+pub struct Settings {
+    pub prefix: Option<String>,
+}
+
 impl EventHandler for Handler {}
 
 impl typemap::Key for GameKey {
     type Value = HashMap<GuildId, Identifier>;
+}
+
+impl typemap::Key for Settings {
+    type Value = HashMap<GuildId, Settings>;
+}
+
+impl Settings {
+    pub fn prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
+        msg.guild_id.and_then(|id| {
+            let data = ctx.data.lock();
+            let map = data.get::<Settings>().expect("failed to get settings map");
+            map.get(&id).and_then(|s| s.prefix.clone())
+        })
+    }
+
+    pub fn set_prefix(ctx: &mut Context, guild: GuildId, prefix: Option<String>) {
+        let mut data = ctx.data.lock();
+        data.get_mut::<Settings>()
+            .expect("failed to get settings map")
+            .entry(guild)
+            .or_insert_with(Default::default)
+            .prefix = prefix;
+    }
 }
 
 #[derive(Debug, Clone)]
