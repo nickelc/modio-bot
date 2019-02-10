@@ -25,6 +25,7 @@ use tokio::runtime::Runtime;
 mod macros;
 
 mod commands;
+mod error;
 mod util;
 
 use commands::{Game, ListGames, ListMods, ModInfo, Popular};
