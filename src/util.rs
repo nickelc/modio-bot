@@ -4,14 +4,16 @@ use std::env::VarError;
 use std::fmt;
 
 use chrono::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sqlite::SqliteConnection;
 use modio::auth::Credentials;
-use serenity::client::Context;
 use serenity::client::EventHandler;
+use serenity::client::{Client, Context};
 use serenity::model::channel::Message;
 use serenity::model::id::GuildId;
 
 use crate::error::Error;
-use crate::{MODIO_API_KEY, MODIO_TOKEN};
+use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -28,6 +30,12 @@ impl EventHandler for Handler {}
 
 impl typemap::Key for Settings {
     type Value = HashMap<GuildId, Settings>;
+}
+
+pub struct PoolKey;
+
+impl typemap::Key for PoolKey {
+    type Value = Pool<ConnectionManager<SqliteConnection>>;
 }
 
 impl Settings {
@@ -127,6 +135,23 @@ pub fn credentials() -> Result<Credentials> {
             Err("Environment variable 'MODIO_API_KEY' or 'MODIO_TOKEN' not found".into())
         }
     }
+}
+
+pub fn discord() -> Result<Client> {
+    let token = var(DISCORD_BOT_TOKEN)?;
+    let database_url = var(DATABASE_URL)?;
+
+    let mgr = ConnectionManager::new(database_url);
+    let pool = Pool::new(mgr)?;
+
+    let client = Client::new(&token, Handler)?;
+    {
+        let mut data = client.data.lock();
+        data.insert::<PoolKey>(pool);
+        data.insert::<Settings>(Default::default());
+    }
+
+    Ok(client)
 }
 
 // vim: fdm=marker

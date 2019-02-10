@@ -18,7 +18,6 @@
 use dotenv::dotenv;
 use modio::Modio;
 use serenity::framework::standard::{help_commands, StandardFramework};
-use serenity::prelude::*;
 use tokio::runtime::Runtime;
 
 #[macro_use]
@@ -31,6 +30,7 @@ mod util;
 use commands::{Game, ListGames, ListMods, ModInfo, Popular};
 use util::*;
 
+const DATABASE_URL: &str = "DATABASE_URL";
 const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
 const MODIO_HOST: &str = "MODIO_HOST";
 const MODIO_API_KEY: &str = "MODIO_API_KEY";
@@ -48,8 +48,6 @@ fn main() {
 fn try_main() -> CliResult {
     dotenv().ok();
 
-    let token = var(DISCORD_BOT_TOKEN)?;
-
     let modio = {
         let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
 
@@ -63,11 +61,7 @@ fn try_main() -> CliResult {
     let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
     let popular_cmd = Popular::new(modio.clone(), rt.executor());
 
-    let mut client = Client::new(&token, Handler)?;
-    {
-        let mut data = client.data.lock();
-        data.insert::<util::Settings>(Default::default());
-    }
+    let mut client = util::discord()?;
 
     client.with_framework(
         StandardFramework::new()
