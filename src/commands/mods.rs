@@ -7,11 +7,9 @@ command!(
     ListMods(self, ctx, msg) {
         let channel = msg.channel_id;
         let game_id = msg.guild_id.and_then(|id| {
-            let data = ctx.data.lock();
-            let map = data.get::<GameKey>().expect("failed to get map");
-            map.get(&id).cloned()
+            Settings::game(ctx, id)
         });
-        if let Some(Identifier::Id(id)) = game_id {
+        if let Some(id) = game_id {
             let opts = Default::default();
             let task = list_mods(
                 self.modio.game(id).mods(),
@@ -37,11 +35,9 @@ command!(
     ModInfo(self, ctx, msg, args) {
         let channel = msg.channel_id;
         let game_id = msg.guild_id.and_then(|id| {
-            let data = ctx.data.lock();
-            let map = data.get::<GameKey>().expect("failed to get map");
-            map.get(&id).cloned()
+            Settings::game(ctx, id)
         });
-        if let Some(Identifier::Id(game_id)) = game_id {
+        if let Some(game_id) = game_id {
             let mut opts = ModsListOptions::new();
             match args.single::<u32>() {
                 Ok(id) => opts.id(Operator::Equals, id),
@@ -90,11 +86,9 @@ command!(
     Popular(self, ctx, msg) {
         let channel = msg.channel_id;
         let game_id = msg.guild_id.and_then(|id| {
-            let data = ctx.data.lock();
-            let map = data.get::<GameKey>().expect("failed to get map");
-            map.get(&id).cloned()
+            Settings::game(ctx, id)
         });
-        if let Some(Identifier::Id(id)) = game_id {
+        if let Some(id) = game_id {
             let mut opts = ModsListOptions::new();
             opts.limit(10);
             opts.sort_by(ModsListOptions::POPULAR, modio::filter::Order::Desc);

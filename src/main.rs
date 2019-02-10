@@ -66,7 +66,6 @@ fn try_main() -> CliResult {
     {
         let mut data = client.data.lock();
         data.insert::<util::Settings>(Default::default());
-        data.insert::<GameKey>(Default::default());
     }
 
     client.with_framework(

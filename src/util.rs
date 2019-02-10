@@ -18,24 +18,35 @@ pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Handler;
-pub struct GameKey;
 
 #[derive(Default)]
 pub struct Settings {
+    pub game: Option<u32>,
     pub prefix: Option<String>,
 }
 
 impl EventHandler for Handler {}
-
-impl typemap::Key for GameKey {
-    type Value = HashMap<GuildId, Identifier>;
-}
 
 impl typemap::Key for Settings {
     type Value = HashMap<GuildId, Settings>;
 }
 
 impl Settings {
+    pub fn game(ctx: &mut Context, guild: GuildId) -> Option<u32> {
+        let data = ctx.data.lock();
+        let map = data.get::<Settings>().expect("failed to get settings map");
+        map.get(&guild).and_then(|s| s.game)
+    }
+
+    pub fn set_game(ctx: &mut Context, guild: GuildId, game: u32) {
+        let mut data = ctx.data.lock();
+        data.get_mut::<Settings>()
+            .expect("failed to get settings map")
+            .entry(guild)
+            .or_insert_with(Default::default)
+            .game = Some(game);
+    }
+
     pub fn prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
         msg.guild_id.and_then(|id| {
             let data = ctx.data.lock();

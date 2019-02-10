@@ -21,7 +21,7 @@ pub mod prelude {
 
     pub use super::ModioListResponseExt;
     pub use super::{CommandResult, EmbedField, UserExt};
-    pub use crate::util::{format_timestamp, GameKey, Identifier};
+    pub use crate::util::{format_timestamp, Identifier, Settings};
 }
 
 pub mod basic;

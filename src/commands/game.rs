@@ -59,13 +59,9 @@ where
 {
     fn game(&self, ctx: &mut Context, msg: &Message) -> CommandResult {
         let channel = msg.channel_id;
-        let game_id = msg.guild_id.and_then(|id| {
-            let data = ctx.data.lock();
-            let map = data.get::<GameKey>().expect("failed to get map");
-            map.get(&id).cloned()
-        });
+        let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
 
-        if let Some(Identifier::Id(id)) = game_id {
+        if let Some(id) = game_id {
             let stats = self
                 .modio
                 .game(id)
@@ -101,7 +97,7 @@ where
     }
 
     fn set_game(&self, ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
-        let ctx2 = ctx.clone();
+        let mut ctx2 = ctx.clone();
         let channel = msg.channel_id;
 
         if let Some(guild_id) = msg.guild_id {
@@ -117,9 +113,7 @@ where
                 .and_then(|mut list| Ok(list.shift()))
                 .and_then(move |game| {
                     if let Some(game) = game {
-                        let mut data = ctx2.data.lock();
-                        let map = data.get_mut::<GameKey>().unwrap();
-                        map.insert(guild_id, Identifier::Id(game.id));
+                        Settings::set_game(&mut ctx2, guild_id, game.id);
                         let _ = channel.say(format!("Game is set to '{}'", game.name));
                     } else {
                         let _ = channel.say("Game not found");
