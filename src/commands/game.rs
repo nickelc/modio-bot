@@ -159,7 +159,7 @@ impl GameExt for modio::games::Game {
                     r#"**Mods:** {}
 **Subscribers:** {}
 **Downloads:** {}"#,
-                    total, downloads, subs,
+                    total, subs, downloads,
                 ),
                 true,
             )
