@@ -4,6 +4,7 @@ use std::io::Error as IoError;
 
 use diesel::r2d2::PoolError;
 use diesel::result::Error as QueryError;
+use diesel_migrations::RunMigrationsError;
 use serenity::Error as SerenityError;
 
 #[derive(Debug)]
@@ -19,6 +20,7 @@ pub enum Error {
 pub enum DatabaseError {
     Connection(PoolError),
     Query(QueryError),
+    Migrations(RunMigrationsError),
 }
 
 impl fmt::Display for Error {
@@ -29,6 +31,7 @@ impl fmt::Display for Error {
             Error::Serenity(e) => e.fmt(fmt),
             Error::Database(DatabaseError::Connection(e)) => e.fmt(fmt),
             Error::Database(DatabaseError::Query(e)) => e.fmt(fmt),
+            Error::Database(DatabaseError::Migrations(e)) => e.fmt(fmt),
             Error::Env(key, VarError::NotPresent) => {
                 write!(fmt, "Environment variable '{}' not found", key)
             }
@@ -72,5 +75,11 @@ impl From<PoolError> for Error {
 impl From<QueryError> for Error {
     fn from(e: QueryError) -> Error {
         Error::Database(DatabaseError::Query(e))
+    }
+}
+
+impl From<RunMigrationsError> for Error {
+    fn from(e: RunMigrationsError) -> Error {
+        Error::Database(DatabaseError::Migrations(e))
     }
 }

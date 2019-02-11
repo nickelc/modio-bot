@@ -14,6 +14,7 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 
+use crate::embedded_migrations;
 use crate::error::Error;
 use crate::schema::settings;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
@@ -259,6 +260,8 @@ pub fn discord() -> Result<Client> {
 
     let mgr = ConnectionManager::new(database_url);
     let pool = Pool::new(mgr)?;
+
+    embedded_migrations::run_with_output(&pool.get()?, &mut std::io::stdout())?;
 
     let client = Client::new(&token, Handler)?;
     {
