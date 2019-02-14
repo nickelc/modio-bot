@@ -80,12 +80,12 @@ fn try_main() -> CliResult {
             })
             .cmd("prefix", commands::basic::Prefix)
             .cmd("invite", commands::basic::Invite)
-            .command("guide", |c| c.cmd_with_options(commands::basic::Guide))
+            .cmd("guide", commands::basic::Guide)
             .cmd("games", games_cmd)
             .cmd("game", game_cmd)
             .cmd("mods", mods_cmd)
             .cmd("mod", mod_cmd)
-            .command("popular", |c| c.cmd_with_options(popular_cmd))
+            .cmd("popular", popular_cmd)
             .help(help_commands::with_embeds),
     );
     client.start()?;

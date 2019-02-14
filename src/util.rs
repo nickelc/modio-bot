@@ -57,13 +57,13 @@ impl From<(GuildId, Option<String>)> for ChangeSettings {
     }
 }
 
-impl typemap::Key for Settings {
+impl serenity::prelude::TypeMapKey for Settings {
     type Value = HashMap<GuildId, Settings>;
 }
 
 pub struct PoolKey;
 
-impl typemap::Key for PoolKey {
+impl serenity::prelude::TypeMapKey for PoolKey {
     type Value = Pool<ConnectionManager<SqliteConnection>>;
 }
 
