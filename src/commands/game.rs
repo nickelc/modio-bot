@@ -2,7 +2,7 @@ use modio::games::GamesListOptions;
 
 use crate::commands::prelude::*;
 
-type Stats = (u32, u32, u32);
+type Stats = (usize, u32, u32);
 
 command!(
     ListGames(self, _ctx, msg) {
@@ -66,14 +66,15 @@ where
                 .modio
                 .game(id)
                 .mods()
-                .list(&Default::default())
+                .statistics(&Default::default())
+                .collect()
                 .and_then(|list| {
-                    let total = list.total;
+                    let total = list.len();
                     Ok(list
                         .into_iter()
-                        .fold((total, 0, 0), |(total, mut dl, mut sub), m| {
-                            dl += m.stats.downloads_total;
-                            sub += m.stats.subscribers_total;
+                        .fold((total, 0, 0), |(total, mut dl, mut sub), s| {
+                            dl += s.downloads_total;
+                            sub += s.subscribers_total;
                             (total, dl, sub)
                         }))
                 });

@@ -8,7 +8,7 @@ pub type EmbedField = (&'static str, String, bool);
 pub mod prelude {
     pub use std::fmt::Write;
 
-    pub use futures::Future;
+    pub use futures::{Future, Stream};
     pub use modio::filter::Operator;
     pub use modio::users::User;
     pub use modio::Connect;
