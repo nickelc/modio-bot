@@ -27,6 +27,7 @@ command!(
     options(opts) {
         opts.help_available = true;
         opts.desc = Some("List all games on <https://mod.io>".to_string());
+        opts.bucket = Some("simple".to_string());
         opts.max_args = Some(0);
     }
 );
@@ -49,6 +50,7 @@ command!(
         opts.desc = Some("Display or set the default game.".to_string());
         opts.usage = Some("game [id|search]".to_string());
         opts.guild_only = true;
+        opts.bucket = Some("simple".to_string());
         opts.min_args = Some(0);
     }
 );

@@ -82,6 +82,7 @@ fn try_main() -> CliResult {
                     .dynamic_prefix(util::Settings::prefix)
                     .on_mention(true)
             })
+            .simple_bucket("simple", 5)
             .cmd("prefix", commands::basic::Prefix)
             .cmd("invite", commands::basic::Invite)
             .cmd("guide", commands::basic::Guide)

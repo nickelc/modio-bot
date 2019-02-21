@@ -27,6 +27,7 @@ command!(
         opts.desc = Some("List mods of the default game".to_string());
         opts.usage = Some("mods".to_string());
         opts.guild_only = true;
+        opts.bucket = Some("simple".to_string());
         opts.max_args = Some(0);
     }
 );
@@ -78,6 +79,7 @@ command!(
         opts.desc = Some("Search mods or show the details for a single mod.".to_string());
         opts.usage = Some("mod <id|search>".to_string());
         opts.guild_only = true;
+        opts.bucket = Some("simple".to_string());
         opts.min_args = Some(1);
     }
 );
@@ -108,6 +110,7 @@ command!(
         opts.desc = Some("List popular mods.".to_string());
         opts.usage = Some("popular".to_string());
         opts.guild_only = true;
+        opts.bucket = Some("simple".to_string());
         opts.max_args = Some(0);
     }
 );
