@@ -59,7 +59,11 @@ fn try_main() -> CliResult {
     let modio = {
         let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
 
-        Modio::host(host, "modbot", credentials()?)
+        Modio::builder(credentials()?)
+            .host(host)
+            .agent("modbot")
+            .build()
+            .map_err(error::Error::from)?
     };
     let rt = Runtime::new()?;
 

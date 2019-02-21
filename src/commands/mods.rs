@@ -112,14 +112,11 @@ command!(
     }
 );
 
-fn list_mods<C>(
-    mods: modio::mods::Mods<C>,
+fn list_mods(
+    mods: modio::mods::Mods,
     opts: &ModsListOptions,
     channel: ChannelId,
-) -> impl Future<Item = (), Error = ()> + Send + 'static
-where
-    C: Clone + Connect + 'static,
-{
+) -> impl Future<Item = (), Error = ()> + Send + 'static {
     mods.list(opts)
         .and_then(move |list| {
             let ret = if list.count == 0 {

@@ -5,12 +5,14 @@ use std::io::Error as IoError;
 use diesel::r2d2::PoolError;
 use diesel::result::Error as QueryError;
 use diesel_migrations::RunMigrationsError;
+use modio::Error as ModioError;
 use serenity::Error as SerenityError;
 
 #[derive(Debug)]
 pub enum Error {
     Message(String),
     Io(IoError),
+    Modio(ModioError),
     Database(DatabaseError),
     Serenity(SerenityError),
     Env(&'static str, VarError),
@@ -32,6 +34,7 @@ impl fmt::Display for Error {
             Error::Database(DatabaseError::Connection(e)) => e.fmt(fmt),
             Error::Database(DatabaseError::Query(e)) => e.fmt(fmt),
             Error::Database(DatabaseError::Migrations(e)) => e.fmt(fmt),
+            Error::Modio(e) => e.fmt(fmt),
             Error::Env(key, VarError::NotPresent) => {
                 write!(fmt, "Environment variable '{}' not found", key)
             }
@@ -57,6 +60,12 @@ impl From<&str> for Error {
 impl From<IoError> for Error {
     fn from(e: IoError) -> Error {
         Error::Io(e)
+    }
+}
+
+impl From<ModioError> for Error {
+    fn from(e: ModioError) -> Error {
+        Error::Modio(e)
     }
 }
 

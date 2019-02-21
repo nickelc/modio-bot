@@ -53,10 +53,7 @@ command!(
     }
 );
 
-impl<C> Game<C>
-where
-    C: Clone + Connect + 'static,
-{
+impl Game {
     fn game(&self, ctx: &mut Context, msg: &Message) -> CommandResult {
         let channel = msg.channel_id;
         let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));

@@ -3,40 +3,28 @@ macro_rules! command {
     ($cmd:ident($_self:ident, $c:ident) $b:block) => {
         command!(__impl $cmd);
 
-        impl<C> serenity::framework::standard::Command for $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
+        impl serenity::framework::standard::Command for $cmd {
             command!(__impl_exec $_self $c $b);
         }
     };
     ($cmd:ident($_self:ident, $c:ident, $m:ident) $b:block) => {
         command!(__impl $cmd);
 
-        impl<C> serenity::framework::standard::Command for $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
+        impl serenity::framework::standard::Command for $cmd {
             command!(__impl_exec2 $_self $c $m $b);
         }
     };
     ($cmd:ident($_self:ident, $c:ident, $m:ident, $a:ident) $b:block) => {
         command!(__impl $cmd);
 
-        impl<C> serenity::framework::standard::Command for $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
+        impl serenity::framework::standard::Command for $cmd {
             command!(__impl_exec3 $_self $c $m $a $b);
         }
     };
     ($cmd:ident($_self:ident, $c:ident) $b:block options($o:ident) $opts:block) => {
         command!(__impl $cmd);
 
-        impl<C> serenity::framework::standard::Command for $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
+        impl serenity::framework::standard::Command for $cmd {
             command!(__impl_exec $_self $c $b);
 
             command!(__impl_opts $o $opts);
@@ -45,10 +33,7 @@ macro_rules! command {
     ($cmd:ident($_self:ident, $c:ident, $m:ident) $b:block options($o:ident) $opts:block) => {
         command!(__impl $cmd);
 
-        impl<C> serenity::framework::standard::Command for $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
+        impl serenity::framework::standard::Command for $cmd {
             command!(__impl_exec2 $_self $c $m $b);
 
             command!(__impl_opts $o $opts);
@@ -57,29 +42,20 @@ macro_rules! command {
     ($cmd:ident($_self:ident, $c:ident, $m:ident, $a:ident) $b:block options($o:ident) $opts:block) => {
         command!(__impl $cmd);
 
-        impl<C> serenity::framework::standard::Command for $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
+        impl serenity::framework::standard::Command for $cmd {
             command!(__impl_exec3 $_self $c $m $a $b);
 
             command!(__impl_opts $o $opts);
         }
     };
     (__impl $cmd:ident) => {
-        pub struct $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
-            modio: modio::Modio<C>,
+        pub struct $cmd {
+            modio: modio::Modio,
             executor: tokio::runtime::TaskExecutor,
         }
 
-        impl<C> $cmd<C>
-        where
-            C: Clone + modio::Connect + 'static,
-        {
-            pub fn new(modio: modio::Modio<C>, executor: tokio::runtime::TaskExecutor) -> Self {
+        impl $cmd {
+            pub fn new(modio: modio::Modio, executor: tokio::runtime::TaskExecutor) -> Self {
                 Self { modio, executor }
             }
         }
