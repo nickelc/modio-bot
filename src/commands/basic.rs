@@ -59,6 +59,7 @@ impl Command for Prefix {
             desc: Some("Set prefix for server".to_string()),
             guild_only: true,
             max_args: Some(1),
+            required_permissions: Permissions::MANAGE_GUILD,
             ..Default::default()
         })
     }
