@@ -7,6 +7,7 @@ use chrono::prelude::*;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
+use log::info;
 use modio::auth::Credentials;
 use serenity::client::EventHandler;
 use serenity::client::{Client, Context};
@@ -83,9 +84,11 @@ impl EventHandler for Handler {
                 .map_err(Error::from)
                 .and_then(|conn| {
                     let it = ready.guilds.iter().map(|g| g.id().0 as i64);
-                    let filter = settings.filter(guild.ne_all(it));
+                    let ids = it.collect::<Vec<_>>();
+                    info!("Guilds: {:?}", ids);
+                    let filter = settings.filter(guild.ne_all(ids));
                     match diesel::delete(filter).execute(&conn).map_err(Error::from) {
-                        Ok(num) => println!("Deleted {} guild(s).", num),
+                        Ok(num) => info!("Deleted {} guild(s).", num),
                         Err(e) => eprintln!("{}", e),
                     }
                     Ok(conn)

@@ -55,6 +55,7 @@ fn main() {
 
 fn try_main() -> CliResult {
     dotenv().ok();
+    env_logger::init();
 
     let modio = {
         let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
