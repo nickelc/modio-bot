@@ -21,9 +21,7 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 use dotenv::dotenv;
-use modio::Modio;
 use serenity::framework::standard::{help_commands, StandardFramework};
-use tokio::runtime::Runtime;
 
 #[macro_use]
 mod macros;
@@ -57,24 +55,13 @@ fn try_main() -> CliResult {
     dotenv().ok();
     env_logger::init();
 
-    let modio = {
-        let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
-
-        Modio::builder(credentials()?)
-            .host(host)
-            .agent("modbot")
-            .build()
-            .map_err(error::Error::from)?
-    };
-    let rt = Runtime::new()?;
+    let (mut client, modio, rt) = util::initialize()?;
 
     let games_cmd = ListGames::new(modio.clone(), rt.executor());
     let game_cmd = Game::new(modio.clone(), rt.executor());
     let mods_cmd = ListMods::new(modio.clone(), rt.executor());
     let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
     let popular_cmd = Popular::new(modio.clone(), rt.executor());
-
-    let mut client = util::discord()?;
 
     client.with_framework(
         StandardFramework::new()

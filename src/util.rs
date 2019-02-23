@@ -9,16 +9,19 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::info;
 use modio::auth::Credentials;
+use modio::Modio;
 use serenity::client::EventHandler;
 use serenity::client::{Client, Context};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
+use tokio::runtime::Runtime;
 
 use crate::embedded_migrations;
 use crate::error::Error;
 use crate::schema::settings;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
+use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -236,7 +239,7 @@ pub fn var_or<S: Into<String>>(key: &'static str, default: S) -> Result<String> 
     }
 }
 
-pub fn credentials() -> Result<Credentials> {
+fn credentials() -> Result<Credentials> {
     use VarError::*;
 
     let api_key = env::var(MODIO_API_KEY);
@@ -257,7 +260,7 @@ pub fn credentials() -> Result<Credentials> {
     }
 }
 
-pub fn discord() -> Result<Client> {
+pub fn initialize() -> Result<(Client, Modio, Runtime)> {
     let token = var(DISCORD_BOT_TOKEN)?;
     let database_url = var(DATABASE_URL)?;
 
@@ -272,7 +275,19 @@ pub fn discord() -> Result<Client> {
         data.insert::<PoolKey>(pool);
     }
 
-    Ok(client)
+    let modio = {
+        let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
+
+        Modio::builder(credentials()?)
+            .host(host)
+            .agent("modbot")
+            .build()
+            .map_err(Error::from)?
+    };
+
+    let rt = Runtime::new()?;
+
+    Ok((client, modio, rt))
 }
 
 // vim: fdm=marker
