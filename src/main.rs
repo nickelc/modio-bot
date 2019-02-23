@@ -83,14 +83,18 @@ fn try_main() -> CliResult {
                     .on_mention(true)
             })
             .simple_bucket("simple", 5)
-            .cmd("prefix", commands::basic::Prefix)
-            .cmd("invite", commands::basic::Invite)
-            .cmd("guide", commands::basic::Guide)
-            .cmd("games", games_cmd)
-            .cmd("game", game_cmd)
-            .cmd("mods", mods_cmd)
-            .cmd("mod", mod_cmd)
-            .cmd("popular", popular_cmd)
+            .group("General", |g| {
+                g.cmd("prefix", commands::basic::Prefix)
+                    .cmd("invite", commands::basic::Invite)
+                    .cmd("guide", commands::basic::Guide)
+            })
+            .group("mod.io", |g| {
+                g.cmd("games", games_cmd)
+                    .cmd("game", game_cmd)
+                    .cmd("mods", mods_cmd)
+                    .cmd("mod", mod_cmd)
+                    .cmd("popular", popular_cmd)
+            })
             .help(help_commands::with_embeds),
     );
     client.start()?;
