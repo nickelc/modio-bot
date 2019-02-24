@@ -27,6 +27,7 @@ use serenity::framework::standard::{help_commands, StandardFramework};
 mod macros;
 
 mod commands;
+mod db;
 mod error;
 mod schema;
 mod util;
@@ -41,8 +42,6 @@ const MODIO_API_KEY: &str = "MODIO_API_KEY";
 const MODIO_TOKEN: &str = "MODIO_TOKEN";
 
 const DEFAULT_MODIO_HOST: &str = "https://api.mod.io/v1";
-
-embed_migrations!("migrations");
 
 fn main() {
     if let Err(e) = try_main() {
@@ -67,7 +66,7 @@ fn try_main() -> CliResult {
         StandardFramework::new()
             .configure(|c| {
                 c.prefix("~")
-                    .dynamic_prefix(util::Settings::prefix)
+                    .dynamic_prefix(util::dynamic_prefix)
                     .on_mention(true)
             })
             .simple_bucket("simple", 5)

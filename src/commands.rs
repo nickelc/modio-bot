@@ -20,7 +20,9 @@ pub mod prelude {
 
     pub use super::ModioListResponseExt;
     pub use super::{CommandResult, EmbedField, UserExt};
-    pub use crate::util::{format_timestamp, Identifier, Settings};
+    pub use crate::db::Settings;
+    pub use crate::error::Error;
+    pub use crate::util::{format_timestamp, Identifier};
 }
 
 pub mod basic;

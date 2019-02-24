@@ -6,7 +6,7 @@ use serenity::model::channel::Message;
 use serenity::model::permissions::Permissions;
 
 use crate::commands::CommandResult;
-use crate::util::Settings;
+use crate::db::Settings;
 
 pub struct Invite;
 
