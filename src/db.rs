@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
+use log::info;
 use serenity::client::Context;
 use serenity::model::channel::Message;
 use serenity::model::id::GuildId;
@@ -112,6 +115,39 @@ pub fn init_db(database_url: String) -> Result<DbPool> {
     embedded_migrations::run_with_output(&pool.get()?, &mut std::io::stdout())?;
 
     Ok(pool)
+}
+
+pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, Settings>> {
+    use crate::schema::settings::dsl::*;
+
+    type Record = (i64, Option<i32>, Option<String>);
+
+    pool.get()
+        .map_err(Error::from)
+        .and_then(|conn| {
+            let it = guilds.iter().map(|g| g.0 as i64);
+            let ids = it.collect::<Vec<_>>();
+            let filter = settings.filter(guild.ne_all(ids));
+            match diesel::delete(filter).execute(&conn).map_err(Error::from) {
+                Ok(num) => info!("Deleted {} guild(s).", num),
+                Err(e) => eprintln!("{}", e),
+            }
+            Ok(conn)
+        })
+        .and_then(|conn| settings.load::<Record>(&conn).map_err(Error::from))
+        .and_then(|list| {
+            let mut map = HashMap::new();
+            for r in list {
+                map.insert(
+                    GuildId(r.0 as u64),
+                    Settings {
+                        game: r.1.map(|id| id as u32),
+                        prefix: r.2,
+                    },
+                );
+            }
+            Ok(map)
+        })
 }
 
 impl From<(GuildId, u32)> for ChangeSettings {

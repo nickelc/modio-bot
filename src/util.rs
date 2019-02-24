@@ -4,7 +4,6 @@ use std::env::VarError;
 use std::fmt;
 
 use chrono::prelude::*;
-use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::info;
@@ -17,14 +16,13 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use tokio::runtime::Runtime;
 
-use crate::db::{init_db, Settings};
+use crate::db::{init_db, load_settings, Settings};
 use crate::error::Error;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
-type Record = (i64, Option<i32>, Option<String>);
 
 impl serenity::prelude::TypeMapKey for Settings {
     type Value = HashMap<GuildId, Settings>;
@@ -40,42 +38,16 @@ pub struct Handler;
 
 impl EventHandler for Handler {
     fn ready(&self, ctx: Context, ready: Ready) {
-        use crate::schema::settings::dsl::*;
-
         let map = {
             let data = ctx.data.lock();
             let pool = data
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
 
-            pool.get()
-                .map_err(Error::from)
-                .and_then(|conn| {
-                    let it = ready.guilds.iter().map(|g| g.id().0 as i64);
-                    let ids = it.collect::<Vec<_>>();
-                    info!("Guilds: {:?}", ids);
-                    let filter = settings.filter(guild.ne_all(ids));
-                    match diesel::delete(filter).execute(&conn).map_err(Error::from) {
-                        Ok(num) => info!("Deleted {} guild(s).", num),
-                        Err(e) => eprintln!("{}", e),
-                    }
-                    Ok(conn)
-                })
-                .and_then(|conn| settings.load::<Record>(&conn).map_err(Error::from))
-                .and_then(|list| {
-                    let mut map = HashMap::new();
-                    for r in list {
-                        map.insert(
-                            GuildId(r.0 as u64),
-                            Settings {
-                                game: r.1.map(|id| id as u32),
-                                prefix: r.2,
-                            },
-                        );
-                    }
-                    Ok(map)
-                })
-                .unwrap_or_default()
+            let guilds = ready.guilds.iter().map(|g| g.id()).collect::<Vec<_>>();
+            info!("Guilds: {:?}", guilds);
+
+            load_settings(&pool, &guilds).unwrap_or_default()
         };
         let mut data = ctx.data.lock();
         data.insert::<Settings>(map);
