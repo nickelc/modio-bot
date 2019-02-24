@@ -4,8 +4,6 @@ use std::env::VarError;
 use std::fmt;
 
 use chrono::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::sqlite::SqliteConnection;
 use log::info;
 use modio::auth::Credentials;
 use modio::Modio;
@@ -16,7 +14,7 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use tokio::runtime::Runtime;
 
-use crate::db::{init_db, load_settings, Settings};
+use crate::db::{init_db, load_settings, DbPool, Settings};
 use crate::error::Error;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
@@ -31,7 +29,7 @@ impl serenity::prelude::TypeMapKey for Settings {
 pub struct PoolKey;
 
 impl serenity::prelude::TypeMapKey for PoolKey {
-    type Value = Pool<ConnectionManager<SqliteConnection>>;
+    type Value = DbPool;
 }
 
 pub struct Handler;
