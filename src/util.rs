@@ -7,11 +7,10 @@ use chrono::prelude::*;
 use log::info;
 use modio::auth::Credentials;
 use modio::Modio;
-use serenity::client::EventHandler;
-use serenity::client::{Client, Context};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
+use serenity::prelude::*;
 use tokio::runtime::Runtime;
 
 use crate::db::{init_db, load_settings, DbPool, Settings};
@@ -22,13 +21,13 @@ use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl serenity::prelude::TypeMapKey for Settings {
+impl TypeMapKey for Settings {
     type Value = HashMap<GuildId, Settings>;
 }
 
 pub struct PoolKey;
 
-impl serenity::prelude::TypeMapKey for PoolKey {
+impl TypeMapKey for PoolKey {
     type Value = DbPool;
 }
 
