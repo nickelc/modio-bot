@@ -227,10 +227,20 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
         })
 }
 
-pub fn load_subscriptions(pool: &DbPool) -> Result<Subscriptions> {
+pub fn load_subscriptions(pool: &DbPool, guilds: &[GuildId]) -> Result<Subscriptions> {
     use crate::schema::subscriptions::dsl::*;
     pool.get()
         .map_err(Error::from)
+        .and_then(|conn| {
+            let it = guilds.iter().map(|g| g.0 as i64);
+            let ids = it.collect::<Vec<_>>();
+            let filter = subscriptions.filter(guild.ne_all(ids));
+            match diesel::delete(filter).execute(&conn).map_err(Error::from) {
+                Ok(num) => info!("Deleted {} subscription(s).", num),
+                Err(e) => eprintln!("{}", e),
+            }
+            Ok(conn)
+        })
         .and_then(|conn| {
             subscriptions
                 .load::<(i32, i64, Option<i64>)>(&conn)
