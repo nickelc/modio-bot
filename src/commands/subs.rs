@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
+use futures::future::{self, Either};
 use futures::{Future, Stream};
 use log::{debug, warn};
 use modio::filter::{Operator, Order};
 use modio::games::GamesListOptions;
+use modio::mods::ModsListOptions;
 use modio::EventListOptions;
 use modio::Modio;
 use serenity::prelude::*;
@@ -111,23 +114,38 @@ pub fn task(
                 if channels.is_empty() {
                     continue;
                 }
-                debug!("polling events for game={} channels: {:?}", game, channels);
-                let task = modio
-                    .game(game)
-                    .mods()
+                debug!(
+                    "polling events at {} for game={} channels: {:?}",
+                    tstamp, game, channels
+                );
+                let mods = modio.game(game).mods();
+                let task = mods
                     .events(&opts)
                     .collect()
                     .and_then(move |events| {
-                        for e in events {
-                            for (channel, _) in &channels {
-                                let _ = channel.say(format!(
-                                    "[{}] {:?}",
-                                    tstamp,
-                                    e,
-                                ));
-                            }
+                        if events.is_empty() {
+                            return Either::A(future::ok(()));
                         }
-                        Ok(())
+                        let mut opts = ModsListOptions::new();
+                        opts.id(
+                            Operator::In,
+                            events.iter().map(|e| e.mod_id).collect::<Vec<_>>(),
+                        );
+                        Either::B(mods.iter(&opts).collect().and_then(move |mods| {
+                            let mods: HashMap<_, _> = mods.iter().map(|m| (m.id, m)).collect();
+                            for e in events {
+                                for (channel, _) in &channels {
+                                    let _ = channel.say(format!(
+                                        "{} {}",
+                                        mods.get(&e.mod_id)
+                                            .map(|m| m.name.to_string())
+                                            .unwrap_or_default(),
+                                        e.event_type,
+                                    ));
+                                }
+                            }
+                            Ok(())
+                        }))
                     })
                     .map_err(|_| ());
 
