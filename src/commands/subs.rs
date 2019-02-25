@@ -97,8 +97,7 @@ pub fn task(
     let data = client.data.clone();
 
     Interval::new_interval(Duration::from_secs(3 * 60))
-        .for_each(move |_| {
-            let tstamp = util::current_timestamp() - 3 * 30;
+        .fold(util::current_timestamp(), move |tstamp, _| {
             let mut opts = EventListOptions::new();
             opts.date_added(Operator::GreaterThan, tstamp);
             opts.sort_by(EventListOptions::ID, Order::Asc);
@@ -135,7 +134,9 @@ pub fn task(
                 exec.spawn(task);
             }
 
-            Ok(())
+            // current timestamp for the next run
+            Ok(util::current_timestamp())
         })
+        .map(|_| ())
         .map_err(|e| warn!("interval errored: {}", e))
 }
