@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -6,6 +6,7 @@ use diesel::sqlite::SqliteConnection;
 use log::info;
 use serenity::client::Context;
 use serenity::model::channel::Message;
+use serenity::model::id::ChannelId;
 use serenity::model::id::GuildId;
 
 use crate::error::Error;
@@ -108,6 +109,82 @@ impl Settings {
     }
 }
 
+#[derive(Default)]
+pub struct Subscriptions(pub HashMap<u32, HashSet<(ChannelId, Option<GuildId>)>>);
+
+impl Subscriptions {
+    pub fn add(
+        ctx: &mut Context,
+        game_id: u32,
+        channel_id: ChannelId,
+        guild_id: Option<GuildId>,
+    ) -> Result<()> {
+        use crate::schema::subscriptions::dsl::*;
+
+        {
+            let mut data = ctx.data.lock();
+            data.get_mut::<Subscriptions>()
+                .expect("failed to get settings map")
+                .0
+                .entry(game_id)
+                .or_insert_with(Default::default)
+                .insert((channel_id, guild_id));
+        }
+
+        let data = ctx.data.lock();
+        let pool = data
+            .get::<PoolKey>()
+            .expect("failed to get connection pool");
+
+        pool.get()
+            .map_err(Error::from)
+            .and_then(|conn| {
+                diesel::replace_into(subscriptions)
+                    .values((
+                        game.eq(game_id as i32),
+                        channel.eq(channel_id.0 as i64),
+                        guild.eq(guild_id.map(|g| g.0 as i64)),
+                    ))
+                    .execute(&conn)
+                    .map_err(Error::from)
+            })
+            .map(|_| ())
+    }
+
+    pub fn remove(
+        ctx: &mut Context,
+        game_id: u32,
+        channel_id: ChannelId,
+        guild_id: Option<GuildId>,
+    ) -> Result<()> {
+        use crate::schema::subscriptions::dsl::*;
+
+        {
+            let mut data = ctx.data.lock();
+            data.get_mut::<Subscriptions>()
+                .expect("failed to get settings map")
+                .0
+                .entry(game_id)
+                .or_insert_with(Default::default)
+                .remove(&(channel_id, guild_id));
+        }
+
+        let data = ctx.data.lock();
+        let pool = data
+            .get::<PoolKey>()
+            .expect("failed to get connection pool");
+
+        pool.get()
+            .map_err(Error::from)
+            .and_then(|conn| {
+                let pred = game.eq(game_id as i32).and(channel.eq(channel_id.0 as i64));
+                let filter = subscriptions.filter(pred);
+                diesel::delete(filter).execute(&conn).map_err(Error::from)
+            })
+            .map(|_| ())
+    }
+}
+
 pub fn init_db(database_url: String) -> Result<DbPool> {
     let mgr = ConnectionManager::new(database_url);
     let pool = Pool::new(mgr)?;
@@ -147,6 +224,29 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
                 );
             }
             Ok(map)
+        })
+}
+
+pub fn load_subscriptions(pool: &DbPool) -> Result<Subscriptions> {
+    use crate::schema::subscriptions::dsl::*;
+    pool.get()
+        .map_err(Error::from)
+        .and_then(|conn| {
+            subscriptions
+                .load::<(i32, i64, Option<i64>)>(&conn)
+                .map_err(Error::from)
+        })
+        .and_then(|list| {
+            Ok(Subscriptions(list.into_iter().fold(
+                Default::default(),
+                |mut map, (game_id, channel_id, guild_id)| {
+                    let guild_id = guild_id.map(|id| GuildId(id as u64));
+                    map.entry(game_id as u32)
+                        .or_insert_with(Default::default)
+                        .insert((ChannelId(channel_id as u64), guild_id));
+                    map
+                },
+            )))
         })
 }
 

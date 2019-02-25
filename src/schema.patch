@@ -8,3 +8,16 @@
          game -> Nullable<Integer>,
          prefix -> Nullable<Text>,
      }
+--- src/schema.rs.orig	2019-02-24 22:39:33.641530261 +0100
++++ src/schema.rs	2019-02-24 22:40:13.184879005 +0100
+@@ -9,8 +9,8 @@
+ table! {
+     subscriptions (game, channel) {
+         game -> Integer,
+-        channel -> Integer,
+-        guild -> Nullable<Integer>,
++        channel -> BigInt,
++        guild -> Nullable<BigInt>,
+     }
+ }
+ 

@@ -29,9 +29,11 @@ mod macros;
 mod commands;
 mod db;
 mod error;
+#[rustfmt::skip]
 mod schema;
 mod util;
 
+use commands::subs;
 use commands::{Game, ListGames, ListMods, ModInfo, Popular};
 use util::*;
 
@@ -54,13 +56,17 @@ fn try_main() -> CliResult {
     dotenv().ok();
     env_logger::init();
 
-    let (mut client, modio, rt) = util::initialize()?;
+    let (mut client, modio, mut rt) = util::initialize()?;
 
     let games_cmd = ListGames::new(modio.clone(), rt.executor());
     let game_cmd = Game::new(modio.clone(), rt.executor());
     let mods_cmd = ListMods::new(modio.clone(), rt.executor());
     let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
     let popular_cmd = Popular::new(modio.clone(), rt.executor());
+    let subscribe_cmd = subs::Subscribe::new(modio.clone(), rt.executor());
+    let unsubscribe_cmd = subs::Unsubscribe::new(modio.clone(), rt.executor());
+
+    rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
 
     client.with_framework(
         StandardFramework::new()
@@ -81,6 +87,8 @@ fn try_main() -> CliResult {
                     .cmd("mods", mods_cmd)
                     .cmd("mod", mod_cmd)
                     .cmd("popular", popular_cmd)
+                    .cmd("subscribe", subscribe_cmd)
+                    .cmd("unsubscribe", unsubscribe_cmd)
             })
             .help(help_commands::with_embeds),
     );

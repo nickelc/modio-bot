@@ -28,6 +28,7 @@ pub mod prelude {
 pub mod basic;
 mod game;
 mod mods;
+pub mod subs;
 
 pub use game::{Game, ListGames};
 pub use mods::{ListMods, ModInfo, Popular};

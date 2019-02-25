@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::env::VarError;
 use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::prelude::*;
 use log::info;
@@ -13,7 +14,7 @@ use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tokio::runtime::Runtime;
 
-use crate::db::{init_db, load_settings, DbPool, Settings};
+use crate::db::{init_db, load_settings, load_subscriptions, DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
@@ -23,6 +24,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 impl TypeMapKey for Settings {
     type Value = HashMap<GuildId, Settings>;
+}
+
+impl TypeMapKey for Subscriptions {
+    type Value = Subscriptions;
 }
 
 pub struct PoolKey;
@@ -35,7 +40,7 @@ pub struct Handler;
 
 impl EventHandler for Handler {
     fn ready(&self, ctx: Context, ready: Ready) {
-        let map = {
+        let (settings, subs) = {
             let data = ctx.data.lock();
             let pool = data
                 .get::<PoolKey>()
@@ -44,10 +49,15 @@ impl EventHandler for Handler {
             let guilds = ready.guilds.iter().map(|g| g.id()).collect::<Vec<_>>();
             info!("Guilds: {:?}", guilds);
 
-            load_settings(&pool, &guilds).unwrap_or_default()
+            let settings = load_settings(&pool, &guilds).unwrap_or_default();
+            let subs = load_subscriptions(&pool).unwrap_or_default();
+            info!("Subscriptions: {:?}", subs.0);
+
+            (settings, subs)
         };
         let mut data = ctx.data.lock();
-        data.insert::<Settings>(map);
+        data.insert::<Settings>(settings);
+        data.insert::<Subscriptions>(subs);
     }
 }
 
@@ -82,6 +92,13 @@ impl fmt::Display for Identifier {
     }
 }
 // }}}
+
+pub fn current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
 
 pub fn format_timestamp(seconds: i64) -> impl fmt::Display {
     NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M:%S")

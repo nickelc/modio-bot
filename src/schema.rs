@@ -5,3 +5,16 @@ table! {
         prefix -> Nullable<Text>,
     }
 }
+
+table! {
+    subscriptions (game, channel) {
+        game -> Integer,
+        channel -> BigInt,
+        guild -> Nullable<BigInt>,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(
+    settings,
+    subscriptions,
+);
