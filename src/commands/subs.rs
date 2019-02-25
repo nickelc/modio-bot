@@ -16,6 +16,8 @@ use tokio::timer::Interval;
 use crate::db::Subscriptions;
 use crate::util;
 
+const INTERVAL_DURATION: Duration = Duration::from_secs(300);
+
 command!(
     Subscribe(self, ctx, msg, args) {
         let mut ctx2 = ctx.clone();
@@ -99,7 +101,7 @@ pub fn task(
 ) -> impl Future<Item = (), Error = ()> {
     let data = client.data.clone();
 
-    Interval::new_interval(Duration::from_secs(3 * 60))
+    Interval::new_interval(INTERVAL_DURATION)
         .fold(util::current_timestamp(), move |tstamp, _| {
             let mut opts = EventListOptions::new();
             opts.date_added(Operator::GreaterThan, tstamp);
