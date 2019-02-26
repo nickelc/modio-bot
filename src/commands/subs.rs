@@ -104,6 +104,16 @@ pub fn task(
         .fold(util::current_timestamp(), move |tstamp, _| {
             let mut opts = EventListOptions::new();
             opts.date_added(Operator::GreaterThan, tstamp);
+            opts.event_type(
+                Operator::In,
+                vec![
+                    EventType::ModfileChanged,
+                    EventType::ModEdited,
+                    EventType::ModDeleted,
+                    EventType::ModAvailable,
+                    EventType::ModUnavailable,
+                ],
+            );
             opts.sort_by(EventListOptions::ID, Order::Asc);
 
             let data = data.lock();
