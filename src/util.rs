@@ -51,7 +51,7 @@ impl EventHandler for Handler {
 
             let settings = load_settings(&pool, &guilds).unwrap_or_default();
             let subs = load_subscriptions(&pool, &guilds).unwrap_or_default();
-            info!("Subscriptions: {:?}", subs.0);
+            info!("Subscriptions: {}", subs);
 
             (settings, subs)
         };

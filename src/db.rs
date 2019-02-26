@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -111,6 +112,44 @@ impl Settings {
 
 #[derive(Default)]
 pub struct Subscriptions(pub HashMap<u32, HashSet<(ChannelId, Option<GuildId>)>>);
+
+/// impl Display for Subscriptions {{{
+impl fmt::Display for Subscriptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.is_empty() {
+            return f.write_str("{}");
+        }
+        f.write_str("{")?;
+        let mut has_field = false;
+        for (game, channels) in &self.0 {
+            if has_field {
+                f.write_str(", ")?;
+            }
+            has_field = true;
+            if channels.is_empty() {
+                write!(f, "{}: {{}}", game)?;
+                continue;
+            }
+            write!(f, "{}: ", game)?;
+            let mut has_subs = false;
+            f.write_str("{")?;
+            for (channel_id, guild_id) in channels {
+                if has_subs {
+                    f.write_str(", ")?;
+                }
+                if let Some(guild_id) = guild_id {
+                    write!(f, "{}@{}", channel_id, guild_id)?;
+                } else {
+                    fmt::Display::fmt(&channel_id.0, f)?;
+                }
+                has_subs = true;
+            }
+            f.write_str("}")?;
+        }
+        f.write_str("}")
+    }
+}
+/// }}}
 
 impl Subscriptions {
     pub fn add(
@@ -279,3 +318,5 @@ impl From<(GuildId, Option<String>)> for ChangeSettings {
         }
     }
 }
+
+// vim: fdm=marker
