@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::Duration;
 
 use futures::future::{self, Either};
@@ -133,17 +132,16 @@ pub fn task(
                             Operator::In,
                             events.iter().map(|e| e.mod_id).collect::<Vec<_>>(),
                         );
-                        Either::B(mods.iter(&opts).collect().and_then(move |mods| {
-                            let mods: HashMap<_, _> = mods.iter().map(|m| (m.id, m)).collect();
-                            for e in events {
+                        Either::B(mods.iter(&opts).collect().and_then(move |mut mods| {
+                            mods.sort_by(|a, b| {
+                                events
+                                    .iter()
+                                    .position(|e| e.mod_id == a.id)
+                                    .cmp(&events.iter().position(|e| e.mod_id == b.id))
+                            });
+                            for (e, m) in events.iter().zip(mods.iter()) {
                                 for (channel, _) in &channels {
-                                    let _ = channel.say(format!(
-                                        "{} {}",
-                                        mods.get(&e.mod_id)
-                                            .map(|m| m.name.to_string())
-                                            .unwrap_or_default(),
-                                        e.event_type,
-                                    ));
+                                    let _ = channel.say(format!("{} {}", m.name, e.event_type));
                                 }
                             }
                             Ok(())
