@@ -101,11 +101,8 @@ struct Notification<'a> {
 }
 
 impl<'a> Notification<'a> {
-    fn new(n: (&'a Event, &'a Mod)) -> Notification<'a> {
-        Notification {
-            event: n.0,
-            mod_: n.1,
-        }
+    fn new((event, mod_): (&'a Event, &'a Mod)) -> Notification<'a> {
+        Notification { event, mod_ }
     }
 
     fn is_ignored(&self) -> bool {
