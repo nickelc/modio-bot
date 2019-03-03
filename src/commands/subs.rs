@@ -9,6 +9,7 @@ use modio::games::GamesListOptions;
 use modio::mods::{Event, EventType, Mod, ModsListOptions};
 use modio::EventListOptions;
 use modio::Modio;
+use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
@@ -55,7 +56,9 @@ command!(
     }
 
     options(opts) {
+        opts.desc = Some("Subscribe the current channel to mod updates of a game".to_string());
         opts.min_args = Some(1);
+        opts.required_permissions = Permissions::MANAGE_CHANNELS;
     }
 );
 
@@ -92,6 +95,12 @@ command!(
             });
 
         self.executor.spawn(task);
+    }
+
+    options(opts) {
+        opts.desc = Some("Unsubscribe the current channel from mod updates of a game".to_string());
+        opts.min_args = Some(1);
+        opts.required_permissions = Permissions::MANAGE_CHANNELS;
     }
 );
 
