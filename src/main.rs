@@ -14,6 +14,7 @@
 //! [mod.io]: https://mod.io
 //! [`modio-rs`]: https://github.com/nickelc/modio-rs
 //! [`serenity`]: https://github.com/serenity-rs/serenity
+#![deny(rust_2018_idioms)]
 
 #[macro_use]
 extern crate diesel;
