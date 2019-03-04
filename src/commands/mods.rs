@@ -217,7 +217,7 @@ Download: {}"#,
                 .url(self.profile_url.to_string())
                 .author(|a| self.submitted_by.create_author(a))
                 .description(self.summary.to_string())
-                .thumbnail(self.logo.thumb_640x360.to_string())
+                .thumbnail(&self.logo.thumb_320x180)
                 .fields(self.create_fields())
         })
     }

@@ -142,7 +142,7 @@ impl<'a> Notification<'a> {
             e.title(&self.mod_.name)
                 .url(&self.mod_.profile_url)
                 .description(desc)
-                .thumbnail(&self.mod_.logo.thumb_640x360)
+                .thumbnail(&self.mod_.logo.thumb_320x180)
         })
     }
 }
