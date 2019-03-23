@@ -4,10 +4,9 @@ use either::{Left, Right};
 use futures::future::{self, Either};
 use futures::{Future, Stream};
 use log::{debug, warn};
-use modio::filter::{Operator, Order};
-use modio::games::GamesListOptions;
-use modio::mods::{Event, EventType, Mod, ModsListOptions};
-use modio::EventListOptions;
+use modio::filter::prelude::*;
+use modio::mods::filters::events::EventType as EventTypeFilter;
+use modio::mods::{Event, EventType, Mod};
 use modio::Modio;
 use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
@@ -26,15 +25,14 @@ command!(
         let channel_id = msg.channel_id;
         let guild_id = msg.guild_id.clone();
 
-        let mut opts = GamesListOptions::new();
-        match args.single::<u32>() {
-            Ok(id) => opts.id(Operator::Equals, id),
-            Err(_) => opts.fulltext(args.rest().to_string()),
+        let filter = match args.single::<u32>() {
+            Ok(id) => Id::eq(id),
+            Err(_) => Fulltext::eq(args.rest().to_string()),
         };
         let task = self
             .modio
             .games()
-            .list(&opts)
+            .list(&filter)
             .and_then(|mut list| Ok(list.shift()))
             .and_then(move |game| {
                 if let Some(g) = game {
@@ -68,15 +66,14 @@ command!(
         let channel_id = msg.channel_id;
         let guild_id = msg.guild_id.clone();
 
-        let mut opts = GamesListOptions::new();
-        match args.single::<u32>() {
-            Ok(id) => opts.id(Operator::Equals, id),
-            Err(_) => opts.fulltext(args.rest().to_string()),
+        let filter = match args.single::<u32>() {
+            Ok(id) => Id::eq(id),
+            Err(_) => Fulltext::eq(args.rest().to_string()),
         };
         let task = self
             .modio
             .games()
-            .list(&opts)
+            .list(&filter)
             .and_then(|mut list| Ok(list.shift()))
             .and_then(move |game| {
                 if let Some(g) = game {
@@ -156,19 +153,15 @@ pub fn task(
 
     Interval::new_interval(INTERVAL_DURATION)
         .fold(util::current_timestamp(), move |tstamp, _| {
-            let mut opts = EventListOptions::new();
-            opts.date_added(Operator::GreaterThan, tstamp);
-            opts.event_type(
-                Operator::In,
-                vec![
+            let filter = DateAdded::gt(tstamp)
+                .and(EventTypeFilter::_in(vec![
                     EventType::ModfileChanged,
                     EventType::ModEdited,
                     EventType::ModDeleted,
                     EventType::ModAvailable,
                     EventType::ModUnavailable,
-                ],
-            );
-            opts.sort_by(EventListOptions::ID, Order::Asc);
+                ]))
+                .order_by(Id::asc());
 
             let data = data.lock();
             let Subscriptions(subs) = data
@@ -185,18 +178,15 @@ pub fn task(
                 );
                 let mods = modio.game(game).mods();
                 let task = mods
-                    .events(&opts)
+                    .events(&filter)
                     .collect()
                     .and_then(move |events| {
                         if events.is_empty() {
                             return Either::A(future::ok(()));
                         }
-                        let mut opts = ModsListOptions::new();
-                        opts.id(
-                            Operator::In,
-                            events.iter().map(|e| e.mod_id).collect::<Vec<_>>(),
-                        );
-                        Either::B(mods.iter(&opts).collect().and_then(move |mut mods| {
+                        let filter = Id::_in(events.iter().map(|e| e.mod_id).collect::<Vec<_>>());
+
+                        Either::B(mods.iter(&filter).collect().and_then(move |mut mods| {
                             mods.sort_by(|a, b| {
                                 events
                                     .iter()

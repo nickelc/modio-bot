@@ -1,5 +1,7 @@
 use either::Either;
-use modio::mods::{Mod, ModsListOptions, Statistics};
+use modio::filter::prelude::*;
+use modio::mods::filters::Popular as PopularFilter;
+use modio::mods::{Mod, Statistics};
 
 use crate::commands::prelude::*;
 
@@ -39,16 +41,15 @@ command!(
             Settings::game(ctx, id)
         });
         if let Some(game_id) = game_id {
-            let mut opts = ModsListOptions::new();
-            match args.single::<u32>() {
-                Ok(id) => opts.id(Operator::Equals, id),
-                Err(_) => opts.fulltext(args.rest()),
+            let filter = match args.single::<u32>() {
+                Ok(id) => Id::eq(id),
+                Err(_) => Fulltext::eq(args.rest()),
             };
             let task = self
                 .modio
                 .game(game_id)
                 .mods()
-                .list(&opts)
+                .list(&filter)
                 .and_then(move |list| {
                     let ret = match list.count {
                         0 => {
@@ -91,12 +92,10 @@ command!(
             Settings::game(ctx, id)
         });
         if let Some(id) = game_id {
-            let mut opts = ModsListOptions::new();
-            opts.limit(10);
-            opts.sort_by(ModsListOptions::POPULAR, modio::filter::Order::Desc);
+            let filter = with_limit(10).order_by(PopularFilter::desc());
             let task = list_mods(
                 self.modio.game(id).mods(),
-                &opts,
+                &filter,
                 channel,
             );
 
@@ -117,7 +116,7 @@ command!(
 
 fn list_mods(
     mods: modio::mods::Mods,
-    opts: &ModsListOptions,
+    opts: &Filter,
     channel: ChannelId,
 ) -> impl Future<Item = (), Error = ()> + Send + 'static {
     mods.list(opts)

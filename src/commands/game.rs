@@ -1,4 +1,4 @@
-use modio::games::GamesListOptions;
+use modio::filter::prelude::*;
 
 use crate::commands::prelude::*;
 
@@ -101,15 +101,14 @@ impl Game {
         let channel = msg.channel_id;
 
         if let Some(guild_id) = msg.guild_id {
-            let mut opts = GamesListOptions::new();
-            match id {
-                Identifier::Id(id) => opts.id(Operator::Equals, id),
-                Identifier::Search(id) => opts.fulltext(id),
+            let filter = match id {
+                Identifier::Id(id) => Id::eq(id),
+                Identifier::Search(id) => Fulltext::eq(id),
             };
             let task = self
                 .modio
                 .games()
-                .list(&opts)
+                .list(&filter)
                 .and_then(|mut list| Ok(list.shift()))
                 .and_then(move |game| {
                     if let Some(game) = game {
