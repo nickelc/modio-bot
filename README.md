@@ -53,6 +53,16 @@ MODIO_API_KEY="your api key" \
 ./path/to/modbot
 ```
 
+#### Logging
+
+Logging can be configured via environment variables.
+
+```bash
+RUST_LOG=modio=debug,modbot=debug
+```
+
+See the [env\_logger](https://crates.io/crates/env_logger) crate for more information.
+
 ## License
 
 Licensed under either of
