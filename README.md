@@ -19,6 +19,14 @@ $ cargo build --release
 $ ./target/release/modbot
 ```
 
+### Building with bundled sqlite3
+
+Use the feature `sqlite-bundled` to compile sqlite3 from source and link against that.
+
+```
+$ cargo build --features sqlite-bundled
+```
+
 ## Installation
 
 ### Cargo
