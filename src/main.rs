@@ -78,7 +78,8 @@ fn try_main() -> CliResult {
             })
             .simple_bucket("simple", 5)
             .group("General", |g| {
-                g.cmd("prefix", commands::basic::Prefix)
+                g.cmd("about", commands::basic::About)
+                    .cmd("prefix", commands::basic::Prefix)
                     .cmd("invite", commands::basic::Invite)
                     .cmd("guide", commands::basic::Guide)
             })

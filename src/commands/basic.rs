@@ -8,6 +8,66 @@ use serenity::model::permissions::Permissions;
 use crate::commands::CommandResult;
 use crate::db::Settings;
 
+pub struct About;
+
+impl Command for About {
+    fn options(&self) -> Arc<CommandOptions> {
+        Arc::new(CommandOptions {
+            desc: Some("Get bot info.".to_string()),
+            ..Default::default()
+        })
+    }
+
+    fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
+        serenity::http::raw::get_current_user().and_then(|u| {
+            let perms = Permissions::READ_MESSAGES
+                | Permissions::SEND_MESSAGES
+                | Permissions::EMBED_LINKS
+                | Permissions::ADD_REACTIONS;
+            let url = u.invite_url(perms)?;
+
+            msg.channel_id.send_message(|m| {
+                m.embed(|e| {
+                    e.author(|a| {
+                        let mut a = a.name("modbot");
+                        if let Some(avatar) = u.avatar_url() {
+                            a = a.icon_url(&avatar);
+                        }
+                        a
+                    })
+                    .field("Invite", format!("[Invite modbot]({})", url), true)
+                    .field("Website", "[mod.io](https://mod.io)", true)
+                    .field(
+                        "mod.io Discord",
+                        "[discord.mod.io](https://discord.mod.io)",
+                        true,
+                    )
+                    .field(
+                        "modbot Discord",
+                        "[discord.gg/4akZJFf](https://discord.gg/4akZJFf)",
+                        true,
+                    )
+                    .field(
+                        "Version",
+                        format!(
+                            "{} ({})",
+                            env!("CARGO_PKG_VERSION"),
+                            env!("VERGEN_SHA_SHORT"),
+                        ),
+                        true,
+                    )
+                    .field(
+                        "Github",
+                        "[nickelc/modio-bot](https://github.com/nickelc/modio-bot)",
+                        true,
+                    )
+                })
+            })
+        })?;
+        Ok(())
+    }
+}
+
 pub struct Invite;
 
 impl Command for Invite {
