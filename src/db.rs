@@ -152,6 +152,16 @@ impl fmt::Display for Subscriptions {
 /// }}}
 
 impl Subscriptions {
+    pub fn list_games(ctx: &mut Context, channel_id: ChannelId) -> Vec<u32> {
+        let data = ctx.data.lock();
+        data.get::<Subscriptions>()
+            .expect("failed to get settings map")
+            .0
+            .iter()
+            .filter_map(|(&k, v)| v.iter().find(|(chan, _)| chan == &channel_id).map(|_| k))
+            .collect()
+    }
+
     pub fn add(
         ctx: &mut Context,
         game_id: u32,

@@ -20,6 +20,40 @@ use crate::util;
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
 command!(
+    List(self, ctx, msg) {
+        let mut ctx2 = ctx;
+        let channel_id = msg.channel_id;
+        let games = Subscriptions::list_games(&mut ctx2, msg.channel_id);
+
+        if !games.is_empty() {
+            let filter = Id::_in(games);
+            let task = self
+                .modio
+                .games()
+                .iter(&filter)
+                .fold(String::from("**Subscriptions**\n"), |mut buf, g| {
+                    let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
+                    future::ok::<_, modio::error::Error>(buf)
+                })
+                .and_then(move |games| {
+                    let _ = channel_id.send_message(|m| m.embed(|e| e.description(games)));
+                    Ok(())
+                })
+                .map_err(|e| eprintln!("{}", e));
+            self.executor.spawn(task);
+        } else {
+            let _ = channel_id.say("No subscriptions found.");
+        }
+    }
+
+    options(opts) {
+        opts.desc = Some("List subscriptions of the current channel to mod updates of a game".to_string());
+        opts.aliases = vec!["subs".to_string()];
+        opts.required_permissions = Permissions::MANAGE_CHANNELS;
+    }
+);
+
+command!(
     Subscribe(self, ctx, msg, args) {
         let mut ctx2 = ctx.clone();
         let channel_id = msg.channel_id;
