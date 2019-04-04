@@ -20,12 +20,6 @@ impl Command for About {
 
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
         serenity::http::raw::get_current_user().and_then(|u| {
-            let perms = Permissions::READ_MESSAGES
-                | Permissions::SEND_MESSAGES
-                | Permissions::EMBED_LINKS
-                | Permissions::ADD_REACTIONS;
-            let url = u.invite_url(perms)?;
-
             msg.channel_id.send_message(|m| {
                 m.embed(|e| {
                     e.author(|a| {
@@ -35,7 +29,7 @@ impl Command for About {
                         }
                         a
                     })
-                    .field("Invite", format!("[Invite modbot]({})", url), true)
+                    .field("Invite", "[discordbot.mod.io](https://discordbot.mod.io)", true)
                     .field("Website", "[mod.io](https://mod.io)", true)
                     .field(
                         "mod.io Discord",
@@ -79,16 +73,7 @@ impl Command for Invite {
     }
 
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
-        serenity::http::raw::get_current_user().and_then(|u| {
-            let perms = Permissions::READ_MESSAGES
-                | Permissions::SEND_MESSAGES
-                | Permissions::EMBED_LINKS
-                | Permissions::ADD_REACTIONS;
-            let url = u.invite_url(perms)?;
-            msg.channel_id.send_message(|m| {
-                m.embed(|e| e.description(format!("Visit the link to [invite modbot]({}).", url)))
-            })
-        })?;
+        let _ = msg.channel_id.say("Visit <https://discordbot.mod.io> to invite modbot.");
         Ok(())
     }
 }
