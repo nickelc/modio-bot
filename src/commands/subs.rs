@@ -31,12 +31,16 @@ command!(
                 .modio
                 .games()
                 .iter(&filter)
-                .fold(String::from("**Subscriptions**\n"), |mut buf, g| {
+                .fold(util::ContentBuilder::default(), |mut buf, g| {
                     let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
                     future::ok::<_, modio::error::Error>(buf)
                 })
                 .and_then(move |games| {
-                    let _ = channel_id.send_message(|m| m.embed(|e| e.description(games)));
+                    for content in games {
+                        let _ = channel_id.send_message(|m| {
+                            m.embed(|e| e.title("Subscriptions").description(content))
+                        });
+                    }
                     Ok(())
                 })
                 .map_err(|e| eprintln!("{}", e));

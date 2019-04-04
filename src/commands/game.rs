@@ -1,6 +1,8 @@
+use futures::future;
 use modio::filter::prelude::*;
 
 use crate::commands::prelude::*;
+use crate::util::ContentBuilder;
 
 type Stats = (usize, u32, u32);
 
@@ -10,11 +12,19 @@ command!(
         let task = self
             .modio
             .games()
-            .list(&Default::default())
-            .and_then(move |list| {
-                let ret = channel.send_message(|m| list.create_message(m));
-                if let Err(e) = ret {
-                    eprintln!("{:?}", e);
+            .iter(&Default::default())
+            .fold(ContentBuilder::default(), |mut buf, game| {
+                let _ = writeln!(&mut buf, "{}. {}", game.id, game.name);
+                future::ok::<_, modio::Error>(buf)
+            })
+            .and_then(move |games| {
+                for content in games {
+                    let ret = channel.send_message(|m| {
+                        m.embed(|e| e.title("Games").description(content))
+                    });
+                    if let Err(e) = ret {
+                        eprintln!("{:?}", e);
+                    }
                 }
                 Ok(())
             })
@@ -175,15 +185,5 @@ impl GameExt for modio::games::Game {
                 .image(self.logo.thumb_640x360.to_string())
                 .fields(self.create_fields(stats))
         })
-    }
-}
-
-impl ModioListResponseExt for ModioListResponse<modio::games::Game> {
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
-        let mut buf = String::new();
-        for g in &self.data {
-            let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
-        }
-        m.embed(|e| e.description(buf))
     }
 }

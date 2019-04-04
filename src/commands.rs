@@ -1,5 +1,5 @@
 use modio::users::User;
-use serenity::builder::{CreateEmbedAuthor, CreateMessage};
+use serenity::builder::CreateEmbedAuthor;
 use serenity::framework::standard::CommandError;
 
 pub type CommandResult = Result<(), CommandError>;
@@ -18,7 +18,6 @@ pub mod prelude {
     pub use serenity::model::channel::Message;
     pub use serenity::model::id::ChannelId;
 
-    pub use super::ModioListResponseExt;
     pub use super::{CommandResult, EmbedField, UserExt};
     pub use crate::db::Settings;
     pub use crate::error::Error;
@@ -35,10 +34,6 @@ pub use mods::{ListMods, ModInfo, Popular};
 
 pub trait UserExt {
     fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
-}
-
-pub trait ModioListResponseExt {
-    fn create_message(&self, m: CreateMessage) -> CreateMessage;
 }
 
 impl UserExt for User {

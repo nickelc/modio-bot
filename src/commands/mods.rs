@@ -1,9 +1,11 @@
 use either::Either;
+use futures::future;
 use modio::filter::prelude::*;
 use modio::mods::filters::Popular as PopularFilter;
 use modio::mods::{Mod, Statistics};
 
 use crate::commands::prelude::*;
+use crate::util::ContentBuilder;
 
 command!(
     ListMods(self, ctx, msg) {
@@ -53,17 +55,29 @@ command!(
                 .and_then(move |list| {
                     let ret = match list.count {
                         0 => {
-                            channel.say("no mods found.")
+                            Some(channel.say("no mods found."))
                         }
                         1 => {
                             let mod_ = &list[0];
-                            channel.send_message(|m| mod_.create_message(m))
+                            Some(channel.send_message(|m| mod_.create_message(m)))
                         }
                         _ => {
-                            channel.send_message(|m| list.create_message(m))
+                            let mods = list.into_iter().fold(ContentBuilder::default(), |mut buf, mod_| {
+                                let _ = writeln!(&mut buf, "{}. {}", mod_.id, mod_.name);
+                                buf
+                            });
+                            for content in mods {
+                                let ret = channel.send_message(|m| {
+                                    m.embed(|e| e.title("Matching mods").description(content))
+                                });
+                                if let Err(e) = ret {
+                                    eprintln!("{:?}", e);
+                                }
+                            }
+                            None
                         }
                     };
-                    if let Err(e) = ret {
+                    if let Some(Err(e)) = ret {
                         eprintln!("{:?}", e);
                     }
                     Ok(())
@@ -116,20 +130,30 @@ command!(
 
 fn list_mods(
     mods: modio::mods::Mods,
-    opts: &Filter,
+    filter: &Filter,
     channel: ChannelId,
 ) -> impl Future<Item = (), Error = ()> + Send + 'static {
-    mods.list(opts)
-        .and_then(move |list| {
-            let ret = if list.count == 0 {
-                channel.say("no mods found.")
+    mods.iter(filter)
+        .fold(ContentBuilder::default(), |mut buf, mod_| {
+            let _ = buf.write_str(&format!("{}. {}\n", mod_.id, mod_.name));
+            future::ok::<_, modio::Error>(buf)
+        })
+        .and_then(move |mods| {
+            if mods.is_empty() {
+                let ret = channel.say("no mods found.");
+                if let Err(e) = ret {
+                    eprintln!("{:?}", e);
+                }
             } else {
-                channel.send_message(|m| list.create_message(m))
+                for content in mods {
+                    let ret = channel.send_message(|m| {
+                        m.embed(|e| e.title("Mods").description(content))
+                    });
+                    if let Err(e) = ret {
+                        eprintln!("{:?}", e);
+                    }
+                }
             };
-
-            if let Err(e) = ret {
-                eprintln!("{:?}", e);
-            }
             Ok(())
         })
         .map_err(|e| {
@@ -219,15 +243,5 @@ Download: {}"#,
                 .thumbnail(&self.logo.thumb_320x180)
                 .fields(self.create_fields())
         })
-    }
-}
-
-impl ModioListResponseExt for ModioListResponse<Mod> {
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
-        let mut buf = String::new();
-        for m in &self.data {
-            let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
-        }
-        m.embed(|e| e.description(buf))
     }
 }
