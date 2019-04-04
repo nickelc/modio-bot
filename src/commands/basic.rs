@@ -23,7 +23,7 @@ impl Command for About {
             msg.channel_id.send_message(|m| {
                 m.embed(|e| {
                     e.author(|a| {
-                        let mut a = a.name("modbot");
+                        let mut a = a.name(&u.name);
                         if let Some(avatar) = u.avatar_url() {
                             a = a.icon_url(&avatar);
                         }
