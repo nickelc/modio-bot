@@ -10,6 +10,7 @@ use modio::auth::Credentials;
 use modio::Modio;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::guild::GuildStatus;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tokio::runtime::Runtime;
@@ -46,7 +47,7 @@ impl EventHandler for Handler {
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
 
-            let guilds = ready.guilds.iter().map(|g| g.id()).collect::<Vec<_>>();
+            let guilds = ready.guilds.iter().map(GuildStatus::id).collect::<Vec<_>>();
             info!("Guilds: {:?}", guilds);
 
             let settings = load_settings(&pool, &guilds).unwrap_or_default();

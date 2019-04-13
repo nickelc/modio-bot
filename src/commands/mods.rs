@@ -226,7 +226,7 @@ Download: {}"#,
             let tags = m
                 .tags
                 .iter()
-                .map(|t| t.to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
             ("Tags", tags, false)

@@ -26,6 +26,7 @@ pub struct Settings {
 
 #[derive(Insertable, AsChangeset)]
 #[table_name = "settings"]
+#[allow(clippy::option_option)]
 struct ChangeSettings {
     pub guild: i64,
     pub game: Option<Option<i32>>,

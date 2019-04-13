@@ -61,7 +61,7 @@ command!(
     Subscribe(self, ctx, msg, args) {
         let mut ctx2 = ctx.clone();
         let channel_id = msg.channel_id;
-        let guild_id = msg.guild_id.clone();
+        let guild_id = msg.guild_id;
 
         let filter = match args.single::<u32>() {
             Ok(id) => Id::eq(id),
@@ -102,7 +102,7 @@ command!(
     Unsubscribe(self, ctx, msg, args) {
         let mut ctx2 = ctx.clone();
         let channel_id = msg.channel_id;
-        let guild_id = msg.guild_id.clone();
+        let guild_id = msg.guild_id;
 
         let filter = match args.single::<u32>() {
             Ok(id) => Id::eq(id),
