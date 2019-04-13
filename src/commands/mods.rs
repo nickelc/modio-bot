@@ -146,9 +146,8 @@ fn list_mods(
                 }
             } else {
                 for content in mods {
-                    let ret = channel.send_message(|m| {
-                        m.embed(|e| e.title("Mods").description(content))
-                    });
+                    let ret =
+                        channel.send_message(|m| m.embed(|e| e.title("Mods").description(content)));
                     if let Err(e) = ret {
                         eprintln!("{:?}", e);
                     }

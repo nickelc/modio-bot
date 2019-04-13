@@ -29,7 +29,11 @@ impl Command for About {
                         }
                         a
                     })
-                    .field("Invite", "[discordbot.mod.io](https://discordbot.mod.io)", true)
+                    .field(
+                        "Invite",
+                        "[discordbot.mod.io](https://discordbot.mod.io)",
+                        true,
+                    )
                     .field("Website", "[mod.io](https://mod.io)", true)
                     .field(
                         "mod.io Discord",
@@ -73,7 +77,9 @@ impl Command for Invite {
     }
 
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
-        let _ = msg.channel_id.say("Visit <https://discordbot.mod.io> to invite modbot.");
+        let _ = msg
+            .channel_id
+            .say("Visit <https://discordbot.mod.io> to invite modbot.");
         Ok(())
     }
 }
