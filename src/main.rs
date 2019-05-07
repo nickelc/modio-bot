@@ -77,7 +77,7 @@ fn try_main() -> CliResult {
                     .dynamic_prefix(util::dynamic_prefix)
                     .on_mention(true)
             })
-            .simple_bucket("simple", 5)
+            .simple_bucket("simple", 1)
             .group("General", |g| {
                 g.cmd("about", commands::basic::About)
                     .cmd("prefix", commands::basic::Prefix)
