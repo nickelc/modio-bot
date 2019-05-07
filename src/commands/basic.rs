@@ -30,7 +30,7 @@ impl Command for About {
                         a
                     })
                     .field(
-                        "Invite",
+                        "Invite to channel",
                         "[discordbot.mod.io](https://discordbot.mod.io)",
                         true,
                     )
@@ -79,7 +79,7 @@ impl Command for Invite {
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
         let _ = msg
             .channel_id
-            .say("Visit <https://discordbot.mod.io> to invite modbot.");
+            .say("Visit <https://discordbot.mod.io> to invite modbot to join your Discord channel. Once modbot has joined, you can set the default game and subscribe to game(s) for updates using the `game` and `subscribe` commands.");
         Ok(())
     }
 }
