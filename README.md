@@ -1,11 +1,38 @@
 [![MODBOT logo][logo]][repo]
 
+# ModBot for Discord
 ![Rust version][rust-version]
 ![Rust edition][rust-edition]
 ![License][license-badge]
 [![Discord][discord-badge]][discord]
 
-MODBOT is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
+ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
+
+![MODBOT example](https://image.mod.io/members/c4ca/1/profileguides/modbot.png)
+
+## Setup
+
+You can invite the officially hosted ModBot to join your Discord server using the following URL https://discordbot.mod.io, or you can build and install your own version of ModBot by following the instructions below.
+
+## Commands
+
+By default `~` is the prefix used to issue commands to ModBot. Once you have invited ModBot to your server, you can set the default game using the command `~game ID`. Now when a user issues the command `~mods`, all of the mods for the game you specified will be returned. You can change the default game at any time.
+
+We recommend you also `~subscribe ID` to games you are interested in receiving push notifications from. For example in our [#modbot channel](https://discord.mod.io), we have subscribed to a bunch of games and whenever a mod is updated, the channel is notified.
+
+Popular commands include:
+
+ * `~help` show these commands
+ * `~prefix CHARACTER` change the default prefix from `~` to something else
+ * `~game ID|Name` set the default game
+ * `~game` return information about the default game
+ * `~games` return a list of all games
+ * `~mod ID|Name` return information about the mod(s) requested
+ * `~mods` return a list of all mods belonging to the default game
+ * `~popular` return a list of mods ordered by popularity
+ * `~subscribe ID|Name` subscribe to a game for updates (mods added/edited)
+ * `~subscriptions` see all games subscribed too
+ * `~unsubscribe ID|Name` unsubscribe from a game
 
 ## Building
 
@@ -80,7 +107,7 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [discord]: https://discord.gg/4akZJFf
-[discord-badge]: https://img.shields.io/discord/541627648112066581.svg
+[discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
 [repo]: https://github.com/nickelc/modio-bot
 [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
 [mod.io]: https://mod.io
