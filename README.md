@@ -1,4 +1,4 @@
-[![MODBOT logo][logo]][repo]
+<img src="https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png" width="200" align="right"/>
 
 # ModBot for Discord
 ![Rust version][rust-version]
@@ -8,7 +8,9 @@
 
 ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
-![MODBOT example](https://image.mod.io/members/c4ca/1/profileguides/modbot.png)
+## Example
+
+<img src="https://image.mod.io/members/c4ca/1/profileguides/modbot.png" height="500"/>
 
 ## Setup
 
