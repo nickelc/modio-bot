@@ -8,6 +8,8 @@
 
 ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
+![MODBOT example](https://image.mod.io/members/c4ca/1/profileguides/modbot.png)
+
 ## Setup
 
 You can invite the officially hosted ModBot to join your Discord channel using the following URL https://discordbot.mod.io, or you can build and install your own version of ModBot by following the instructions below.
@@ -31,8 +33,6 @@ Popular commands include:
  * `~subscribe ID|Name` subscribe to a game for updates (mods added/edited)
  * `~subscriptions` see all games subscribed too
  * `~unsubscribe ID|Name` unsubscribe from a game
- 
-![MODBOT example](https://image.mod.io/members/c4ca/1/profileguides/modbot.png)
 
 ## Building
 
