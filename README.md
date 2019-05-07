@@ -20,7 +20,7 @@ You can invite the officially hosted ModBot to join your Discord server using th
 
 By default `~` is the prefix used to issue commands to ModBot. Once you have invited ModBot to your server, you can set the default game using the command `~game ID`. Now when a user issues the command `~mods`, all of the mods for the game you specified will be returned. You can change the default game at any time.
 
-We recommend you also `~subscribe ID` to games you are interested in receiving push notifications from. For example in our [#modbot channel](https://discord.mod.io), we have subscribed to a bunch of games and whenever a mod is updated, the channel is notified.
+We recommend you also `~subscribe ID` to games you are interested in receiving push notifications from. For example in our [#bot channel][modio-bot-channel], we have subscribed to a bunch of games and whenever a mod is updated, the channel is notified.
 
 Popular commands include:
 
@@ -110,6 +110,7 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [discord]: https://discord.gg/4akZJFf
 [discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
+[modio-bot-channel]: https://discord.gg/QR7DGD7
 [repo]: https://github.com/nickelc/modio-bot
 [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
 [mod.io]: https://mod.io
