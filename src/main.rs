@@ -22,7 +22,7 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 use dotenv::dotenv;
-use serenity::framework::standard::{help_commands, StandardFramework};
+use serenity::framework::standard::{help_commands, DispatchError, StandardFramework};
 
 #[macro_use]
 mod macros;
@@ -93,6 +93,20 @@ fn try_main() -> CliResult {
                     .cmd("subscriptions", list_subs_cmd)
                     .cmd("subscribe", subscribe_cmd)
                     .cmd("unsubscribe", unsubscribe_cmd)
+            })
+            .on_dispatch_error(|_, msg, error| match error {
+                DispatchError::NotEnoughArguments { .. } => {
+                    let _ = msg.channel_id.say("Not enough arguments.");
+                }
+                DispatchError::LackingRole | DispatchError::LackOfPermissions(_) => {
+                    let _ = msg
+                        .channel_id
+                        .say("You have insufficient rights for this command.");
+                }
+                DispatchError::RateLimited(_) => {
+                    let _ = msg.channel_id.say("Try again in 1 second.");
+                }
+                _ => {}
             })
             .help(help_commands::with_embeds),
     );

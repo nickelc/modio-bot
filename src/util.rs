@@ -9,7 +9,7 @@ use log::info;
 use modio::auth::Credentials;
 use modio::Modio;
 use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
+use serenity::model::gateway::{Game, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
@@ -59,6 +59,9 @@ impl EventHandler for Handler {
         let mut data = ctx.data.lock();
         data.insert::<Settings>(settings);
         data.insert::<Subscriptions>(subs);
+
+        let game = Game::playing(&format!("@{} help", ready.user.name));
+        ctx.set_game(game);
     }
 }
 
