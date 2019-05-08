@@ -18,6 +18,7 @@ command!(
             let task = list_mods(
                 self.modio.game(id).mods(),
                 &opts,
+                None,
                 channel,
             );
 
@@ -110,6 +111,7 @@ command!(
             let task = list_mods(
                 self.modio.game(id).mods(),
                 &filter,
+                Some(10),
                 channel,
             );
 
@@ -131,9 +133,19 @@ command!(
 fn list_mods(
     mods: modio::mods::Mods,
     filter: &Filter,
+    limit: Option<usize>,
     channel: ChannelId,
 ) -> impl Future<Item = (), Error = ()> + Send + 'static {
+    let mut limit = limit;
     mods.iter(filter)
+        .take_while(move |_| match limit.as_mut() {
+            Some(ref v) if **v == 0 => Ok(false),
+            Some(v) => {
+                *v -= 1;
+                Ok(true)
+            }
+            None => Ok(true),
+        })
         .fold(ContentBuilder::default(), |mut buf, mod_| {
             let _ = buf.write_str(&format!("{}. {}\n", mod_.id, mod_.name));
             future::ok::<_, modio::Error>(buf)
