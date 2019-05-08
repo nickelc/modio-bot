@@ -5,6 +5,7 @@
 ![Rust edition][rust-edition]
 ![License][license-badge]
 [![Discord][discord-badge]][discord]
+[![Invite ModBot][bot-invite-badge]][bot-invite-url]
 
 ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
@@ -110,6 +111,8 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [discord]: https://discord.gg/4akZJFf
 [discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
+[bot-invite-badge]: https://img.shields.io/static/v1.svg?label=%20&logo=discord&message=Invite%20ModBot&color=7289DA&labelColor=2C2F33
+[bot-invite-url]: https://discordbot.mod.io
 [modio-bot-channel]: https://discord.gg/QR7DGD7
 [repo]: https://github.com/nickelc/modio-bot
 [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
