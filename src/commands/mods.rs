@@ -242,7 +242,11 @@ Download: {}"#,
                 .join(", ");
             ("Tags", tags, false)
         }
-        vec![ratings(&self.stats), info(self), dates(self), tags(self)]
+        let mut fields = vec![ratings(&self.stats), info(self), dates(self)];
+        if !self.tags.is_empty() {
+            fields.push(tags(self))
+        }
+        fields
     }
 
     fn create_message(&self, m: CreateMessage) -> CreateMessage {
