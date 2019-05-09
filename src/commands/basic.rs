@@ -7,6 +7,7 @@ use serenity::model::permissions::Permissions;
 
 use crate::commands::CommandResult;
 use crate::db::Settings;
+use crate::util::guild_stats;
 
 pub struct About;
 
@@ -18,7 +19,7 @@ impl Command for About {
         })
     }
 
-    fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
+    fn execute(&self, ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
         serenity::http::raw::get_current_user().and_then(|u| {
             msg.channel_id.send_message(|m| {
                 m.embed(|e| {
@@ -28,6 +29,10 @@ impl Command for About {
                             a = a.icon_url(&avatar);
                         }
                         a
+                    })
+                    .footer(|f| {
+                        let (guilds, users) = guild_stats(ctx);
+                        f.text(format!("Servers: {} | Users: {}", guilds, users))
                     })
                     .field(
                         "Invite to server",

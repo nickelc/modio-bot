@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::env::VarError;
 use std::fmt;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::prelude::*;
@@ -10,7 +11,7 @@ use modio::auth::Credentials;
 use modio::Modio;
 use serenity::model::channel::Message;
 use serenity::model::gateway::{Game, Ready};
-use serenity::model::guild::GuildStatus;
+use serenity::model::guild::{Guild, GuildStatus, PartialGuild};
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tokio::runtime::Runtime;
@@ -22,6 +23,14 @@ use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
+
+type GuildStats = HashMap<GuildId, usize>;
+
+struct GuildStatsKey;
+
+impl TypeMapKey for GuildStatsKey {
+    type Value = GuildStats;
+}
 
 impl TypeMapKey for Settings {
     type Value = HashMap<GuildId, Settings>;
@@ -41,12 +50,17 @@ pub struct Handler;
 
 impl EventHandler for Handler {
     fn ready(&self, ctx: Context, ready: Ready) {
-        let (settings, subs) = {
+        let (settings, subs, stats) = {
             let data = ctx.data.lock();
             let pool = data
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
 
+            let stats = ready
+                .guilds
+                .iter()
+                .map(|g| (g.id(), 0))
+                .collect::<GuildStats>();
             let guilds = ready.guilds.iter().map(GuildStatus::id).collect::<Vec<_>>();
             info!("Guilds: {:?}", guilds);
 
@@ -54,15 +68,41 @@ impl EventHandler for Handler {
             let subs = load_subscriptions(&pool, &guilds).unwrap_or_default();
             info!("Subscriptions: {}", subs);
 
-            (settings, subs)
+            (settings, subs, stats)
         };
         let mut data = ctx.data.lock();
         data.insert::<Settings>(settings);
         data.insert::<Subscriptions>(subs);
+        data.insert::<GuildStatsKey>(stats);
 
         let game = Game::playing(&format!("@{} help", ready.user.name));
         ctx.set_game(game);
     }
+
+    fn guild_create(&self, ctx: Context, guild: Guild, _: bool) {
+        let mut data = ctx.data.lock();
+        let stats = data
+            .get_mut::<GuildStatsKey>()
+            .expect("failed to get guild stats");
+        stats.insert(guild.id, guild.members.len());
+    }
+
+    fn guild_delete(&self, ctx: Context, guild: PartialGuild, _: Option<Arc<RwLock<Guild>>>) {
+        let mut data = ctx.data.lock();
+        let stats = data
+            .get_mut::<GuildStatsKey>()
+            .expect("failed to get guild stats");
+        stats.remove(&guild.id);
+    }
+}
+
+pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
+    let data = ctx.data.lock();
+    let stats = data
+        .get::<GuildStatsKey>()
+        .expect("failed to get guild stats");
+
+    (stats.len(), stats.values().sum())
 }
 
 pub fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
