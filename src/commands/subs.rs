@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use either::{Left, Right};
 use futures::future::{self, Either};
 use futures::{Future, Stream};
 use log::{debug, warn};
 use modio::filter::prelude::*;
+use modio::games::Game;
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{Event, EventType, Mod};
 use modio::Modio;
@@ -157,28 +157,58 @@ impl<'a> Notification<'a> {
         }
     }
 
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
-        let desc = match self.event.event_type {
-            EventType::ModEdited => Left("The mod has been edited."),
-            EventType::ModAvailable => Left("A new mod is available."),
-            EventType::ModUnavailable => Left("The mod is now unavailable."),
-            EventType::ModfileChanged => Right(format!(
-                "The primary file changed. [link]({})",
-                self.mod_
+    fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+        use crate::commands::mods::ModExt;
+
+        let create_embed =
+            |m: CreateMessage, desc: &str, changelog: Option<(&str, String, bool)>| {
+                m.embed(|e| {
+                    e.title(&self.mod_.name)
+                        .url(&self.mod_.profile_url)
+                        .description(desc)
+                        .thumbnail(&self.mod_.logo.thumb_320x180)
+                        .author(|a| {
+                            a.name(&game.name)
+                                .icon_url(&game.icon.thumb_64x64.to_string())
+                        })
+                        .fields(changelog)
+                })
+            };
+
+        match self.event.event_type {
+            EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
+            EventType::ModAvailable => {
+                let m = m.content("A new mod is available. :tada:");
+                self.mod_.create_message(m)
+            }
+            EventType::ModUnavailable => create_embed(m, "The mod is now unavailable.", None),
+            EventType::ModfileChanged => {
+                let (desc, changelog) = self
+                    .mod_
                     .modfile
                     .as_ref()
-                    .map(|f| f.download.binary_url.to_string())
-                    .unwrap_or_default(),
-            )),
-            EventType::ModDeleted => Left("The mod has been permanently deleted."),
-            _ => Left("ignored event"),
-        };
-        m.embed(|e| {
-            e.title(&self.mod_.name)
-                .url(&self.mod_.profile_url)
-                .description(desc)
-                .thumbnail(&self.mod_.logo.thumb_320x180)
-        })
+                    .map(|f| {
+                        let link = f.download.binary_url.to_string();
+                        let version = f
+                            .version
+                            .as_ref()
+                            .filter(|v| !v.is_empty())
+                            .map_or_else(String::new, |v| format!(" to {}", v));
+                        let changelog = f
+                            .changelog
+                            .as_ref()
+                            .filter(|c| !c.is_empty())
+                            .map(|c| ("Changelog", c.to_owned(), true));
+                        let desc = format!("The primary file [has changed]({}){}.", link, version);
+
+                        (desc, changelog)
+                    })
+                    .unwrap_or_default();
+                create_embed(m, &desc, changelog)
+            }
+            EventType::ModDeleted => create_embed(m, "The mod has been permanently deleted.", None),
+            _ => create_embed(m, "event ignored", None),
+        }
     }
 }
 
@@ -214,7 +244,9 @@ pub fn task(
                     "polling events at {} for game={} channels: {:?}",
                     tstamp, game, channels
                 );
-                let mods = modio.game(game).mods();
+
+                let game = modio.game(game);
+                let mods = game.mods();
                 let task = mods
                     .events(&filter)
                     .collect()
@@ -224,7 +256,10 @@ pub fn task(
                         }
                         let filter = Id::_in(events.iter().map(|e| e.mod_id).collect::<Vec<_>>());
 
-                        Either::B(mods.iter(&filter).collect().and_then(move |mut mods| {
+                        let game = game.get();
+                        let mods = mods.iter(&filter).collect();
+
+                        Either::B(game.join(mods).and_then(move |(game, mut mods)| {
                             mods.sort_by(|a, b| {
                                 events
                                     .iter()
@@ -238,7 +273,11 @@ pub fn task(
                                 .filter(|n| !n.is_ignored());
                             for n in it {
                                 for (channel, _) in &channels {
-                                    let _ = channel.send_message(|m| n.create_message(m));
+                                    debug!(
+                                        "send message to #{}: {} for {:?}",
+                                        channel, n.event.event_type, n.mod_.name,
+                                    );
+                                    let _ = channel.send_message(|m| n.create_message(&game, m));
                                 }
                             }
                             Ok(())

@@ -172,7 +172,7 @@ fn list_mods(
         })
 }
 
-trait ModExt {
+pub trait ModExt {
     fn create_message(&self, _: CreateMessage) -> CreateMessage;
 
     fn create_fields(&self) -> Vec<EmbedField>;
