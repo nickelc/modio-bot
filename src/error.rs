@@ -8,11 +8,14 @@ use diesel_migrations::RunMigrationsError;
 use modio::Error as ModioError;
 use serenity::Error as SerenityError;
 
+use crate::dbl::Error as DblError;
+
 #[derive(Debug)]
 pub enum Error {
     Message(String),
     Io(IoError),
     Modio(ModioError),
+    Dbl(DblError),
     Database(DatabaseError),
     Serenity(SerenityError),
     Env(&'static str, VarError),
@@ -35,6 +38,7 @@ impl fmt::Display for Error {
             Error::Database(DatabaseError::Query(e)) => e.fmt(fmt),
             Error::Database(DatabaseError::Migrations(e)) => e.fmt(fmt),
             Error::Modio(e) => e.fmt(fmt),
+            Error::Dbl(e) => e.fmt(fmt),
             Error::Env(key, VarError::NotPresent) => {
                 write!(fmt, "Environment variable '{}' not found", key)
             }
@@ -66,6 +70,12 @@ impl From<IoError> for Error {
 impl From<ModioError> for Error {
     fn from(e: ModioError) -> Error {
         Error::Modio(e)
+    }
+}
+
+impl From<DblError> for Error {
+    fn from(e: DblError) -> Error {
+        Error::Dbl(e)
     }
 }
 

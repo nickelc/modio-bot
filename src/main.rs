@@ -29,6 +29,7 @@ mod macros;
 
 mod commands;
 mod db;
+mod dbl;
 mod error;
 #[rustfmt::skip]
 mod schema;
@@ -40,6 +41,7 @@ use util::*;
 
 const DATABASE_URL: &str = "DATABASE_URL";
 const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
+const DBL_TOKEN: &str = "DBL_TOKEN";
 const MODIO_HOST: &str = "MODIO_HOST";
 const MODIO_API_KEY: &str = "MODIO_API_KEY";
 const MODIO_TOKEN: &str = "MODIO_TOKEN";
@@ -67,6 +69,10 @@ fn try_main() -> CliResult {
     let list_subs_cmd = subs::List::new(modio.clone(), rt.executor());
     let subscribe_cmd = subs::Subscribe::new(modio.clone(), rt.executor());
     let unsubscribe_cmd = subs::Unsubscribe::new(modio.clone(), rt.executor());
+
+    if let Ok(token) = util::var(DBL_TOKEN) {
+        rt.spawn(dbl::task(&token, rt.executor())?);
+    }
 
     rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
 
