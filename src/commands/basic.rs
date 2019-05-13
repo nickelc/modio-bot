@@ -140,3 +140,20 @@ impl Command for Prefix {
         Ok(())
     }
 }
+
+pub struct Vote;
+
+impl Command for Vote {
+    fn options(&self) -> Arc<CommandOptions> {
+        Arc::new(CommandOptions {
+            desc: Some("Get link to vote for Modbot on Discord Bot List".to_string()),
+            ..Default::default()
+        })
+    }
+
+    fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
+        let profile = crate::dbl::get_profile();
+        msg.channel_id.say(format!("{}/vote", profile))?;
+        Ok(())
+    }
+}

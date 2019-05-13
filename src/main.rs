@@ -86,10 +86,14 @@ fn try_main() -> CliResult {
             })
             .simple_bucket("simple", 1)
             .group("General", |g| {
-                g.cmd("about", commands::basic::About)
+                let mut g = g.cmd("about", commands::basic::About)
                     .cmd("prefix", commands::basic::Prefix)
                     .cmd("invite", commands::basic::Invite)
-                    .cmd("guide", commands::basic::Guide)
+                    .cmd("guide", commands::basic::Guide);
+                if dbl::is_dbl_enabled() {
+                    g = g.cmd("vote", commands::basic::Vote);
+                }
+                g
             })
             .group("mod.io", |g| {
                 g.cmd("games", games_cmd)
