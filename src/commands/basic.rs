@@ -21,6 +21,13 @@ impl Command for About {
 
     fn execute(&self, ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
         serenity::http::raw::get_current_user().and_then(|u| {
+            let dbl = if crate::dbl::is_dbl_enabled() {
+                let profile = crate::dbl::get_profile();
+                let value = format!("[Profile]({}) | [Vote]({0}/vote)", profile);
+                Some(("discordbots.org", value, true))
+            } else {
+                None
+            };
             msg.channel_id.send_message(|m| {
                 m.embed(|e| {
                     e.author(|a| {
@@ -51,6 +58,11 @@ impl Command for About {
                         true,
                     )
                     .field(
+                        "Github",
+                        "[nickelc/modio-bot](https://github.com/nickelc/modio-bot)",
+                        true,
+                    )
+                    .field(
                         "Version",
                         format!(
                             "{} ({})",
@@ -59,11 +71,7 @@ impl Command for About {
                         ),
                         true,
                     )
-                    .field(
-                        "Github",
-                        "[nickelc/modio-bot](https://github.com/nickelc/modio-bot)",
-                        true,
-                    )
+                    .fields(dbl)
                 })
             })
         })?;

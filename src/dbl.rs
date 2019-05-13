@@ -14,6 +14,7 @@ use tokio::timer::Interval;
 
 use crate::util;
 
+const DBL_BASE_URL: &str = "https://discordbots.org/bot";
 const DBL: &str = "https://discordbots.org/api/bots";
 const MIN: Duration = Duration::from_secs(1 * 60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
@@ -91,11 +92,19 @@ impl From<ReqwestError> for Error {
 }
 // }}}
 
+pub fn is_dbl_enabled() -> bool {
+    util::var(crate::DBL_TOKEN).is_ok()
+}
+
 pub fn get_bot_id() -> u64 {
     util::var(crate::DBL_OVERRIDE_BOT_ID)
         .ok()
         .and_then(|id| id.parse::<u64>().ok())
         .unwrap_or_else(|| *CACHE.read().user.id.as_u64())
+}
+
+pub fn get_profile() -> String {
+    format!("{}/{}", DBL_BASE_URL, get_bot_id())
 }
 
 pub fn task(
