@@ -12,6 +12,8 @@ use serenity::CACHE;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
+use crate::util;
+
 const DBL: &str = "https://discordbots.org/api/bots";
 const MIN: Duration = Duration::from_secs(1 * 60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
@@ -89,6 +91,13 @@ impl From<ReqwestError> for Error {
 }
 // }}}
 
+pub fn get_bot_id() -> u64 {
+    util::var(crate::DBL_OVERRIDE_BOT_ID)
+        .ok()
+        .and_then(|id| id.parse::<u64>().ok())
+        .unwrap_or_else(|| *CACHE.read().user.id.as_u64())
+}
+
 pub fn task(
     token: &str,
     executor: TaskExecutor,
@@ -97,7 +106,7 @@ pub fn task(
 
     Ok(Interval::new(Instant::now() + MIN, SIX_HOURS)
         .for_each(move |_| {
-            let bot = *CACHE.read().user.id.as_u64();
+            let bot = get_bot_id();
             let servers = CACHE.read().guilds.len();
             let task = client
                 .update_stats(bot, servers)

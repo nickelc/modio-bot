@@ -42,6 +42,7 @@ use util::*;
 const DATABASE_URL: &str = "DATABASE_URL";
 const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
 const DBL_TOKEN: &str = "DBL_TOKEN";
+const DBL_OVERRIDE_BOT_ID: &str = "DBL_OVERRIDE_BOT_ID";
 const MODIO_HOST: &str = "MODIO_HOST";
 const MODIO_API_KEY: &str = "MODIO_API_KEY";
 const MODIO_TOKEN: &str = "MODIO_TOKEN";
