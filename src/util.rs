@@ -102,7 +102,15 @@ pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
         .get::<GuildStatsKey>()
         .expect("failed to get guild stats");
 
-    (stats.len(), stats.values().sum())
+    // ignore Discord Bot List server
+    let dbl = GuildId(264445053596991498);
+
+    stats
+        .iter()
+        .filter(|&(&id, _)| dbl != id)
+        .fold((0, 0), |(count, sum), (_, members)| {
+            (count + 1, sum + members)
+        })
 }
 
 pub fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
