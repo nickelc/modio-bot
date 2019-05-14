@@ -33,6 +33,7 @@ mod dbl;
 mod error;
 #[rustfmt::skip]
 mod schema;
+mod tools;
 mod util;
 
 use commands::subs;
@@ -59,6 +60,10 @@ fn main() {
 fn try_main() -> CliResult {
     dotenv().ok();
     env_logger::init();
+
+    if tools::tools() {
+        return Ok(());
+    }
 
     let (mut client, modio, mut rt) = util::initialize()?;
 
