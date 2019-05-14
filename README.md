@@ -43,10 +43,16 @@ MODBOT is written in Rust, so you'll need to grab a [Rust installation][rust-lan
 Building is easy:
 
 ```
+$ mkdir bot-compile
+$ cd bot-compile
 $ git clone https://github.com/nickelc/modio-bot
 $ cd modio-bot
 $ cargo build --release
-$ ./target/release/modbot
+$ cp target/release/modbot /home/modbot/
+$ chown modbot:modbot /home/modbot/modbot
+$ sudo su modbot 
+$ cd ~
+$ ./modbot &
 ```
 
 ### Building with bundled sqlite3
