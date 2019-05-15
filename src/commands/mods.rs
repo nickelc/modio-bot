@@ -1,6 +1,7 @@
 use either::Either;
 use futures::future;
 use modio::filter::prelude::*;
+use modio::games::Game;
 use modio::mods::filters::Popular as PopularFilter;
 use modio::mods::{Mod, Statistics};
 
@@ -173,13 +174,15 @@ fn list_mods(
 }
 
 pub trait ModExt {
+    fn create_new_mod_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
+
     fn create_message(&self, _: CreateMessage) -> CreateMessage;
 
-    fn create_fields(&self) -> Vec<EmbedField>;
+    fn create_fields(&self, is_new: bool) -> Vec<EmbedField>;
 }
 
 impl ModExt for Mod {
-    fn create_fields(&self) -> Vec<EmbedField> {
+    fn create_fields(&self, is_new: bool) -> Vec<EmbedField> {
         fn ratings(stats: &Statistics) -> EmbedField {
             (
                 "Ratings",
@@ -233,18 +236,23 @@ Download: {}"#,
                 true,
             )
         }
-        fn tags(m: &Mod) -> EmbedField {
+        fn tags(m: &Mod, inline: bool) -> EmbedField {
             let tags = m
                 .tags
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            ("Tags", tags, false)
+            ("Tags", tags, inline)
         }
-        let mut fields = vec![ratings(&self.stats), info(self), dates(self)];
+
+        let mut fields = if is_new {
+            vec![info(self)]
+        } else {
+            vec![ratings(&self.stats), info(self), dates(self)]
+        };
         if !self.tags.is_empty() {
-            fields.push(tags(self))
+            fields.push(tags(self, is_new))
         }
         fields
     }
@@ -256,7 +264,23 @@ Download: {}"#,
                 .author(|a| self.submitted_by.create_author(a))
                 .description(self.summary.to_string())
                 .thumbnail(&self.logo.thumb_320x180)
-                .fields(self.create_fields())
+                .fields(self.create_fields(false))
+        })
+    }
+
+    fn create_new_mod_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+        m.embed(|e| {
+            e.title(&self.name)
+                .url(&self.profile_url)
+                .description(&self.summary)
+                .image(&self.logo.thumb_640x360)
+                .author(|a| {
+                    a.name(&game.name)
+                        .icon_url(&game.icon.thumb_64x64.to_string())
+                        .url(&game.profile_url.to_string())
+                })
+                .footer(|f| self.submitted_by.create_footer(f))
+                .fields(self.create_fields(true))
         })
     }
 }

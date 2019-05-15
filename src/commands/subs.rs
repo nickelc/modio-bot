@@ -170,7 +170,9 @@ impl<'a> Notification<'a> {
                         .author(|a| {
                             a.name(&game.name)
                                 .icon_url(&game.icon.thumb_64x64.to_string())
+                                .url(&game.profile_url.to_string())
                         })
+                        .footer(|f| self.mod_.submitted_by.create_footer(f))
                         .fields(changelog)
                 })
             };
@@ -179,7 +181,7 @@ impl<'a> Notification<'a> {
             EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
             EventType::ModAvailable => {
                 let m = m.content("A new mod is available. :tada:");
-                self.mod_.create_message(m)
+                self.mod_.create_new_mod_message(game, m)
             }
             EventType::ModUnavailable => create_embed(m, "The mod is now unavailable.", None),
             EventType::ModfileChanged => {

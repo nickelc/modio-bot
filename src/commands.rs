@@ -1,5 +1,5 @@
 use modio::users::User;
-use serenity::builder::CreateEmbedAuthor;
+use serenity::builder::{CreateEmbedAuthor, CreateEmbedFooter};
 use serenity::framework::standard::CommandError;
 
 pub type CommandResult = Result<(), CommandError>;
@@ -33,6 +33,8 @@ pub use mods::{ListMods, ModInfo, Popular};
 
 pub trait UserExt {
     fn create_author(&self, _: CreateEmbedAuthor) -> CreateEmbedAuthor;
+
+    fn create_footer(&self, _: CreateEmbedFooter) -> CreateEmbedFooter;
 }
 
 impl UserExt for User {
@@ -43,5 +45,13 @@ impl UserExt for User {
             a = a.icon_url(&icon);
         }
         a
+    }
+
+    fn create_footer(&self, mut f: CreateEmbedFooter) -> CreateEmbedFooter {
+        f = f.text(&self.username);
+        if let Some(avatar) = &self.avatar {
+            f = f.icon_url(&avatar.thumb_50x50.to_string());
+        }
+        f
     }
 }
