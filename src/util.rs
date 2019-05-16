@@ -103,7 +103,7 @@ pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
         .expect("failed to get guild stats");
 
     // ignore Discord Bot List server
-    let dbl = GuildId(264445053596991498);
+    let dbl = GuildId(264_445_053_596_991_498);
 
     stats
         .iter()

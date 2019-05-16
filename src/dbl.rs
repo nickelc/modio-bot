@@ -16,7 +16,7 @@ use crate::util;
 
 const DBL_BASE_URL: &str = "https://discordbots.org/bot";
 const DBL: &str = "https://discordbots.org/api/bots";
-const MIN: Duration = Duration::from_secs(1 * 60);
+const MIN: Duration = Duration::from_secs(60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
 
 struct DblClient {
