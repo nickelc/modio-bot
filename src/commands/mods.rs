@@ -49,19 +49,19 @@ command!(
                 Ok(id) => Id::eq(id),
                 Err(_) => Fulltext::eq(args.rest()),
             };
-            let task = self
-                .modio
-                .game(game_id)
-                .mods()
-                .list(&filter)
-                .and_then(move |list| {
+            let game = self.modio.game(game_id);
+            let mods = game.mods().list(&filter);
+            let task = game
+                .get()
+                .join(mods)
+                .and_then(move |(game, list)| {
                     let ret = match list.count {
                         0 => {
                             Some(channel.say("no mods found."))
                         }
                         1 => {
                             let mod_ = &list[0];
-                            Some(channel.send_message(|m| mod_.create_message(m)))
+                            Some(channel.send_message(|m| mod_.create_message(&game, m)))
                         }
                         _ => {
                             let mods = list.into_iter().fold(ContentBuilder::default(), |mut buf, mod_| {
@@ -176,7 +176,7 @@ fn list_mods(
 pub trait ModExt {
     fn create_new_mod_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
 
-    fn create_message(&self, _: CreateMessage) -> CreateMessage;
+    fn create_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
 
     fn create_fields(&self, is_new: bool) -> Vec<EmbedField>;
 }
@@ -257,13 +257,18 @@ Download: {}"#,
         fields
     }
 
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
+    fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
         m.embed(|e| {
             e.title(self.name.to_string())
                 .url(self.profile_url.to_string())
-                .author(|a| self.submitted_by.create_author(a))
                 .description(self.summary.to_string())
                 .thumbnail(&self.logo.thumb_320x180)
+                .author(|a| {
+                    a.name(&game.name)
+                        .icon_url(&game.icon.thumb_64x64.to_string())
+                        .url(&game.profile_url.to_string())
+                })
+                .footer(|f| self.submitted_by.create_footer(f))
                 .fields(self.create_fields(false))
         })
     }
