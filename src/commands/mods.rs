@@ -236,14 +236,14 @@ Download: {}"#,
                 true,
             )
         }
-        fn tags(m: &Mod, inline: bool) -> EmbedField {
+        fn tags(m: &Mod) -> EmbedField {
             let tags = m
                 .tags
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            ("Tags", tags, inline)
+            ("Tags", tags, true)
         }
 
         let mut fields = if is_new {
@@ -252,7 +252,7 @@ Download: {}"#,
             vec![ratings(&self.stats), info(self), dates(self)]
         };
         if !self.tags.is_empty() {
-            fields.push(tags(self, is_new))
+            fields.push(tags(self))
         }
         fields
     }
