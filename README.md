@@ -17,6 +17,11 @@ ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
 You can invite the officially hosted ModBot to join your Discord server using the following URL https://discordbot.mod.io, or you can build and install your own version of ModBot by following the instructions below.
 
+ * Invite the ModBot https://discordbot.mod.io/
+ * View the games list `~games` and set the default game `~game Foundation` (for example)
+ * In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe Foundation` (for example
+ * Ensure the bot has `Read Messages`, `Send Messages`, `Embed Links` and `Read Message History` [permissions](https://image.mod.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.51.27_am.png) in the channel(s) it is in to be able to function correctly
+
 ## Commands
 
 By default `~` is the prefix used to issue commands to ModBot. Once you have invited ModBot to your server, you can set the default game using the command `~game ID`. Now when a user issues the command `~mods`, all of the mods for the game you specified will be returned. You can change the default game at any time.
