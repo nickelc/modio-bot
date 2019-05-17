@@ -54,7 +54,7 @@ impl Command for About {
                     )
                     .field(
                         "modbot Discord",
-                        "[discord.gg/4akZJFf](https://discord.gg/4akZJFf)",
+                        "[discord.gg/XNX9665](https://discord.gg/XNX9665)",
                         true,
                     )
                     .field(
