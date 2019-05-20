@@ -130,7 +130,7 @@ fn try_main() -> CliResult {
                 DispatchError::RateLimited(_) => {
                     let _ = msg.channel_id.say("Try again in 1 second.");
                 }
-                _ => {}
+                e => eprintln!("Dispatch error: {:?}", e),
             })
             .help(workaround::help),
     );
