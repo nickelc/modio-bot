@@ -189,7 +189,19 @@ impl Command for Servers {
                 );
                 buf
             });
-        let _ = msg.channel_id.say(buf);
+        match msg.author.direct_message(move |m| m.content(buf)) {
+            Ok(_) => {
+                if msg.guild_id.is_some() {
+                    let _ = msg.react('\u{01F44C}'); // :ok_hand:
+                }
+            }
+            Err(e) => {
+                eprintln!("Error sending server list: {:?}", e);
+                let _ = msg
+                    .channel_id
+                    .say("There was a problem sending you the server list.");
+            }
+        }
         Ok(())
     }
 }
