@@ -82,16 +82,24 @@ fn try_main() -> CliResult {
 
     rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
 
+    let owners = match serenity::http::get_current_application_info() {
+        Ok(info) => vec![info.owner.id].into_iter().collect(),
+        Err(e) => panic!("Couldn't get application info: {}", e),
+    };
+
     client.with_framework(
         StandardFramework::new()
             .configure(|c| {
                 c.prefix("~")
                     .dynamic_prefix(util::dynamic_prefix)
                     .on_mention(true)
+                    .owners(owners)
             })
             .simple_bucket("simple", 1)
+            .group("Owner", |g| g.cmd("servers", commands::basic::Servers))
             .group("General", |g| {
-                let mut g = g.cmd("about", commands::basic::About)
+                let mut g = g
+                    .cmd("about", commands::basic::About)
                     .cmd("prefix", commands::basic::Prefix)
                     .cmd("invite", commands::basic::Invite)
                     .cmd("guide", commands::basic::Guide);

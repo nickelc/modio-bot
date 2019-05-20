@@ -4,6 +4,7 @@ use serenity::client::Context;
 use serenity::framework::standard::{Args, Command, CommandOptions};
 use serenity::model::channel::Message;
 use serenity::model::permissions::Permissions;
+use serenity::CACHE;
 
 use crate::commands::CommandResult;
 use crate::db::Settings;
@@ -154,6 +155,41 @@ impl Command for Vote {
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
         let profile = crate::dbl::get_profile();
         msg.channel_id.say(format!("{}/vote", profile))?;
+        Ok(())
+    }
+}
+
+pub struct Servers;
+
+impl Command for Servers {
+    fn options(&self) -> Arc<CommandOptions> {
+        Arc::new(CommandOptions {
+            owners_only: true,
+            dm_only: true,
+            help_available: false,
+            ..Default::default()
+        })
+    }
+
+    fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
+        use std::fmt::Write;
+
+        let buf = CACHE
+            .read()
+            .guilds
+            .values()
+            .fold(String::new(), |mut buf, guild| {
+                let guild = guild.read();
+                let _ = writeln!(
+                    &mut buf,
+                    "- {} (id: {}, members: {})",
+                    guild.name,
+                    guild.id,
+                    guild.members.len(),
+                );
+                buf
+            });
+        let _ = msg.channel_id.say(buf);
         Ok(())
     }
 }
