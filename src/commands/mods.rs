@@ -13,13 +13,20 @@ command!(
         let game_id = msg.guild_id.and_then(|id| {
             Settings::game(ctx, id)
         });
+        let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
+
         if let Some(id) = game_id {
-            let opts = Default::default();
+            let filter = Default::default();
+            let game = self.modio.game(id);
+            let mods = game.mods();
             let task = list_mods(
-                self.modio.game(id).mods(),
-                &opts,
+                game,
+                mods,
+                &filter,
                 None,
                 channel,
+                "Mods",
+                item,
             );
 
             self.executor.spawn(task);
@@ -106,13 +113,30 @@ command!(
         let game_id = msg.guild_id.and_then(|id| {
             Settings::game(ctx, id)
         });
+        let item = |m: &Mod| {
+            format!(
+                "{:02}. [{}]({}) ({}) +{}/-{}\n",
+                m.stats.popularity.rank_position,
+                m.name,
+                m.profile_url,
+                m.id,
+                m.stats.ratings.positive,
+                m.stats.ratings.negative,
+            )
+        };
+
         if let Some(id) = game_id {
             let filter = with_limit(10).order_by(PopularFilter::desc());
+            let game = self.modio.game(id);
+            let mods = game.mods();
             let task = list_mods(
-                self.modio.game(id).mods(),
+                game,
+                mods,
                 &filter,
                 Some(10),
                 channel,
+                "Popular Mods",
+                item,
             );
 
             self.executor.spawn(task);
@@ -130,12 +154,18 @@ command!(
     }
 );
 
-fn list_mods(
+fn list_mods<F>(
+    game: modio::games::GameRef,
     mods: modio::mods::Mods,
     filter: &Filter,
     limit: Option<usize>,
     channel: ChannelId,
-) -> impl Future<Item = (), Error = ()> + Send + 'static {
+    title: &'static str,
+    item: F,
+) -> impl Future<Item = (), Error = ()> + Send + 'static
+where
+    F: Fn(&Mod) -> String + Send + 'static,
+{
     let mut limit = limit;
     mods.iter(filter)
         .take_while(move |_| match limit.as_mut() {
@@ -146,11 +176,12 @@ fn list_mods(
             }
             None => Ok(true),
         })
-        .fold(ContentBuilder::default(), |mut buf, mod_| {
-            let _ = buf.write_str(&format!("{}. {}\n", mod_.id, mod_.name));
+        .fold(ContentBuilder::default(), move |mut buf, mod_| {
+            let _ = buf.write_str(&item(&mod_));
             future::ok::<_, modio::Error>(buf)
         })
-        .and_then(move |mods| {
+        .join(game.get())
+        .and_then(move |(mods, game)| {
             if mods.is_empty() {
                 let ret = channel.say("no mods found.");
                 if let Err(e) = ret {
@@ -158,8 +189,15 @@ fn list_mods(
                 }
             } else {
                 for content in mods {
-                    let ret =
-                        channel.send_message(|m| m.embed(|e| e.title("Mods").description(content)));
+                    let ret = channel.send_message(|m| {
+                        m.embed(|e| {
+                            e.title(title).description(content).author(|a| {
+                                a.name(&game.name)
+                                    .icon_url(&game.icon.thumb_64x64.to_string())
+                                    .url(&game.profile_url.to_string())
+                            })
+                        })
+                    });
                     if let Err(e) = ret {
                         eprintln!("{:?}", e);
                     }
