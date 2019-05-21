@@ -190,18 +190,20 @@ impl<'a> Notification<'a> {
                     .modfile
                     .as_ref()
                     .map(|f| {
-                        let link = f.download.binary_url.to_string();
-                        let version = f
+                        let link = &f.download.binary_url;
+                        let no_version = || format!("[Download]({})", link);
+                        let version = |v| format!("[Version {}]({})", v, link);
+                        let download = f
                             .version
                             .as_ref()
                             .filter(|v| !v.is_empty())
-                            .map_or_else(String::new, |v| format!(" to {}", v));
+                            .map_or_else(no_version, version);
                         let changelog = f
                             .changelog
                             .as_ref()
                             .filter(|c| !c.is_empty())
                             .map(|c| ("Changelog", c.to_owned(), true));
-                        let desc = format!("The primary file [has changed]({}){}.", link, version);
+                        let desc = format!("A new version is available. {}", download);
 
                         (desc, changelog)
                     })
