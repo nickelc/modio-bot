@@ -228,7 +228,7 @@ pub fn task(
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
                     EventType::ModfileChanged,
-                    EventType::ModEdited,
+                    // EventType::ModEdited,
                     EventType::ModDeleted,
                     EventType::ModAvailable,
                     EventType::ModUnavailable,
