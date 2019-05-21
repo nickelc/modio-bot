@@ -219,7 +219,7 @@ pub fn current_timestamp() -> u64 {
 }
 
 pub fn format_timestamp(seconds: i64) -> impl fmt::Display {
-    NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M:%S")
+    NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M")
 }
 
 pub fn var(key: &'static str) -> Result<String> {

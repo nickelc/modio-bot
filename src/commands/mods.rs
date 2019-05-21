@@ -1,4 +1,3 @@
-use either::Either;
 use futures::future;
 use modio::filter::prelude::*;
 use modio::games::Game;
@@ -183,8 +182,8 @@ pub trait ModExt {
 
 impl ModExt for Mod {
     fn create_fields(&self, is_new: bool) -> Vec<EmbedField> {
-        fn ratings(stats: &Statistics) -> EmbedField {
-            (
+        fn ratings(stats: &Statistics) -> Option<EmbedField> {
+            Some((
                 "Ratings",
                 format!(
                     r#"- Rank: {}/{}
@@ -199,62 +198,54 @@ impl ModExt for Mod {
                     stats.ratings.negative,
                 ),
                 true,
-            )
+            ))
         }
-        fn dates(m: &Mod) -> EmbedField {
+        fn dates(m: &Mod) -> Option<EmbedField> {
             let added = format_timestamp(m.date_added as i64);
             let updated = format_timestamp(m.date_updated as i64);
-            (
+            Some((
                 "Dates",
-                format!(
-                    r#"- Created: {}
-- Updated: {}"#,
-                    added, updated,
-                ),
+                format!("- Created: {}\n- Updated: {}", added, updated),
                 true,
-            )
+            ))
         }
-        fn info(m: &Mod) -> EmbedField {
-            let homepage = if let Some(homepage) = &m.homepage_url {
-                Either::Left(format!("\nHomepage: {}\n", homepage))
+        fn info(m: &Mod) -> Option<EmbedField> {
+            let mut info = String::from("Links: ");
+            if let Some(homepage) = &m.homepage_url {
+                let _ = write!(info, "[Homepage]({}), ", homepage);
+            }
+            if let Some(f) = &m.modfile {
+                let _ = writeln!(info, "[Download]({})", f.download.binary_url);
+                if let Some(version) = &f.version {
+                    let _ = writeln!(info, "Version: {}", version);
+                }
+                let _ = writeln!(info, "Size: {}", bytesize::to_string(f.filesize, false));
+            }
+            if info.len() > 7 {
+                Some(("Info", info, true))
             } else {
-                Either::Right("")
-            };
-            let download = if let Some(f) = &m.modfile {
-                Either::Left(format!("[{}]({})", f.filename, f.download.binary_url))
-            } else {
-                Either::Right("No file available")
-            };
-            (
-                "Info",
-                format!(
-                    r#"Id: {}
-Name-Id: {}{}
-Download: {}"#,
-                    m.id, m.name_id, homepage, download,
-                ),
-                true,
-            )
+                None
+            }
         }
-        fn tags(m: &Mod) -> EmbedField {
+        fn tags(m: &Mod) -> Option<EmbedField> {
+            if m.tags.is_empty() {
+                return None;
+            }
             let tags = m
                 .tags
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            ("Tags", tags, true)
+            Some(("Tags", tags, true))
         }
 
-        let mut fields = if is_new {
-            vec![info(self)]
+        let fields = if is_new {
+            vec![info(self), tags(self)]
         } else {
-            vec![ratings(&self.stats), info(self), dates(self)]
+            vec![ratings(&self.stats), info(self), dates(self), tags(self)]
         };
-        if !self.tags.is_empty() {
-            fields.push(tags(self))
-        }
-        fields
+        fields.into_iter().flatten().collect()
     }
 
     fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
