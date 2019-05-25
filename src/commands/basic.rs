@@ -20,7 +20,7 @@ impl Command for About {
         })
     }
 
-    fn execute(&self, ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
+    fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> CommandResult {
         serenity::http::raw::get_current_user().and_then(|u| {
             let dbl = if crate::dbl::is_dbl_enabled() {
                 let profile = crate::dbl::get_profile();
@@ -39,7 +39,7 @@ impl Command for About {
                         a
                     })
                     .footer(|f| {
-                        let (guilds, users) = guild_stats(ctx);
+                        let (guilds, users) = guild_stats();
                         f.text(format!("Servers: {} | Users: {}", guilds, users))
                     })
                     .field(
