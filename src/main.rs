@@ -96,6 +96,10 @@ fn try_main() -> CliResult {
                     .owners(owners)
             })
             .simple_bucket("simple", 1)
+            .before(|_, msg, _| {
+                log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
+                true
+            })
             .group("Owner", |g| g.cmd("servers", commands::basic::Servers))
             .group("General", |g| {
                 let mut g = g
