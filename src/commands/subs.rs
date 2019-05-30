@@ -148,7 +148,7 @@ struct Notification<'a> {
 }
 
 impl<'a> Notification<'a> {
-    fn new(event: &'a Event, user: &'a User, mod_: &'a Mod) -> Notification<'a> {
+    fn new((event, (user, mod_)): (&'a Event, (&'a User, &'a Mod))) -> Notification<'a> {
         Notification { event, user, mod_ }
     }
 
@@ -271,22 +271,19 @@ pub fn task(
                         let users = users.iter(&UserId::_in(uid)).collect();
 
                         Either::B(game.join(mods).join(users).and_then(
-                            move |((game, mut mods), users)| {
-                                mods.sort_by(|a, b| {
-                                    events
-                                        .iter()
-                                        .position(|e| e.mod_id == a.id)
-                                        .cmp(&events.iter().position(|e| e.mod_id == b.id))
-                                });
+                            move |((game, mods), users)| {
+                                let mods = events
+                                    .iter()
+                                    .map(|e| mods.iter().find(|m| m.id == e.mod_id))
+                                    .flatten();
                                 let users = events
                                     .iter()
                                     .map(|e| users.iter().find(|u| u.id == e.user_id))
                                     .flatten();
                                 let it = events
                                     .iter()
-                                    .zip(users)
-                                    .zip(mods.iter())
-                                    .map(|((e, u), m)| Notification::new(e, u, m))
+                                    .zip(users.zip(mods))
+                                    .map(Notification::new)
                                     .filter(|n| !n.is_ignored());
                                 for n in it {
                                     for (channel, _) in &channels {
