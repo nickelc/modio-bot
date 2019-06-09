@@ -205,6 +205,19 @@ impl<'a> Notification<'a> {
                             .changelog
                             .as_ref()
                             .filter(|c| !c.is_empty())
+                            .map(|c| {
+                                let it = c.char_indices().scan(0, |state, (pos, c)| {
+                                    let len = *state + c.len_utf8();
+                                    if len <= 1024 {
+                                        *state = len;
+                                        Some(pos + c.len_utf8())
+                                    } else {
+                                        None
+                                    }
+                                });
+                                let pos = it.max().unwrap_or_default();
+                                &c[..pos]
+                            })
                             .map(|c| ("Changelog", c.to_owned(), true));
                         let desc = format!("A new version is available. {}", download);
 
