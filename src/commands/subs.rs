@@ -95,6 +95,7 @@ command!(
 
     options(opts) {
         opts.desc = Some("Subscribe the current channel to mod updates of a game".to_string());
+        opts.aliases = vec!["sub".to_string()];
         opts.min_args = Some(1);
         opts.required_permissions = Permissions::MANAGE_CHANNELS;
     }
@@ -136,6 +137,7 @@ command!(
 
     options(opts) {
         opts.desc = Some("Unsubscribe the current channel from mod updates of a game".to_string());
+        opts.aliases = vec!["unsub".to_string()];
         opts.min_args = Some(1);
         opts.required_permissions = Permissions::MANAGE_CHANNELS;
     }
