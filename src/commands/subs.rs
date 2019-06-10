@@ -208,16 +208,15 @@ impl<'a> Notification<'a> {
                             .as_ref()
                             .filter(|c| !c.is_empty())
                             .map(|c| {
-                                let it = c.char_indices().scan(0, |state, (pos, c)| {
-                                    let len = *state + c.len_utf8();
-                                    if len <= 1024 {
-                                        *state = len;
-                                        Some(pos + c.len_utf8())
+                                let it = c.char_indices().rev().scan(c.len(), |state, (pos, _)| {
+                                    if *state > 1024 {
+                                        *state = pos;
+                                        Some(pos)
                                     } else {
                                         None
                                     }
                                 });
-                                let pos = it.max().unwrap_or_default();
+                                let pos = it.last().unwrap_or(c.len());
                                 &c[..pos]
                             })
                             .map(|c| ("Changelog", c.to_owned(), true));
