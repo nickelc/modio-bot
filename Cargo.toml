@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 bytesize = "1"
 chrono = "0.4"
+dbl-rs = "0.1"
 dotenv = "0.13"
 env_logger = "0.6"
 futures = "0.1"

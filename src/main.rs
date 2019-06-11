@@ -77,6 +77,7 @@ fn try_main() -> CliResult {
     let unsubscribe_cmd = subs::Unsubscribe::new(modio.clone(), rt.executor());
 
     if let Ok(token) = util::var(DBL_TOKEN) {
+        log::info!("Spawning DBL task");
         rt.spawn(dbl::task(&token, rt.executor())?);
     }
 

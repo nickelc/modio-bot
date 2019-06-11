@@ -2,13 +2,12 @@ use std::env::VarError;
 use std::fmt;
 use std::io::Error as IoError;
 
+use dbl::Error as DblError;
 use diesel::r2d2::PoolError;
 use diesel::result::Error as QueryError;
 use diesel_migrations::RunMigrationsError;
 use modio::Error as ModioError;
 use serenity::Error as SerenityError;
-
-use crate::dbl::Error as DblError;
 
 #[derive(Debug)]
 pub enum Error {

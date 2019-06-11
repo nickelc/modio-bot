@@ -1,96 +1,18 @@
-use std::collections::HashMap;
-use std::fmt;
 use std::time::{Duration, Instant};
 
-use futures::future::{self, Either};
+use dbl::{types::ShardStats, Client};
 use futures::{Future, Stream};
 use log::error;
-use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue, AUTHORIZATION};
-use reqwest::r#async::Client;
-use reqwest::Error as ReqwestError;
 use serenity::CACHE;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
+use crate::error::Error;
 use crate::util;
 
 const DBL_BASE_URL: &str = "https://discordbots.org/bot";
-const DBL: &str = "https://discordbots.org/api/bots";
 const MIN: Duration = Duration::from_secs(60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
-
-struct DblClient {
-    client: Client,
-}
-
-impl DblClient {
-    fn new(token: &str) -> Result<DblClient, Error> {
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, HeaderValue::from_str(token)?);
-
-        let client = Client::builder().default_headers(headers).build()?;
-
-        Ok(DblClient { client })
-    }
-
-    fn update_stats(&self, bot: u64, servers: usize) -> impl Future<Item = (), Error = Error> {
-        let mut data = HashMap::new();
-        data.insert("server_count", servers);
-
-        self.client
-            .post(&format!("{}/{}/stats", DBL, bot))
-            .json(&data)
-            .send()
-            .and_then(move |r| {
-                if r.status().is_success() {
-                    log::info!("Update bot stats [servers={}]", servers);
-
-                    Either::A(future::ok(()))
-                } else {
-                    Either::B(r.into_body().concat2().and_then(move |body| {
-                        if let Ok(s) = std::str::from_utf8(&body) {
-                            log::error!("Failed to update bot stats: {}", s);
-                        } else {
-                            log::error!("Failed to update bot stats");
-                        }
-                        Ok(())
-                    }))
-                }
-            })
-            .map_err(Error::from)
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Http(InvalidHeaderValue),
-    Client(ReqwestError),
-}
-
-// impl StdError, Display, From for Error {{{
-impl std::error::Error for Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Client(e) => e.fmt(f),
-            Error::Http(e) => e.fmt(f),
-        }
-    }
-}
-
-impl From<InvalidHeaderValue> for Error {
-    fn from(e: InvalidHeaderValue) -> Error {
-        Error::Http(e)
-    }
-}
-
-impl From<ReqwestError> for Error {
-    fn from(e: ReqwestError) -> Error {
-        Error::Client(e)
-    }
-}
-// }}}
 
 pub fn is_dbl_enabled() -> bool {
     util::var(crate::DBL_TOKEN).is_ok()
@@ -111,14 +33,22 @@ pub fn task(
     token: &str,
     executor: TaskExecutor,
 ) -> Result<impl Future<Item = (), Error = ()>, Error> {
-    let client = DblClient::new(token)?;
+    let client = Client::new(token.to_owned()).map_err(Error::Dbl)?;
 
     Ok(Interval::new(Instant::now() + MIN, SIX_HOURS)
         .for_each(move |_| {
             let bot = get_bot_id();
             let servers = CACHE.read().guilds.len();
+            let stats = ShardStats::Cumulative {
+                server_count: servers as u64,
+                shard_count: None,
+            };
+
             let task = client
-                .update_stats(bot, servers)
+                .update_stats(bot, stats)
+                .map(move |_| {
+                    log::info!("Update bot stats [servers={}]", servers);
+                })
                 .map_err(|e| error!("Failed to update bot stats: {:?}", e));
 
             executor.spawn(task);
