@@ -66,9 +66,10 @@ impl Command for About {
                     .field(
                         "Version",
                         format!(
-                            "{} ({})",
+                            "{} ([{}](https://github.com/nickelc/modio-bot/commit/{}))",
                             env!("CARGO_PKG_VERSION"),
                             env!("VERGEN_SHA_SHORT"),
+                            env!("VERGEN_SHA"),
                         ),
                         true,
                     )
