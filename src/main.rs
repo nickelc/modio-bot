@@ -127,10 +127,10 @@ fn try_main() -> CliResult {
                 DispatchError::NotEnoughArguments { .. } => {
                     let _ = msg.channel_id.say("Not enough arguments.");
                 }
-                DispatchError::LackingRole | DispatchError::LackOfPermissions(_) => {
+                DispatchError::LackOfPermissions(_) => {
                     let _ = msg
                         .channel_id
-                        .say("You have insufficient rights for this command.");
+                        .say("You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
                 }
                 DispatchError::RateLimited(_) => {
                     let _ = msg.channel_id.say("Try again in 1 second.");
