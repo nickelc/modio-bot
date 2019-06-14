@@ -137,31 +137,8 @@ fn try_main() -> CliResult {
                 }
                 e => eprintln!("Dispatch error: {:?}", e),
             })
-            .help(workaround::help),
+            .help(help_commands::with_embeds),
     );
     client.start()?;
     Ok(())
-}
-
-mod workaround {
-    use std::collections::HashMap;
-    use std::sync::Arc;
-
-    use super::help_commands;
-    use serenity::client::Context;
-    use serenity::framework::standard::{Args, CommandError, CommandGroup, HelpOptions};
-    use serenity::model::channel::Message;
-
-    pub fn help(
-        ctx: &mut Context,
-        msg: &Message,
-        options: &HelpOptions,
-        commands: HashMap<String, Arc<CommandGroup>>,
-        args: &Args,
-    ) -> Result<(), CommandError> {
-        if msg.author.bot {
-            return Ok(());
-        }
-        help_commands::with_embeds(ctx, msg, options, commands, args)
-    }
 }
