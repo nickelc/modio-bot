@@ -17,13 +17,14 @@ pub mod prelude {
     pub use serenity::model::channel::Message;
     pub use serenity::model::id::ChannelId;
 
-    pub use super::{CommandResult, EmbedField, UserExt};
+    pub use super::{CommandResult, EmbedField /*, UserExt*/};
     pub use crate::db::Settings;
     pub use crate::error::Error;
     pub use crate::util::{format_timestamp, Identifier};
 }
 
 pub mod basic;
+/*
 mod game;
 mod mods;
 pub mod subs;
@@ -55,3 +56,4 @@ impl UserExt for User {
         f
     }
 }
+*/

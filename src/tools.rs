@@ -58,7 +58,7 @@ mod print {
     impl EventHandler for Handler {
         fn ready(&self, ctx: Context, ready: Ready) {
             let guilds = ready.guilds.len();
-            let mut data = ctx.data.lock();
+            let mut data = ctx.data.write();
             let mut counter = data
                 .get_mut::<GuildCounter>()
                 .expect("failed to get GuildCounter")
@@ -69,7 +69,7 @@ mod print {
         }
 
         fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
-            let mut data = ctx.data.lock();
+            let mut data = ctx.data.write();
             let mut counter = data
                 .get_mut::<GuildCounter>()
                 .expect("failed to get GuildCounter")
@@ -97,7 +97,7 @@ mod print {
 
             let mut client = Client::new(&token, Handler).expect("failed to create client");
             {
-                let mut data = client.data.lock();
+                let mut data = client.data.write();
                 data.insert::<GuildCounter>(thread_counter);
             }
             client.start().expect("failed to start client");

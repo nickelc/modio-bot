@@ -1,9 +1,11 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use dbl::{types::ShardStats, Client};
 use futures::{Future, Stream};
 use log::error;
-use serenity::CACHE;
+use serenity::cache::Cache;
+use serenity::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
@@ -18,27 +20,29 @@ pub fn is_dbl_enabled() -> bool {
     util::var(crate::DBL_TOKEN).is_ok()
 }
 
-pub fn get_bot_id() -> u64 {
+fn get_bot_id(bot: u64) -> u64 {
     util::var(crate::DBL_OVERRIDE_BOT_ID)
         .ok()
         .and_then(|id| id.parse::<u64>().ok())
-        .unwrap_or_else(|| *CACHE.read().user.id.as_u64())
+        .unwrap_or(bot)
 }
 
-pub fn get_profile() -> String {
-    format!("{}/{}", DBL_BASE_URL, get_bot_id())
+pub fn get_profile(bot: u64) -> String {
+    format!("{}/{}", DBL_BASE_URL, get_bot_id(bot))
 }
 
 pub fn task(
+    bot: u64,
+    cache: Arc<RwLock<Cache>>,
     token: &str,
     executor: TaskExecutor,
 ) -> Result<impl Future<Item = (), Error = ()>, Error> {
+    let bot = get_bot_id(bot);
     let client = Client::new(token.to_owned()).map_err(Error::Dbl)?;
 
     Ok(Interval::new(Instant::now() + MIN, SIX_HOURS)
         .for_each(move |_| {
-            let bot = get_bot_id();
-            let servers = CACHE.read().guilds.len();
+            let servers = cache.read().guilds.len();
             let stats = ShardStats::Cumulative {
                 server_count: servers as u64,
                 shard_count: None,

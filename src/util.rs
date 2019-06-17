@@ -9,11 +9,10 @@ use log::info;
 use modio::auth::Credentials;
 use modio::Modio;
 use serenity::model::channel::Message;
-use serenity::model::gateway::{Game, Ready};
+use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
-use serenity::CACHE;
 use tokio::runtime::Runtime;
 
 use crate::db::{init_db, load_settings, load_subscriptions, DbPool, Settings, Subscriptions};
@@ -43,7 +42,7 @@ pub struct Handler;
 impl EventHandler for Handler {
     fn ready(&self, ctx: Context, ready: Ready) {
         let (settings, subs) = {
-            let data = ctx.data.lock();
+            let data = ctx.data.read();
             let pool = data
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
@@ -57,19 +56,19 @@ impl EventHandler for Handler {
 
             (settings, subs)
         };
-        let mut data = ctx.data.lock();
+        let mut data = ctx.data.write();
         data.insert::<Settings>(settings);
         data.insert::<Subscriptions>(subs);
 
-        let game = Game::playing(&format!("~help| @{} help", ready.user.name));
-        ctx.set_game(game);
+        let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
+        ctx.set_activity(game);
     }
 }
 
-pub fn guild_stats() -> (usize, usize) {
+pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
     // ignore Discord Bot List server
     let dbl = GuildId(264_445_053_596_991_498);
-    CACHE
+    ctx.cache
         .read()
         .guilds
         .iter()
@@ -230,7 +229,7 @@ pub fn initialize() -> Result<(Client, Modio, Runtime)> {
 
     let client = Client::new(&token, Handler)?;
     {
-        let mut data = client.data.lock();
+        let mut data = client.data.write();
         data.insert::<PoolKey>(pool);
     }
 
