@@ -48,6 +48,7 @@ use commands::{Game, ListGames, ListMods, ModInfo, Popular};
 */
 use commands::basic::*;
 use commands::game::*;
+use commands::mods::*;
 use commands::subs::*;
 use util::*;
 
@@ -79,10 +80,6 @@ fn try_main() -> CliResult {
     let (mut client, modio, mut rt) = util::initialize()?;
 
     /*
-    let mods_cmd = ListMods::new(modio.clone(), rt.executor());
-    let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
-    let popular_cmd = Popular::new(modio.clone(), rt.executor());
-
     rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
     */
 
@@ -114,18 +111,6 @@ fn try_main() -> CliResult {
             .group(&OWNER_GROUP)
             .group(if dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
             .group(&MODIO_GROUP)
-            /*
-            .group("mod.io", |g| {
-                g.cmd("games", games_cmd)
-                    .cmd("game", game_cmd)
-                    .cmd("mods", mods_cmd)
-                    .cmd("mod", mod_cmd)
-                    .cmd("popular", popular_cmd)
-                    .cmd("subscriptions", list_subs_cmd)
-                    .cmd("subscribe", subscribe_cmd)
-                    .cmd("unsubscribe", unsubscribe_cmd)
-            })
-            */
             .on_dispatch_error(|ctx, msg, error| match error {
                 DispatchError::NotEnoughArguments { .. } => {
                     let _ = msg.channel_id.say(ctx, "Not enough arguments.");
@@ -161,7 +146,7 @@ group!({
 group!({
     name: "modio",
     options: {},
-    commands: [list_games, game, subscriptions, subscribe, unsubscribe],
+    commands: [list_games, game, list_mods, mod_info, popular, subscriptions, subscribe, unsubscribe],
 });
 
 mod with_vote {

@@ -180,11 +180,11 @@ impl<'a> Notification<'a> {
         }
     }
 
-    fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+    fn create_message<'b, 'c>(&self, game: &Game, m: &'c CreateMessage<'b>) -> &'c CreateMessage<'b> {
         use crate::commands::mods::ModExt;
 
         let create_embed =
-            |m: CreateMessage, desc: &str, changelog: Option<(&str, String, bool)>| {
+            |m: CreateMessage<'a>, desc: &str, changelog: Option<(&str, String, bool)>| {
                 m.embed(|e| {
                     e.title(&self.mod_.name)
                         .url(&self.mod_.profile_url)
