@@ -13,19 +13,21 @@ pub mod prelude {
     pub use modio::users::User;
     pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};
     pub use serenity::client::Context;
-    pub use serenity::framework::standard::ArgError;
+    pub use serenity::framework::standard::macros::command;
+    pub use serenity::framework::standard::{ArgError, Args};
     pub use serenity::model::channel::Message;
     pub use serenity::model::id::ChannelId;
 
     pub use super::{CommandResult, EmbedField /*, UserExt*/};
     pub use crate::db::Settings;
     pub use crate::error::Error;
-    pub use crate::util::{format_timestamp, Identifier};
+    pub use crate::util::{format_timestamp, ExecutorKey, Identifier, ModioKey};
 }
 
 pub mod basic;
+
+pub mod game;
 /*
-mod game;
 mod mods;
 pub mod subs;
 

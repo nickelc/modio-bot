@@ -14,6 +14,7 @@ use serenity::model::guild::GuildStatus;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tokio::runtime::Runtime;
+use tokio::runtime::TaskExecutor;
 
 use crate::db::{init_db, load_settings, load_subscriptions, DbPool, Settings, Subscriptions};
 use crate::error::Error;
@@ -35,6 +36,18 @@ pub struct PoolKey;
 
 impl TypeMapKey for PoolKey {
     type Value = DbPool;
+}
+
+pub struct ModioKey;
+
+impl TypeMapKey for ModioKey {
+    type Value = Modio;
+}
+
+pub struct ExecutorKey;
+
+impl TypeMapKey for ExecutorKey {
+    type Value = TaskExecutor;
 }
 
 pub struct Handler;
@@ -225,13 +238,8 @@ pub fn initialize() -> Result<(Client, Modio, Runtime)> {
     let token = var(DISCORD_BOT_TOKEN)?;
     let database_url = var(DATABASE_URL)?;
 
+    let rt = Runtime::new()?;
     let pool = init_db(database_url)?;
-
-    let client = Client::new(&token, Handler)?;
-    {
-        let mut data = client.data.write();
-        data.insert::<PoolKey>(pool);
-    }
 
     let modio = {
         let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
@@ -243,7 +251,13 @@ pub fn initialize() -> Result<(Client, Modio, Runtime)> {
             .map_err(Error::from)?
     };
 
-    let rt = Runtime::new()?;
+    let client = Client::new(&token, Handler)?;
+    {
+        let mut data = client.data.write();
+        data.insert::<PoolKey>(pool);
+        data.insert::<ModioKey>(modio.clone());
+        data.insert::<ExecutorKey>(rt.executor());
+    }
 
     Ok((client, modio, rt))
 }

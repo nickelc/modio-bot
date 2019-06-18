@@ -48,6 +48,7 @@ use commands::subs;
 use commands::{Game, ListGames, ListMods, ModInfo, Popular};
 */
 use commands::basic::*;
+use commands::game::*;
 use util::*;
 
 const DATABASE_URL: &str = "DATABASE_URL";
@@ -78,8 +79,6 @@ fn try_main() -> CliResult {
     let (mut client, modio, mut rt) = util::initialize()?;
 
     /*
-    let games_cmd = ListGames::new(modio.clone(), rt.executor());
-    let game_cmd = Game::new(modio.clone(), rt.executor());
     let mods_cmd = ListMods::new(modio.clone(), rt.executor());
     let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
     let popular_cmd = Popular::new(modio.clone(), rt.executor());
@@ -117,6 +116,7 @@ fn try_main() -> CliResult {
             })
             .group(&OWNER_GROUP)
             .group(if dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
+            .group(&MODIO_GROUP)
             /*
             .group("mod.io", |g| {
                 g.cmd("games", games_cmd)
@@ -159,6 +159,12 @@ group!({
     name: "General",
     options: {},
     commands: [about, prefix, invite, guide],
+});
+
+group!({
+    name: "modio",
+    options: {},
+    commands: [list_games, game],
 });
 
 mod with_vote {
