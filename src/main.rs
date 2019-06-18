@@ -44,11 +44,11 @@ mod tools;
 mod util;
 
 /*
-use commands::subs;
 use commands::{Game, ListGames, ListMods, ModInfo, Popular};
 */
 use commands::basic::*;
 use commands::game::*;
+use commands::subs::*;
 use util::*;
 
 const DATABASE_URL: &str = "DATABASE_URL";
@@ -82,9 +82,6 @@ fn try_main() -> CliResult {
     let mods_cmd = ListMods::new(modio.clone(), rt.executor());
     let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
     let popular_cmd = Popular::new(modio.clone(), rt.executor());
-    let list_subs_cmd = subs::List::new(modio.clone(), rt.executor());
-    let subscribe_cmd = subs::Subscribe::new(modio.clone(), rt.executor());
-    let unsubscribe_cmd = subs::Unsubscribe::new(modio.clone(), rt.executor());
 
     rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
     */
@@ -164,7 +161,7 @@ group!({
 group!({
     name: "modio",
     options: {},
-    commands: [list_games, game],
+    commands: [list_games, game, subscriptions, subscribe, unsubscribe],
 });
 
 mod with_vote {

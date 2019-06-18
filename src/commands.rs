@@ -29,8 +29,9 @@ pub mod basic;
 pub mod game;
 /*
 mod mods;
+*/
 pub mod subs;
-
+/*
 pub use game::{Game, ListGames};
 pub use mods::{ListMods, ModInfo, Popular};
 
