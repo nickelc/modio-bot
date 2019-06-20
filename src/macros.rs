@@ -1,4 +1,3 @@
-#[macro_export]
 macro_rules! command {
     ($cmd:ident($_self:ident, $c:ident) $b:block) => {
         command!(__impl $cmd);

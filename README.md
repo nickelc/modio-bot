@@ -122,7 +122,7 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 [rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
 [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
-[discord]: https://discord.gg/4akZJFf
+[discord]: https://discord.gg/XNX9665
 [discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
 [bot-invite-badge]: https://img.shields.io/static/v1.svg?label=%20&logo=discord&message=Invite%20ModBot&color=7289DA&labelColor=2C2F33
 [bot-invite-url]: https://discordbot.mod.io

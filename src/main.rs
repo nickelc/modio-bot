@@ -29,9 +29,11 @@ mod macros;
 
 mod commands;
 mod db;
+mod dbl;
 mod error;
 #[rustfmt::skip]
 mod schema;
+mod tools;
 mod util;
 
 use commands::subs;
@@ -40,6 +42,8 @@ use util::*;
 
 const DATABASE_URL: &str = "DATABASE_URL";
 const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
+const DBL_TOKEN: &str = "DBL_TOKEN";
+const DBL_OVERRIDE_BOT_ID: &str = "DBL_OVERRIDE_BOT_ID";
 const MODIO_HOST: &str = "MODIO_HOST";
 const MODIO_API_KEY: &str = "MODIO_API_KEY";
 const MODIO_TOKEN: &str = "MODIO_TOKEN";
@@ -57,6 +61,10 @@ fn try_main() -> CliResult {
     dotenv().ok();
     env_logger::init();
 
+    if tools::tools() {
+        return Ok(());
+    }
+
     let (mut client, modio, mut rt) = util::initialize()?;
 
     let games_cmd = ListGames::new(modio.clone(), rt.executor());
@@ -68,7 +76,17 @@ fn try_main() -> CliResult {
     let subscribe_cmd = subs::Subscribe::new(modio.clone(), rt.executor());
     let unsubscribe_cmd = subs::Unsubscribe::new(modio.clone(), rt.executor());
 
+    if let Ok(token) = util::var(DBL_TOKEN) {
+        log::info!("Spawning DBL task");
+        rt.spawn(dbl::task(&token, rt.executor())?);
+    }
+
     rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
+
+    let owners = match serenity::http::get_current_application_info() {
+        Ok(info) => vec![info.owner.id].into_iter().collect(),
+        Err(e) => panic!("Couldn't get application info: {}", e),
+    };
 
     client.with_framework(
         StandardFramework::new()
@@ -76,13 +94,24 @@ fn try_main() -> CliResult {
                 c.prefix("~")
                     .dynamic_prefix(util::dynamic_prefix)
                     .on_mention(true)
+                    .owners(owners)
             })
             .simple_bucket("simple", 1)
+            .before(|_, msg, _| {
+                log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
+                true
+            })
+            .group("Owner", |g| g.cmd("servers", commands::basic::Servers))
             .group("General", |g| {
-                g.cmd("about", commands::basic::About)
+                let mut g = g
+                    .cmd("about", commands::basic::About)
                     .cmd("prefix", commands::basic::Prefix)
                     .cmd("invite", commands::basic::Invite)
-                    .cmd("guide", commands::basic::Guide)
+                    .cmd("guide", commands::basic::Guide);
+                if dbl::is_dbl_enabled() {
+                    g = g.cmd("vote", commands::basic::Vote);
+                }
+                g
             })
             .group("mod.io", |g| {
                 g.cmd("games", games_cmd)
@@ -98,15 +127,15 @@ fn try_main() -> CliResult {
                 DispatchError::NotEnoughArguments { .. } => {
                     let _ = msg.channel_id.say("Not enough arguments.");
                 }
-                DispatchError::LackingRole | DispatchError::LackOfPermissions(_) => {
+                DispatchError::LackOfPermissions(_) => {
                     let _ = msg
                         .channel_id
-                        .say("You have insufficient rights for this command.");
+                        .say("You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
                 }
                 DispatchError::RateLimited(_) => {
                     let _ = msg.channel_id.say("Try again in 1 second.");
                 }
-                _ => {}
+                e => eprintln!("Dispatch error: {:?}", e),
             })
             .help(help_commands::with_embeds),
     );

@@ -10,12 +10,14 @@ keywords = ["modio", "discord"]
 edition = "2018"
 
 [dependencies]
+bytesize = "1"
 chrono = "0.4"
-dotenv = "0.13"
-either = "1.5"
+dbl-rs = "0.1"
+dotenv = "0.14"
 env_logger = "0.6"
 futures = "0.1"
 log = "0.4"
+reqwest = "0.9"
 serenity = "0.5"
 tokio = "0.1"
 

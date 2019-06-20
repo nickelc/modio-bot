@@ -1,6 +1,6 @@
-use either::Either;
 use futures::future;
 use modio::filter::prelude::*;
+use modio::games::Game;
 use modio::mods::filters::Popular as PopularFilter;
 use modio::mods::{Mod, Statistics};
 
@@ -13,13 +13,20 @@ command!(
         let game_id = msg.guild_id.and_then(|id| {
             Settings::game(ctx, id)
         });
+        let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
+
         if let Some(id) = game_id {
-            let opts = Default::default();
+            let filter = Default::default();
+            let game = self.modio.game(id);
+            let mods = game.mods();
             let task = list_mods(
-                self.modio.game(id).mods(),
-                &opts,
+                game,
+                mods,
+                &filter,
                 None,
                 channel,
+                "Mods",
+                item,
             );
 
             self.executor.spawn(task);
@@ -48,19 +55,19 @@ command!(
                 Ok(id) => Id::eq(id),
                 Err(_) => Fulltext::eq(args.rest()),
             };
-            let task = self
-                .modio
-                .game(game_id)
-                .mods()
-                .list(&filter)
-                .and_then(move |list| {
+            let game = self.modio.game(game_id);
+            let mods = game.mods().list(&filter);
+            let task = game
+                .get()
+                .join(mods)
+                .and_then(move |(game, list)| {
                     let ret = match list.count {
                         0 => {
                             Some(channel.say("no mods found."))
                         }
                         1 => {
                             let mod_ = &list[0];
-                            Some(channel.send_message(|m| mod_.create_message(m)))
+                            Some(channel.send_message(|m| mod_.create_message(&game, m)))
                         }
                         _ => {
                             let mods = list.into_iter().fold(ContentBuilder::default(), |mut buf, mod_| {
@@ -106,13 +113,30 @@ command!(
         let game_id = msg.guild_id.and_then(|id| {
             Settings::game(ctx, id)
         });
+        let item = |m: &Mod| {
+            format!(
+                "{:02}. [{}]({}) ({}) +{}/-{}\n",
+                m.stats.popularity.rank_position,
+                m.name,
+                m.profile_url,
+                m.id,
+                m.stats.ratings.positive,
+                m.stats.ratings.negative,
+            )
+        };
+
         if let Some(id) = game_id {
             let filter = with_limit(10).order_by(PopularFilter::desc());
+            let game = self.modio.game(id);
+            let mods = game.mods();
             let task = list_mods(
-                self.modio.game(id).mods(),
+                game,
+                mods,
                 &filter,
                 Some(10),
                 channel,
+                "Popular Mods",
+                item,
             );
 
             self.executor.spawn(task);
@@ -130,12 +154,18 @@ command!(
     }
 );
 
-fn list_mods(
+fn list_mods<F>(
+    game: modio::games::GameRef,
     mods: modio::mods::Mods,
     filter: &Filter,
     limit: Option<usize>,
     channel: ChannelId,
-) -> impl Future<Item = (), Error = ()> + Send + 'static {
+    title: &'static str,
+    item: F,
+) -> impl Future<Item = (), Error = ()> + Send + 'static
+where
+    F: Fn(&Mod) -> String + Send + 'static,
+{
     let mut limit = limit;
     mods.iter(filter)
         .take_while(move |_| match limit.as_mut() {
@@ -146,11 +176,12 @@ fn list_mods(
             }
             None => Ok(true),
         })
-        .fold(ContentBuilder::default(), |mut buf, mod_| {
-            let _ = buf.write_str(&format!("{}. {}\n", mod_.id, mod_.name));
+        .fold(ContentBuilder::default(), move |mut buf, mod_| {
+            let _ = buf.write_str(&item(&mod_));
             future::ok::<_, modio::Error>(buf)
         })
-        .and_then(move |mods| {
+        .join(game.get())
+        .and_then(move |(mods, game)| {
             if mods.is_empty() {
                 let ret = channel.say("no mods found.");
                 if let Err(e) = ret {
@@ -158,8 +189,15 @@ fn list_mods(
                 }
             } else {
                 for content in mods {
-                    let ret =
-                        channel.send_message(|m| m.embed(|e| e.title("Mods").description(content)));
+                    let ret = channel.send_message(|m| {
+                        m.embed(|e| {
+                            e.title(title).description(content).author(|a| {
+                                a.name(&game.name)
+                                    .icon_url(&game.icon.thumb_64x64.to_string())
+                                    .url(&game.profile_url.to_string())
+                            })
+                        })
+                    });
                     if let Err(e) = ret {
                         eprintln!("{:?}", e);
                     }
@@ -172,16 +210,18 @@ fn list_mods(
         })
 }
 
-trait ModExt {
-    fn create_message(&self, _: CreateMessage) -> CreateMessage;
+pub trait ModExt {
+    fn create_new_mod_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
 
-    fn create_fields(&self) -> Vec<EmbedField>;
+    fn create_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
+
+    fn create_fields(&self, is_new: bool) -> Vec<EmbedField>;
 }
 
 impl ModExt for Mod {
-    fn create_fields(&self) -> Vec<EmbedField> {
-        fn ratings(stats: &Statistics) -> EmbedField {
-            (
+    fn create_fields(&self, is_new: bool) -> Vec<EmbedField> {
+        fn ratings(stats: &Statistics) -> Option<EmbedField> {
+            Some((
                 "Ratings",
                 format!(
                     r#"- Rank: {}/{}
@@ -196,63 +236,85 @@ impl ModExt for Mod {
                     stats.ratings.negative,
                 ),
                 true,
-            )
+            ))
         }
-        fn dates(m: &Mod) -> EmbedField {
+        fn dates(m: &Mod) -> Option<EmbedField> {
             let added = format_timestamp(m.date_added as i64);
             let updated = format_timestamp(m.date_updated as i64);
-            (
+            Some((
                 "Dates",
-                format!(
-                    r#"- Created: {}
-- Updated: {}"#,
-                    added, updated,
-                ),
+                format!("- Created: {}\n- Updated: {}", added, updated),
                 true,
-            )
+            ))
         }
-        fn info(m: &Mod) -> EmbedField {
-            let homepage = if let Some(homepage) = &m.homepage_url {
-                Either::Left(format!("\nHomepage: {}\n", homepage))
+        fn info(m: &Mod) -> Option<EmbedField> {
+            let mut info = String::from("Links: ");
+            if let Some(homepage) = &m.homepage_url {
+                let _ = write!(info, "[Homepage]({}), ", homepage);
+            }
+            if let Some(f) = &m.modfile {
+                let _ = writeln!(info, "[Download]({})", f.download.binary_url);
+                if let Some(version) = &f.version {
+                    let _ = writeln!(info, "Version: {}", version);
+                }
+                let _ = writeln!(info, "Size: {}", bytesize::to_string(f.filesize, false));
+            }
+            if info.len() > 7 {
+                Some(("Info", info, true))
             } else {
-                Either::Right("")
-            };
-            let download = if let Some(f) = &m.modfile {
-                Either::Left(format!("[{}]({})", f.filename, f.download.binary_url))
-            } else {
-                Either::Right("No file available")
-            };
-            (
-                "Info",
-                format!(
-                    r#"Id: {}
-Name-Id: {}{}
-Download: {}"#,
-                    m.id, m.name_id, homepage, download,
-                ),
-                true,
-            )
+                None
+            }
         }
-        fn tags(m: &Mod) -> EmbedField {
+        fn tags(m: &Mod) -> Option<EmbedField> {
+            if m.tags.is_empty() {
+                return None;
+            }
             let tags = m
                 .tags
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            ("Tags", tags, false)
+            Some(("Tags", tags, true))
         }
-        vec![ratings(&self.stats), info(self), dates(self), tags(self)]
+
+        let fields = if is_new {
+            vec![info(self), tags(self)]
+        } else {
+            vec![ratings(&self.stats), info(self), dates(self), tags(self)]
+        };
+        fields.into_iter().flatten().collect()
     }
 
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
+    fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
         m.embed(|e| {
             e.title(self.name.to_string())
                 .url(self.profile_url.to_string())
-                .author(|a| self.submitted_by.create_author(a))
                 .description(self.summary.to_string())
                 .thumbnail(&self.logo.thumb_320x180)
-                .fields(self.create_fields())
+                .author(|a| {
+                    a.name(&game.name)
+                        .icon_url(&game.icon.thumb_64x64.to_string())
+                        .url(&game.profile_url.to_string())
+                })
+                .footer(|f| self.submitted_by.create_footer(f))
+                .fields(self.create_fields(false))
+        })
+    }
+
+    fn create_new_mod_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+        m.embed(|e| {
+            e.title(&self.name)
+                .url(&self.profile_url)
+                .description(&self.summary)
+                .image(&self.logo.thumb_640x360)
+                .author(|a| {
+                    a.name(&game.name)
+                        .icon_url(&game.icon.thumb_64x64.to_string())
+                        .url(&game.profile_url.to_string())
+                })
+                .footer(|f| self.submitted_by.create_footer(f))
+                .fields(self.create_fields(true))
         })
     }
 }

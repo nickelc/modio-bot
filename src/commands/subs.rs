@@ -1,12 +1,14 @@
 use std::time::Duration;
 
-use either::{Left, Right};
 use futures::future::{self, Either};
 use futures::{Future, Stream};
 use log::{debug, warn};
 use modio::filter::prelude::*;
+use modio::games::Game;
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{Event, EventType, Mod};
+use modio::users::filters::Id as UserId;
+use modio::users::User;
 use modio::Modio;
 use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
@@ -93,6 +95,7 @@ command!(
 
     options(opts) {
         opts.desc = Some("Subscribe the current channel to mod updates of a game".to_string());
+        opts.aliases = vec!["sub".to_string()];
         opts.min_args = Some(1);
         opts.required_permissions = Permissions::MANAGE_CHANNELS;
     }
@@ -134,6 +137,7 @@ command!(
 
     options(opts) {
         opts.desc = Some("Unsubscribe the current channel from mod updates of a game".to_string());
+        opts.aliases = vec!["unsub".to_string()];
         opts.min_args = Some(1);
         opts.required_permissions = Permissions::MANAGE_CHANNELS;
     }
@@ -141,12 +145,13 @@ command!(
 
 struct Notification<'a> {
     event: &'a Event,
+    user: &'a User,
     mod_: &'a Mod,
 }
 
 impl<'a> Notification<'a> {
-    fn new((event, mod_): (&'a Event, &'a Mod)) -> Notification<'a> {
-        Notification { event, mod_ }
+    fn new((event, (user, mod_)): (&'a Event, (&'a User, &'a Mod))) -> Notification<'a> {
+        Notification { event, user, mod_ }
     }
 
     fn is_ignored(&self) -> bool {
@@ -157,28 +162,74 @@ impl<'a> Notification<'a> {
         }
     }
 
-    fn create_message(&self, m: CreateMessage) -> CreateMessage {
-        let desc = match self.event.event_type {
-            EventType::ModEdited => Left("The mod has been edited."),
-            EventType::ModAvailable => Left("A new mod is available."),
-            EventType::ModUnavailable => Left("The mod is now unavailable."),
-            EventType::ModfileChanged => Right(format!(
-                "The primary file changed. [link]({})",
-                self.mod_
+    fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+        use crate::commands::mods::ModExt;
+
+        let create_embed =
+            |m: CreateMessage, desc: &str, changelog: Option<(&str, String, bool)>| {
+                m.embed(|e| {
+                    e.title(&self.mod_.name)
+                        .url(&self.mod_.profile_url)
+                        .description(desc)
+                        .thumbnail(&self.mod_.logo.thumb_320x180)
+                        .author(|a| {
+                            a.name(&game.name)
+                                .icon_url(&game.icon.thumb_64x64.to_string())
+                                .url(&game.profile_url.to_string())
+                        })
+                        .footer(|f| self.user.create_footer(f))
+                        .fields(changelog)
+                })
+            };
+
+        match self.event.event_type {
+            EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
+            EventType::ModAvailable => {
+                let m = m.content("A new mod is available. :tada:");
+                self.mod_.create_new_mod_message(game, m)
+            }
+            EventType::ModUnavailable => create_embed(m, "The mod is now unavailable.", None),
+            EventType::ModfileChanged => {
+                let (desc, changelog) = self
+                    .mod_
                     .modfile
                     .as_ref()
-                    .map(|f| f.download.binary_url.to_string())
-                    .unwrap_or_default(),
-            )),
-            EventType::ModDeleted => Left("The mod has been permanently deleted."),
-            _ => Left("ignored event"),
-        };
-        m.embed(|e| {
-            e.title(&self.mod_.name)
-                .url(&self.mod_.profile_url)
-                .description(desc)
-                .thumbnail(&self.mod_.logo.thumb_320x180)
-        })
+                    .map(|f| {
+                        let link = &f.download.binary_url;
+                        let no_version = || format!("[Download]({})", link);
+                        let version = |v| format!("[Version {}]({})", v, link);
+                        let download = f
+                            .version
+                            .as_ref()
+                            .filter(|v| !v.is_empty())
+                            .map_or_else(no_version, version);
+                        let changelog = f
+                            .changelog
+                            .as_ref()
+                            .filter(|c| !c.is_empty())
+                            .map(|c| {
+                                let it = c.char_indices().rev().scan(c.len(), |state, (pos, _)| {
+                                    if *state > 1024 {
+                                        *state = pos;
+                                        Some(pos)
+                                    } else {
+                                        None
+                                    }
+                                });
+                                let pos = it.last().unwrap_or(c.len());
+                                &c[..pos]
+                            })
+                            .map(|c| ("Changelog", c.to_owned(), true));
+                        let desc = format!("A new version is available. {}", download);
+
+                        (desc, changelog)
+                    })
+                    .unwrap_or_default();
+                create_embed(m, &desc, changelog)
+            }
+            EventType::ModDeleted => create_embed(m, "The mod has been permanently deleted.", None),
+            _ => create_embed(m, "event ignored", None),
+        }
     }
 }
 
@@ -194,7 +245,7 @@ pub fn task(
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
                     EventType::ModfileChanged,
-                    EventType::ModEdited,
+                    // EventType::ModEdited,
                     EventType::ModDeleted,
                     EventType::ModAvailable,
                     EventType::ModUnavailable,
@@ -214,7 +265,10 @@ pub fn task(
                     "polling events at {} for game={} channels: {:?}",
                     tstamp, game, channels
                 );
-                let mods = modio.game(game).mods();
+
+                let users = modio.users();
+                let game = modio.game(game);
+                let mods = game.mods();
                 let task = mods
                     .events(&filter)
                     .collect()
@@ -222,27 +276,42 @@ pub fn task(
                         if events.is_empty() {
                             return Either::A(future::ok(()));
                         }
-                        let filter = Id::_in(events.iter().map(|e| e.mod_id).collect::<Vec<_>>());
+                        let (mid, uid): (Vec<_>, Vec<_>) =
+                            events.iter().map(|e| (e.mod_id, e.user_id)).unzip();
+                        let filter = Id::_in(mid);
 
-                        Either::B(mods.iter(&filter).collect().and_then(move |mut mods| {
-                            mods.sort_by(|a, b| {
-                                events
+                        let game = game.get();
+                        let mods = mods.iter(&filter).collect();
+                        let users = users.iter(&UserId::_in(uid)).collect();
+
+                        Either::B(game.join(mods).join(users).and_then(
+                            move |((game, mods), users)| {
+                                let mods = events
                                     .iter()
-                                    .position(|e| e.mod_id == a.id)
-                                    .cmp(&events.iter().position(|e| e.mod_id == b.id))
-                            });
-                            let it = events
-                                .iter()
-                                .zip(mods.iter())
-                                .map(Notification::new)
-                                .filter(|n| !n.is_ignored());
-                            for n in it {
-                                for (channel, _) in &channels {
-                                    let _ = channel.send_message(|m| n.create_message(m));
+                                    .map(|e| mods.iter().find(|m| m.id == e.mod_id))
+                                    .flatten();
+                                let users = events
+                                    .iter()
+                                    .map(|e| users.iter().find(|u| u.id == e.user_id))
+                                    .flatten();
+                                let it = events
+                                    .iter()
+                                    .zip(users.zip(mods))
+                                    .map(Notification::new)
+                                    .filter(|n| !n.is_ignored());
+                                for n in it {
+                                    for (channel, _) in &channels {
+                                        debug!(
+                                            "send message to #{}: {} for {:?}",
+                                            channel, n.event.event_type, n.mod_.name,
+                                        );
+                                        let _ =
+                                            channel.send_message(|m| n.create_message(&game, m));
+                                    }
                                 }
-                            }
-                            Ok(())
-                        }))
+                                Ok(())
+                            },
+                        ))
                     })
                     .map_err(|_| ());
 
