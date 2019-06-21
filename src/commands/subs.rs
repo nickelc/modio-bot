@@ -11,6 +11,7 @@ use modio::mods::{Event, EventType, Mod};
 use modio::users::filters::Id as UserId;
 use modio::users::User;
 use modio::Modio;
+use serenity::builder::CreateMessage;
 use serenity::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
@@ -160,15 +161,14 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandR
     Ok(())
 }
 
-/*
-struct Notification<'a> {
-    event: &'a Event,
-    user: &'a User,
-    mod_: &'a Mod,
+struct Notification<'n> {
+    event: &'n Event,
+    user: &'n User,
+    mod_: &'n Mod,
 }
 
-impl<'a> Notification<'a> {
-    fn new((event, (user, mod_)): (&'a Event, (&'a User, &'a Mod))) -> Notification<'a> {
+impl<'n> Notification<'n> {
+    fn new((event, (user, mod_)): (&'n Event, (&'n User, &'n Mod))) -> Notification<'n> {
         Notification { event, user, mod_ }
     }
 
@@ -180,11 +180,15 @@ impl<'a> Notification<'a> {
         }
     }
 
-    fn create_message<'b, 'c>(&self, game: &Game, m: &'c CreateMessage<'b>) -> &'c CreateMessage<'b> {
+    fn create_message<'a, 'b>(
+        &self,
+        game: &Game,
+        m: &'b mut CreateMessage<'a>,
+    ) -> &'b mut CreateMessage<'a> {
         use crate::commands::mods::ModExt;
 
         let create_embed =
-            |m: CreateMessage<'a>, desc: &str, changelog: Option<(&str, String, bool)>| {
+            |m: &'b mut CreateMessage<'a>, desc: &str, changelog: Option<(&str, String, bool)>| {
                 m.embed(|e| {
                     e.title(&self.mod_.name)
                         .url(&self.mod_.profile_url)
@@ -257,6 +261,13 @@ pub fn task(
     exec: TaskExecutor,
 ) -> impl Future<Item = (), Error = ()> {
     let data = client.data.clone();
+    let http = client.cache_and_http.http.clone();
+    let (tx, rx) = mpsc::channel::<(ChannelId, CreateMessage<'_>)>();
+
+    std::thread::spawn(move || loop {
+        let (channel, mut msg) = rx.recv().unwrap();
+        let _ = channel.send_message(&http, |_| &mut msg);
+    });
 
     Interval::new_interval(INTERVAL_DURATION)
         .fold(util::current_timestamp(), move |tstamp, _| {
@@ -270,7 +281,7 @@ pub fn task(
                 ]))
                 .order_by(Id::asc());
 
-            let data = data.lock();
+            let data = data.read();
             let Subscriptions(subs) = data
                 .get::<Subscriptions>()
                 .expect("failed to get subscriptions");
@@ -283,7 +294,7 @@ pub fn task(
                     "polling events at {} for game={} channels: {:?}",
                     tstamp, game, channels
                 );
-
+                let tx = tx.clone();
                 let users = modio.users();
                 let game = modio.game(game);
                 let mods = game.mods();
@@ -323,8 +334,9 @@ pub fn task(
                                             "send message to #{}: {} for {:?}",
                                             channel, n.event.event_type, n.mod_.name,
                                         );
-                                        let _ =
-                                            channel.send_message(|m| n.create_message(&game, m));
+                                        let mut msg = CreateMessage::default();
+                                        n.create_message(&game, &mut msg);
+                                        tx.send((*channel, msg)).unwrap();
                                     }
                                 }
                                 Ok(())
@@ -342,4 +354,3 @@ pub fn task(
         .map(|_| ())
         .map_err(|e| warn!("interval errored: {}", e))
 }
-*/

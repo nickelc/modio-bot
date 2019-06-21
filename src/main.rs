@@ -79,9 +79,7 @@ fn try_main() -> CliResult {
 
     let (mut client, modio, mut rt) = util::initialize()?;
 
-    /*
-    rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
-    */
+    rt.spawn(task(&client, modio.clone(), rt.executor()));
 
     let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
