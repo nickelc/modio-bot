@@ -31,9 +31,6 @@ use serenity::framework::standard::{
 };
 use serenity::model::prelude::*;
 
-#[macro_use]
-mod macros;
-
 mod commands;
 mod db;
 mod dbl;
@@ -43,9 +40,6 @@ mod schema;
 mod tools;
 mod util;
 
-/*
-use commands::{Game, ListGames, ListMods, ModInfo, Popular};
-*/
 use commands::basic::*;
 use commands::game::*;
 use commands::mods::*;

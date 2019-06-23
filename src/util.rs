@@ -137,10 +137,6 @@ impl ContentBuilder {
             limit,
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.content.is_empty()
-    }
 }
 
 impl Default for ContentBuilder {
