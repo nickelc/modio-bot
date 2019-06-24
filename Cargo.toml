@@ -1,6 +1,6 @@
 [package]
 name = "modbot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Discord bot for https://mod.io"
 readme = "README.md"
 repository = "https://github.com/nickelc/modio-bot"
