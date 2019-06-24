@@ -238,7 +238,7 @@ impl<'n> Notification<'n> {
                                         None
                                     }
                                 });
-                                let pos = it.last().unwrap_or(c.len());
+                                let pos = it.last().unwrap_or_else(|| c.len());
                                 &c[..pos]
                             })
                             .map(|c| ("Changelog", c.to_owned(), true));
