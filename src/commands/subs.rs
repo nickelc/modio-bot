@@ -8,8 +8,6 @@ use modio::filter::prelude::*;
 use modio::games::Game;
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{Event, EventType, Mod};
-use modio::users::filters::Id as UserId;
-use modio::users::User;
 use modio::Modio;
 use serenity::builder::CreateMessage;
 use serenity::prelude::*;
@@ -163,13 +161,12 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandR
 
 struct Notification<'n> {
     event: &'n Event,
-    user: &'n User,
     mod_: &'n Mod,
 }
 
 impl<'n> Notification<'n> {
-    fn new((event, (user, mod_)): (&'n Event, (&'n User, &'n Mod))) -> Notification<'n> {
-        Notification { event, user, mod_ }
+    fn new((event, mod_): (&'n Event, &'n Mod)) -> Notification<'n> {
+        Notification { event, mod_ }
     }
 
     fn is_ignored(&self) -> bool {
@@ -199,7 +196,7 @@ impl<'n> Notification<'n> {
                                 .icon_url(&game.icon.thumb_64x64.to_string())
                                 .url(&game.profile_url.to_string())
                         })
-                        .footer(|f| self.user.create_footer(f))
+                        .footer(|f| self.mod_.submitted_by.create_footer(f))
                         .fields(changelog)
                 })
             };
@@ -295,7 +292,6 @@ pub fn task(
                     tstamp, game, channels
                 );
                 let tx = tx.clone();
-                let users = modio.users();
                 let game = modio.game(game);
                 let mods = game.mods();
                 let task = mods
@@ -305,27 +301,21 @@ pub fn task(
                         if events.is_empty() {
                             return Either::A(future::ok(()));
                         }
-                        let (mid, uid): (Vec<_>, Vec<_>) =
-                            events.iter().map(|e| (e.mod_id, e.user_id)).unzip();
+                        let mid: Vec<_> = events.iter().map(|e| e.mod_id).collect();
                         let filter = Id::_in(mid);
 
                         let game = game.get();
                         let mods = mods.iter(&filter).collect();
-                        let users = users.iter(&UserId::_in(uid)).collect();
 
-                        Either::B(game.join(mods).join(users).and_then(
-                            move |((game, mods), users)| {
+                        Either::B(game.join(mods).and_then(
+                            move |(game, mods)| {
                                 let mods = events
                                     .iter()
                                     .map(|e| mods.iter().find(|m| m.id == e.mod_id))
                                     .flatten();
-                                let users = events
-                                    .iter()
-                                    .map(|e| users.iter().find(|u| u.id == e.user_id))
-                                    .flatten();
                                 let it = events
                                     .iter()
-                                    .zip(users.zip(mods))
+                                    .zip(mods)
                                     .map(Notification::new)
                                     .filter(|n| !n.is_ignored());
                                 for n in it {
