@@ -17,7 +17,6 @@ dotenv = "0.14"
 env_logger = "0.6"
 futures = "0.1"
 log = "0.4"
-reqwest = "0.9"
 serenity = "0.7"
 tokio = "0.1"
 
