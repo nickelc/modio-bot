@@ -1,6 +1,6 @@
 [package]
 name = "modbot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Discord bot for https://mod.io"
 readme = "README.md"
 repository = "https://github.com/nickelc/modio-bot"
@@ -18,7 +18,7 @@ env_logger = "0.6"
 futures = "0.1"
 log = "0.4"
 reqwest = "0.9"
-serenity = "0.5"
+serenity = "0.7"
 tokio = "0.1"
 
 [dependencies.modio]
@@ -41,6 +41,3 @@ vergen = "3"
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
-
-[patch.crates-io]
-openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }

@@ -1,4 +1,5 @@
-use futures::future;
+use std::sync::mpsc::{self, Receiver, Sender};
+
 use modio::filter::prelude::*;
 use modio::games::Game;
 use modio::mods::filters::Popular as PopularFilter;
@@ -7,165 +8,152 @@ use modio::mods::{Mod, Statistics};
 use crate::commands::prelude::*;
 use crate::util::ContentBuilder;
 
-command!(
-    ListMods(self, ctx, msg) {
-        let channel = msg.channel_id;
-        let game_id = msg.guild_id.and_then(|id| {
-            Settings::game(ctx, id)
-        });
-        let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
+#[command("mods")]
+#[description = "List mods of the default game"]
+#[only_in(guilds)]
+#[bucket = "simple"]
+#[max_args(0)]
+pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
+    let channel = msg.channel_id;
+    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
 
-        if let Some(id) = game_id {
-            let filter = Default::default();
-            let game = self.modio.game(id);
-            let mods = game.mods();
-            let task = list_mods(
-                game,
-                mods,
-                &filter,
-                None,
-                channel,
-                "Mods",
-                item,
-            );
+    let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
 
-            self.executor.spawn(task);
-        } else {
-            let _ = channel.say("default game is not set.");
-        }
+    if let Some(id) = game_id {
+        let data = ctx.data.read();
+        let modio = data.get::<ModioKey>().expect("get modio failed");
+        let exec = data.get::<ExecutorKey>().expect("get exec failed");
+        let (tx, rx) = mpsc::channel();
+
+        let filter = Default::default();
+        let game = modio.game(id);
+        let mods = game.mods();
+
+        let task = find_mods(game, mods, &filter, None, tx);
+
+        exec.spawn(task);
+
+        send_mods(&mut ctx.clone(), channel, rx, "Mods", item);
+    } else {
+        let _ = channel.say(&ctx, "default game is not set.");
     }
+    Ok(())
+}
 
-    options(opts) {
-        opts.desc = Some("List mods of the default game".to_string());
-        opts.usage = Some("mods".to_string());
-        opts.guild_only = true;
-        opts.bucket = Some("simple".to_string());
-        opts.max_args = Some(0);
-    }
-);
+#[command("mod")]
+#[description = "Search mods or show the details for a single mod."]
+#[usage = "mod <id|search>"]
+#[only_in(guilds)]
+#[bucket = "simple"]
+#[min_args(1)]
+pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+    let channel = msg.channel_id;
+    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
 
-command!(
-    ModInfo(self, ctx, msg, args) {
-        let channel = msg.channel_id;
-        let game_id = msg.guild_id.and_then(|id| {
-            Settings::game(ctx, id)
-        });
-        if let Some(game_id) = game_id {
-            let filter = match args.single::<u32>() {
-                Ok(id) => Id::eq(id),
-                Err(_) => Fulltext::eq(args.rest()),
-            };
-            let game = self.modio.game(game_id);
-            let mods = game.mods().list(&filter);
-            let task = game
-                .get()
-                .join(mods)
-                .and_then(move |(game, list)| {
-                    let ret = match list.count {
-                        0 => {
-                            Some(channel.say("no mods found."))
-                        }
-                        1 => {
-                            let mod_ = &list[0];
-                            Some(channel.send_message(|m| mod_.create_message(&game, m)))
-                        }
-                        _ => {
-                            let mods = list.into_iter().fold(ContentBuilder::default(), |mut buf, mod_| {
-                                let _ = writeln!(&mut buf, "{}. {}", mod_.id, mod_.name);
-                                buf
-                            });
-                            for content in mods {
-                                let ret = channel.send_message(|m| {
-                                    m.embed(|e| e.title("Matching mods").description(content))
-                                });
-                                if let Err(e) = ret {
-                                    eprintln!("{:?}", e);
-                                }
-                            }
-                            None
-                        }
-                    };
-                    if let Some(Err(e)) = ret {
-                        eprintln!("{:?}", e);
-                    }
-                    Ok(())
-                })
-                .map_err(|e| {
-                    eprintln!("{}", e)
-                });
+    if let Some(game_id) = game_id {
+        let data = ctx.data.read();
+        let modio = data.get::<ModioKey>().expect("get modio failed");
+        let exec = data.get::<ExecutorKey>().expect("get exec failed");
+        let (tx, rx) = mpsc::channel();
 
-            self.executor.spawn(task);
-        }
-    }
-
-    options(opts) {
-        opts.desc = Some("Search mods or show the details for a single mod.".to_string());
-        opts.usage = Some("mod <id|search>".to_string());
-        opts.guild_only = true;
-        opts.bucket = Some("simple".to_string());
-        opts.min_args = Some(1);
-    }
-);
-
-command!(
-    Popular(self, ctx, msg) {
-        let channel = msg.channel_id;
-        let game_id = msg.guild_id.and_then(|id| {
-            Settings::game(ctx, id)
-        });
-        let item = |m: &Mod| {
-            format!(
-                "{:02}. [{}]({}) ({}) +{}/-{}\n",
-                m.stats.popularity.rank_position,
-                m.name,
-                m.profile_url,
-                m.id,
-                m.stats.ratings.positive,
-                m.stats.ratings.negative,
-            )
+        let filter = match args.single::<u32>() {
+            Ok(id) => Id::eq(id),
+            Err(_) => Fulltext::eq(args.rest()),
         };
 
-        if let Some(id) = game_id {
-            let filter = with_limit(10).order_by(PopularFilter::desc());
-            let game = self.modio.game(id);
-            let mods = game.mods();
-            let task = list_mods(
-                game,
-                mods,
-                &filter,
-                Some(10),
-                channel,
-                "Popular Mods",
-                item,
-            );
+        let game = modio.game(game_id);
+        let mods = game.mods().list(&filter);
+        let task = game
+            .get()
+            .join(mods)
+            .and_then(move |(game, list)| {
+                tx.send((game, list)).unwrap();
+                Ok(())
+            })
+            .map_err(|e| eprintln!("{}", e));
 
-            self.executor.spawn(task);
-        } else {
-            let _ = channel.say("default game is not set.");
+        exec.spawn(task);
+
+        let (game, list) = rx.recv().unwrap();
+        let ret = match list.count {
+            0 => Some(channel.say(&ctx, "no mods found.")),
+            1 => {
+                let mod_ = &list[0];
+                Some(channel.send_message(&ctx, |m| mod_.create_message(&game, m)))
+            }
+            _ => {
+                let mods = list
+                    .into_iter()
+                    .fold(ContentBuilder::default(), |mut buf, mod_| {
+                        let _ = writeln!(&mut buf, "{}. {}", mod_.id, mod_.name);
+                        buf
+                    });
+                for content in mods {
+                    let ret = channel.send_message(&ctx, |m| {
+                        m.embed(|e| e.title("Matching mods").description(content))
+                    });
+                    if let Err(e) = ret {
+                        eprintln!("{:?}", e);
+                    }
+                }
+                None
+            }
+        };
+        if let Some(Err(e)) = ret {
+            eprintln!("{:?}", e);
         }
     }
+    Ok(())
+}
 
-    options(opts) {
-        opts.desc = Some("List popular mods.".to_string());
-        opts.usage = Some("popular".to_string());
-        opts.guild_only = true;
-        opts.bucket = Some("simple".to_string());
-        opts.max_args = Some(0);
+#[command]
+#[description = "List popular mods."]
+#[only_in(guilds)]
+#[bucket = "simple"]
+#[max_args(0)]
+pub fn popular(ctx: &mut Context, msg: &Message) -> CommandResult {
+    let channel = msg.channel_id;
+    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
+
+    let item = |m: &Mod| {
+        format!(
+            "{:02}. [{}]({}) ({}) +{}/-{}\n",
+            m.stats.popularity.rank_position,
+            m.name,
+            m.profile_url,
+            m.id,
+            m.stats.ratings.positive,
+            m.stats.ratings.negative,
+        )
+    };
+
+    if let Some(id) = game_id {
+        let data = ctx.data.read();
+        let modio = data.get::<ModioKey>().expect("get modio failed");
+        let exec = data.get::<ExecutorKey>().expect("get exec failed");
+        let (tx, rx) = mpsc::channel();
+
+        let filter = with_limit(10).order_by(PopularFilter::desc());
+        let game = modio.game(id);
+        let mods = game.mods();
+        let task = find_mods(game, mods, &filter, Some(10), tx);
+
+        exec.spawn(task);
+
+        send_mods(&mut ctx.clone(), channel, rx, "Popular Mods", item);
+    } else {
+        let _ = channel.say(&ctx, "default game is not set.");
     }
-);
+    Ok(())
+}
 
-fn list_mods<F>(
+fn find_mods(
     game: modio::games::GameRef,
     mods: modio::mods::Mods,
     filter: &Filter,
     limit: Option<usize>,
-    channel: ChannelId,
-    title: &'static str,
-    item: F,
-) -> impl Future<Item = (), Error = ()> + Send + 'static
-where
-    F: Fn(&Mod) -> String + Send + 'static,
-{
+    tx: Sender<(Game, Vec<Mod>)>,
+) -> impl Future<Item = (), Error = ()> + Send + 'static {
     let mut limit = limit;
     mods.iter(filter)
         .take_while(move |_| match limit.as_mut() {
@@ -176,33 +164,10 @@ where
             }
             None => Ok(true),
         })
-        .fold(ContentBuilder::default(), move |mut buf, mod_| {
-            let _ = buf.write_str(&item(&mod_));
-            future::ok::<_, modio::Error>(buf)
-        })
+        .collect()
         .join(game.get())
         .and_then(move |(mods, game)| {
-            if mods.is_empty() {
-                let ret = channel.say("no mods found.");
-                if let Err(e) = ret {
-                    eprintln!("{:?}", e);
-                }
-            } else {
-                for content in mods {
-                    let ret = channel.send_message(|m| {
-                        m.embed(|e| {
-                            e.title(title).description(content).author(|a| {
-                                a.name(&game.name)
-                                    .icon_url(&game.icon.thumb_64x64.to_string())
-                                    .url(&game.profile_url.to_string())
-                            })
-                        })
-                    });
-                    if let Err(e) = ret {
-                        eprintln!("{:?}", e);
-                    }
-                }
-            };
+            tx.send((game, mods)).unwrap();
             Ok(())
         })
         .map_err(|e| {
@@ -210,10 +175,57 @@ where
         })
 }
 
-pub trait ModExt {
-    fn create_new_mod_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
+fn send_mods<F>(
+    ctx: &mut Context,
+    channel: ChannelId,
+    rx: Receiver<(Game, Vec<Mod>)>,
+    title: &'static str,
+    item: F,
+) where
+    F: Fn(&Mod) -> String + Send + 'static,
+{
+    let (game, mods) = rx.recv().unwrap();
+    if !mods.is_empty() {
+        let mods = mods
+            .iter()
+            .fold(ContentBuilder::default(), |mut buf, mod_| {
+                let _ = buf.write_str(&item(&mod_));
+                buf
+            });
+        for content in mods {
+            let ret = channel.send_message(&ctx, |m| {
+                m.embed(|e| {
+                    e.title(title).description(content).author(|a| {
+                        a.name(&game.name)
+                            .icon_url(&game.icon.thumb_64x64.to_string())
+                            .url(&game.profile_url.to_string())
+                    })
+                })
+            });
+            if let Err(e) = ret {
+                eprintln!("{:?}", e);
+            }
+        }
+    } else {
+        let ret = channel.say(&ctx, "no mods found.");
+        if let Err(e) = ret {
+            eprintln!("{:?}", e);
+        }
+    }
+}
 
-    fn create_message(&self, _: &Game, _: CreateMessage) -> CreateMessage;
+pub trait ModExt {
+    fn create_new_mod_message<'a, 'b>(
+        &self,
+        _: &Game,
+        _: &'b mut CreateMessage<'a>,
+    ) -> &'b mut CreateMessage<'a>;
+
+    fn create_message<'a, 'b>(
+        &self,
+        _: &Game,
+        _: &'b mut CreateMessage<'a>,
+    ) -> &'b mut CreateMessage<'a>;
 
     fn create_fields(&self, is_new: bool) -> Vec<EmbedField>;
 }
@@ -286,7 +298,11 @@ impl ModExt for Mod {
         fields.into_iter().flatten().collect()
     }
 
-    fn create_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+    fn create_message<'a, 'b>(
+        &self,
+        game: &Game,
+        m: &'b mut CreateMessage<'a>,
+    ) -> &'b mut CreateMessage<'a> {
         m.embed(|e| {
             e.title(self.name.to_string())
                 .url(self.profile_url.to_string())
@@ -302,7 +318,11 @@ impl ModExt for Mod {
         })
     }
 
-    fn create_new_mod_message(&self, game: &Game, m: CreateMessage) -> CreateMessage {
+    fn create_new_mod_message<'a, 'b>(
+        &self,
+        game: &Game,
+        m: &'b mut CreateMessage<'a>,
+    ) -> &'b mut CreateMessage<'a> {
         m.embed(|e| {
             e.title(&self.name)
                 .url(&self.profile_url)

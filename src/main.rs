@@ -1,19 +1,3 @@
-//! ![MODBOT logo][logo]
-//!
-//! ![Rust version][rust-version]
-//! ![Rust edition][rust-edition]
-//! ![License][license-badge]
-//!
-//! MODBOT is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
-//!
-//!
-//! [rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
-//! [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
-//! [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
-//! [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
-//! [mod.io]: https://mod.io
-//! [`modio-rs`]: https://github.com/nickelc/modio-rs
-//! [`serenity`]: https://github.com/serenity-rs/serenity
 #![deny(rust_2018_idioms)]
 
 #[macro_use]
@@ -21,11 +5,15 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-use dotenv::dotenv;
-use serenity::framework::standard::{help_commands, DispatchError, StandardFramework};
+use std::collections::HashSet;
 
-#[macro_use]
-mod macros;
+use dotenv::dotenv;
+use serenity::client::Context;
+use serenity::framework::standard::macros::{group, help};
+use serenity::framework::standard::{
+    help_commands, Args, CommandGroup, CommandResult, DispatchError, HelpOptions, StandardFramework,
+};
+use serenity::model::prelude::*;
 
 mod commands;
 mod db;
@@ -36,8 +24,10 @@ mod schema;
 mod tools;
 mod util;
 
-use commands::subs;
-use commands::{Game, ListGames, ListMods, ModInfo, Popular};
+use commands::basic::*;
+use commands::game::*;
+use commands::mods::*;
+use commands::subs::*;
 use util::*;
 
 const DATABASE_URL: &str = "DATABASE_URL";
@@ -67,78 +57,92 @@ fn try_main() -> CliResult {
 
     let (mut client, modio, mut rt) = util::initialize()?;
 
-    let games_cmd = ListGames::new(modio.clone(), rt.executor());
-    let game_cmd = Game::new(modio.clone(), rt.executor());
-    let mods_cmd = ListMods::new(modio.clone(), rt.executor());
-    let mod_cmd = ModInfo::new(modio.clone(), rt.executor());
-    let popular_cmd = Popular::new(modio.clone(), rt.executor());
-    let list_subs_cmd = subs::List::new(modio.clone(), rt.executor());
-    let subscribe_cmd = subs::Subscribe::new(modio.clone(), rt.executor());
-    let unsubscribe_cmd = subs::Unsubscribe::new(modio.clone(), rt.executor());
+    rt.spawn(task(&client, modio.clone(), rt.executor()));
+
+    let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
+        Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
+        Err(e) => panic!("Couldn't get application info: {}", e),
+    };
 
     if let Ok(token) = util::var(DBL_TOKEN) {
         log::info!("Spawning DBL task");
-        rt.spawn(dbl::task(&token, rt.executor())?);
+        let bot = *bot.as_u64();
+        let cache = client.cache_and_http.cache.clone();
+        rt.spawn(dbl::task(bot, cache, &token, rt.executor())?);
     }
-
-    rt.spawn(subs::task(&client, modio.clone(), rt.executor()));
-
-    let owners = match serenity::http::get_current_application_info() {
-        Ok(info) => vec![info.owner.id].into_iter().collect(),
-        Err(e) => panic!("Couldn't get application info: {}", e),
-    };
 
     client.with_framework(
         StandardFramework::new()
             .configure(|c| {
                 c.prefix("~")
                     .dynamic_prefix(util::dynamic_prefix)
-                    .on_mention(true)
+                    .on_mention(Some(bot))
                     .owners(owners)
             })
-            .simple_bucket("simple", 1)
+            .bucket("simple", |b| b.delay(1))
             .before(|_, msg, _| {
                 log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
                 true
             })
-            .group("Owner", |g| g.cmd("servers", commands::basic::Servers))
-            .group("General", |g| {
-                let mut g = g
-                    .cmd("about", commands::basic::About)
-                    .cmd("prefix", commands::basic::Prefix)
-                    .cmd("invite", commands::basic::Invite)
-                    .cmd("guide", commands::basic::Guide);
-                if dbl::is_dbl_enabled() {
-                    g = g.cmd("vote", commands::basic::Vote);
-                }
-                g
-            })
-            .group("mod.io", |g| {
-                g.cmd("games", games_cmd)
-                    .cmd("game", game_cmd)
-                    .cmd("mods", mods_cmd)
-                    .cmd("mod", mod_cmd)
-                    .cmd("popular", popular_cmd)
-                    .cmd("subscriptions", list_subs_cmd)
-                    .cmd("subscribe", subscribe_cmd)
-                    .cmd("unsubscribe", unsubscribe_cmd)
-            })
-            .on_dispatch_error(|_, msg, error| match error {
+            .group(&OWNER_GROUP)
+            .group(if dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
+            .group(&MODIO_GROUP)
+            .on_dispatch_error(|ctx, msg, error| match error {
                 DispatchError::NotEnoughArguments { .. } => {
-                    let _ = msg.channel_id.say("Not enough arguments.");
+                    let _ = msg.channel_id.say(ctx, "Not enough arguments.");
                 }
-                DispatchError::LackOfPermissions(_) => {
+                DispatchError::LackingPermissions(_) => {
                     let _ = msg
                         .channel_id
-                        .say("You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
+                        .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
                 }
-                DispatchError::RateLimited(_) => {
-                    let _ = msg.channel_id.say("Try again in 1 second.");
+                DispatchError::Ratelimited(_) => {
+                    let _ = msg.channel_id.say(ctx, "Try again in 1 second.");
                 }
                 e => eprintln!("Dispatch error: {:?}", e),
             })
-            .help(help_commands::with_embeds),
+            .help(&HELP),
     );
     client.start()?;
     Ok(())
+}
+
+group!({
+    name: "Owner",
+    options: {},
+    commands: [servers],
+});
+
+group!({
+    name: "General",
+    options: {},
+    commands: [about, prefix, invite, guide],
+});
+
+group!({
+    name: "modio",
+    options: {},
+    commands: [list_games, game, list_mods, mod_info, popular, subscriptions, subscribe, unsubscribe],
+});
+
+mod with_vote {
+    use super::*;
+
+    group!({
+        name: "General",
+        options: {},
+        commands: [about, prefix, invite, guide, vote],
+    });
+}
+
+#[help]
+fn help(
+    context: &mut Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>,
+) -> CommandResult {
+    help_commands::with_embeds(context, msg, args, help_options, groups, owners)
 }

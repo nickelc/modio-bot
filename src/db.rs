@@ -37,7 +37,7 @@ impl Settings {
     fn persist(ctx: &mut Context, change: ChangeSettings) {
         use crate::schema::settings::dsl::*;
 
-        let data = ctx.data.lock();
+        let data = ctx.data.read();
         let pool = data
             .get::<PoolKey>()
             .expect("failed to get connection pool");
@@ -69,14 +69,14 @@ impl Settings {
     }
 
     pub fn game(ctx: &mut Context, guild: GuildId) -> Option<u32> {
-        let data = ctx.data.lock();
+        let data = ctx.data.read();
         let map = data.get::<Settings>().expect("failed to get settings map");
         map.get(&guild).and_then(|s| s.game)
     }
 
     pub fn set_game(ctx: &mut Context, guild: GuildId, game: u32) {
         {
-            let mut data = ctx.data.lock();
+            let mut data = ctx.data.write();
             data.get_mut::<Settings>()
                 .expect("failed to get settings map")
                 .entry(guild)
@@ -90,7 +90,7 @@ impl Settings {
 
     pub fn prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
         msg.guild_id.and_then(|id| {
-            let data = ctx.data.lock();
+            let data = ctx.data.read();
             let map = data.get::<Settings>().expect("failed to get settings map");
             map.get(&id).and_then(|s| s.prefix.clone())
         })
@@ -98,7 +98,7 @@ impl Settings {
 
     pub fn set_prefix(ctx: &mut Context, guild: GuildId, prefix: Option<String>) {
         {
-            let mut data = ctx.data.lock();
+            let mut data = ctx.data.write();
             data.get_mut::<Settings>()
                 .expect("failed to get settings map")
                 .entry(guild)
@@ -154,7 +154,7 @@ impl fmt::Display for Subscriptions {
 
 impl Subscriptions {
     pub fn list_games(ctx: &mut Context, channel_id: ChannelId) -> Vec<u32> {
-        let data = ctx.data.lock();
+        let data = ctx.data.read();
         data.get::<Subscriptions>()
             .expect("failed to get settings map")
             .0
@@ -172,7 +172,7 @@ impl Subscriptions {
         use crate::schema::subscriptions::dsl::*;
 
         {
-            let mut data = ctx.data.lock();
+            let mut data = ctx.data.write();
             data.get_mut::<Subscriptions>()
                 .expect("failed to get settings map")
                 .0
@@ -181,7 +181,7 @@ impl Subscriptions {
                 .insert((channel_id, guild_id));
         }
 
-        let data = ctx.data.lock();
+        let data = ctx.data.read();
         let pool = data
             .get::<PoolKey>()
             .expect("failed to get connection pool");
@@ -210,7 +210,7 @@ impl Subscriptions {
         use crate::schema::subscriptions::dsl::*;
 
         {
-            let mut data = ctx.data.lock();
+            let mut data = ctx.data.write();
             data.get_mut::<Subscriptions>()
                 .expect("failed to get settings map")
                 .0
@@ -219,7 +219,7 @@ impl Subscriptions {
                 .remove(&(channel_id, guild_id));
         }
 
-        let data = ctx.data.lock();
+        let data = ctx.data.read();
         let pool = data
             .get::<PoolKey>()
             .expect("failed to get connection pool");
