@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        build:
+          - default
+          - bundled
+          - musl
+
+        include:
+          - build: default
+            packages: libsqlite3-dev
+          - build: bundled
+            features: --features sqlite-bundled
+          - build: musl
+            features: --features sqlite-bundled
+            target: x86_64-unknown-linux-musl
+            packages: musl-tools
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install packages
+        if: matrix.packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          override: true
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --target ${{ matrix.target || 'x86_64-unknown-linux-gnu' }} ${{ matrix.features }}

@@ -1,6 +1,7 @@
 <img src="https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png" width="200" align="right"/>
 
 # ModBot for Discord
+![gha-badge][gha-url]
 ![Rust version][rust-version]
 ![Rust edition][rust-edition]
 ![License][license-badge]
@@ -115,6 +116,8 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 
 [rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
 [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
+[gha-badge]: https://github.com/nickelc/modio-bot/workflows/CI/badge.svg
+[gha-url]: https://github.com/nickelc/modio-bot/actions?query=workflow%3ACI
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [discord]: https://discord.gg/XNX9665
 [discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
