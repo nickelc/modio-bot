@@ -13,8 +13,8 @@ use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
+use tokio::runtime::Handle;
 use tokio::runtime::Runtime;
-use tokio::runtime::TaskExecutor;
 
 use crate::db::{init_db, load_settings, load_subscriptions, DbPool, Settings, Subscriptions};
 use crate::error::Error;
@@ -47,7 +47,7 @@ impl TypeMapKey for ModioKey {
 pub struct ExecutorKey;
 
 impl TypeMapKey for ExecutorKey {
-    type Value = TaskExecutor;
+    type Value = Handle;
 }
 
 pub struct Handler;
@@ -216,16 +216,13 @@ fn credentials() -> Result<Credentials> {
     let token = env::var(MODIO_TOKEN);
 
     match (api_key, token) {
-        (Ok(key), _) => Ok(Credentials::ApiKey(key)),
-        (_, Ok(token)) => Ok(Credentials::Token(token)),
-        (Err(NotUnicode(_)), Err(_)) => {
+        (Ok(key), Ok(token)) => Ok(Credentials::with_token(key, token)),
+        (Ok(key), _) => Ok(Credentials::new(key)),
+        (Err(NotPresent), _) => {
+            Err("Environment variable 'MODIO_API_KEY' is required".into())
+        }
+        (Err(NotUnicode(_)), _) => {
             Err("Environment variable 'MODIO_API_KEY' is not valid unicode".into())
-        }
-        (Err(_), Err(NotUnicode(_))) => {
-            Err("Environment variable 'MODIO_TOKEN' is not valid unicode".into())
-        }
-        (Err(NotPresent), Err(NotPresent)) => {
-            Err("Environment variable 'MODIO_API_KEY' or 'MODIO_TOKEN' not found".into())
         }
     }
 }
@@ -252,7 +249,7 @@ pub fn initialize() -> Result<(Client, Modio, Runtime)> {
         let mut data = client.data.write();
         data.insert::<PoolKey>(pool);
         data.insert::<ModioKey>(modio.clone());
-        data.insert::<ExecutorKey>(rt.executor());
+        data.insert::<ExecutorKey>(rt.handle().clone());
     }
 
     Ok((client, modio, rt))

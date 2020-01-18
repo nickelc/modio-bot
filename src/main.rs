@@ -55,9 +55,9 @@ fn try_main() -> CliResult {
         return Ok(());
     }
 
-    let (mut client, modio, mut rt) = util::initialize()?;
+    let (mut client, modio, rt) = util::initialize()?;
 
-    rt.spawn(task(&client, modio.clone(), rt.executor()));
+    rt.spawn(rt.enter(|| { task(&client, modio.clone(), rt.handle().clone())}));
 
     let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
@@ -68,7 +68,7 @@ fn try_main() -> CliResult {
         log::info!("Spawning DBL task");
         let bot = *bot.as_u64();
         let cache = client.cache_and_http.cache.clone();
-        rt.spawn(dbl::task(bot, cache, &token, rt.executor())?);
+        rt.spawn(dbl::task(bot, cache, &token, rt.handle().clone())?);
     }
 
     client.with_framework(
@@ -107,32 +107,24 @@ fn try_main() -> CliResult {
     Ok(())
 }
 
-group!({
-    name: "Owner",
-    options: {},
-    commands: [servers],
-});
+#[group]
+#[commands(servers)]
+struct Owner;
 
-group!({
-    name: "General",
-    options: {},
-    commands: [about, prefix, invite, guide],
-});
+#[group]
+#[commands(about, prefix, invite, guide)]
+struct General;
 
-group!({
-    name: "modio",
-    options: {},
-    commands: [list_games, game, list_mods, mod_info, popular, subscriptions, subscribe, unsubscribe],
-});
+#[group]
+#[commands(list_games, game, list_mods, mod_info, popular, subscriptions, subscribe, unsubscribe)]
+struct Modio;
 
 mod with_vote {
     use super::*;
 
-    group!({
-        name: "General",
-        options: {},
-        commands: [about, prefix, invite, guide, vote],
-    });
+    #[group]
+    #[commands(about, prefix, invite, guide, vote)]
+    struct General;
 }
 
 #[help]

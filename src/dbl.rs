@@ -1,13 +1,13 @@
+use std::future::Future;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use dbl::{types::ShardStats, Client};
-use futures::{Future, Stream};
+use futures::{future, StreamExt};
 use log::error;
-use serenity::cache::Cache;
-use serenity::prelude::*;
-use tokio::runtime::TaskExecutor;
-use tokio::timer::Interval;
+use serenity::cache::CacheRwLock;
+use tokio::runtime::Handle;
+use tokio::time::{interval_at, Instant};
 
 use crate::error::Error;
 use crate::util;
@@ -33,32 +33,31 @@ pub fn get_profile(bot: u64) -> String {
 
 pub fn task(
     bot: u64,
-    cache: Arc<RwLock<Cache>>,
+    cache: CacheRwLock,
     token: &str,
-    executor: TaskExecutor,
-) -> Result<impl Future<Item = (), Error = ()>, Error> {
+    handle: Handle,
+) -> Result<impl Future<Output = ()>, Error> {
     let bot = get_bot_id(bot);
-    let client = Client::new(token.to_owned()).map_err(Error::Dbl)?;
+    let client = Arc::new(Client::new(token.to_owned()).map_err(Error::Dbl)?);
 
-    Ok(Interval::new(Instant::now() + MIN, SIX_HOURS)
-        .for_each(move |_| {
-            let servers = cache.read().guilds.len();
-            let stats = ShardStats::Cumulative {
-                server_count: servers as u64,
-                shard_count: None,
-            };
+    let task = interval_at(Instant::now() + MIN, SIX_HOURS).for_each(move |_| {
+        let client = Arc::clone(&client);
+        let servers = cache.read().guilds.len();
+        let stats = ShardStats::Cumulative {
+            server_count: servers as u64,
+            shard_count: None,
+        };
 
-            let task = client
-                .update_stats(bot, stats)
-                .map(move |_| {
-                    log::info!("Update bot stats [servers={}]", servers);
-                })
-                .map_err(|e| error!("Failed to update bot stats: {:?}", e));
+        handle.spawn(async move {
+            match client.update_stats(bot, stats).await {
+                Ok(_) => log::info!("Update bot stats [servers={}]", servers),
+                Err(e) => error!("Failed to update bot stats: {:?}", e),
+            }
+        });
+        future::ready(())
+    });
 
-            executor.spawn(task);
-            Ok(())
-        })
-        .map_err(|e| error!("Interval errored: {}", e)))
+    Ok(task)
 }
 
 // vim: fdm=marker

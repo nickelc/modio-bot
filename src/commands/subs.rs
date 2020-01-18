@@ -2,8 +2,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use futures::future::{self, Either};
-use futures::{Future, Stream};
-use log::{debug, warn};
+use futures::TryFutureExt;
+use futures::{Future, FutureExt, StreamExt, TryStreamExt};
+use log::debug;
 use modio::filter::prelude::*;
 use modio::games::Game;
 use modio::mods::filters::events::EventType as EventTypeFilter;
@@ -11,13 +12,14 @@ use modio::mods::{Event, EventType, Mod};
 use modio::Modio;
 use serenity::builder::CreateMessage;
 use serenity::prelude::*;
-use tokio::runtime::TaskExecutor;
-use tokio::timer::Interval;
+use tokio::runtime::Handle;
+use tokio::time::Instant;
 
 use crate::commands::prelude::*;
 use crate::db::Subscriptions;
 use crate::util;
 
+const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
 #[command]
@@ -36,19 +38,21 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
         let (tx, rx) = mpsc::channel();
 
         let filter = Id::_in(games);
-        let task = modio
-            .games()
-            .iter(&filter)
-            .fold(util::ContentBuilder::default(), |mut buf, g| {
-                let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
-                future::ok::<_, modio::error::Error>(buf)
-            })
-            .and_then(move |games| {
-                tx.send(games).unwrap();
-                Ok(())
-            })
-            .map_err(|e| eprintln!("{}", e));
-        exec.spawn(task);
+        let task =
+            modio
+                .games()
+                .iter(filter)
+                .try_fold(util::ContentBuilder::default(), |mut buf, g| {
+                    let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
+                    future::ok(buf)
+                });
+
+        exec.spawn(async move {
+            match task.await {
+                Ok(games) => tx.send(games).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
 
         let games = rx.recv().unwrap();
         for content in games {
@@ -84,17 +88,15 @@ pub fn subscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandRes
 
         let task = modio
             .games()
-            .list(&filter)
-            .and_then(|mut list| Ok(list.shift()))
-            .and_then(move |game| {
-                tx.send(game).unwrap();
-                Ok(())
-            })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
+            .list(filter)
+            .and_then(|mut list| future::ok(list.shift()));
 
-        exec.spawn(task);
+        exec.spawn(async move {
+            match task.await {
+                Ok(game) => tx.send(game).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
         rx.recv().unwrap()
     };
     if let Some(g) = game {
@@ -131,17 +133,15 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandR
         };
         let task = modio
             .games()
-            .list(&filter)
-            .and_then(|mut list| Ok(list.shift()))
-            .and_then(move |game| {
-                tx.send(game).unwrap();
-                Ok(())
-            })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
+            .list(filter)
+            .and_then(|mut list| future::ok(list.shift()));
 
-        exec.spawn(task);
+        exec.spawn(async move {
+            match task.await {
+                Ok(game) => tx.send(game).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
 
         rx.recv().unwrap()
     };
@@ -252,11 +252,7 @@ impl<'n> Notification<'n> {
     }
 }
 
-pub fn task(
-    client: &Client,
-    modio: Modio,
-    exec: TaskExecutor,
-) -> impl Future<Item = (), Error = ()> {
+pub fn task(client: &Client, modio: Modio, exec: Handle) -> impl Future<Output = ()> {
     let data = client.data.clone();
     let http = client.cache_and_http.http.clone();
     let (tx, rx) = mpsc::channel::<(ChannelId, CreateMessage<'_>)>();
@@ -266,7 +262,7 @@ pub fn task(
         let _ = channel.send_message(&http, |_| &mut msg);
     });
 
-    Interval::new_interval(INTERVAL_DURATION)
+    tokio::time::interval_at(Instant::now() + MIN, INTERVAL_DURATION)
         .fold(util::current_timestamp(), move |tstamp, _| {
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
@@ -295,52 +291,53 @@ pub fn task(
                 let game = modio.game(game);
                 let mods = game.mods();
                 let task = mods
-                    .events(&filter)
-                    .collect()
+                    .events(filter.clone())
+                    .try_collect::<Vec<_>>()
                     .and_then(move |events| {
                         if events.is_empty() {
-                            return Either::A(future::ok(()));
+                            return Either::Left(future::ok(()));
                         }
                         let mid: Vec<_> = events.iter().map(|e| e.mod_id).collect();
                         let filter = Id::_in(mid);
 
+                        let mods = game.mods();
                         let game = game.get();
-                        let mods = mods.iter(&filter).collect();
+                        let mods = mods.iter(filter).try_collect::<Vec<_>>();
 
-                        Either::B(game.join(mods).and_then(
-                            move |(game, mods)| {
-                                let mods = events
-                                    .iter()
-                                    .map(|e| mods.iter().find(|m| m.id == e.mod_id))
-                                    .flatten();
-                                let it = events
-                                    .iter()
-                                    .zip(mods)
-                                    .map(Notification::new)
-                                    .filter(|n| !n.is_ignored());
-                                for n in it {
-                                    for (channel, _) in &channels {
-                                        debug!(
-                                            "send message to #{}: {} for {:?}",
-                                            channel, n.event.event_type, n.mod_.name,
-                                        );
-                                        let mut msg = CreateMessage::default();
-                                        n.create_message(&game, &mut msg);
-                                        tx.send((*channel, msg)).unwrap();
-                                    }
+                        Either::Right(future::try_join(game, mods).and_then(move |(game, mods)| {
+                            let mods = events
+                                .iter()
+                                .map(|e| mods.iter().find(|m| m.id == e.mod_id))
+                                .flatten();
+                            let it = events
+                                .iter()
+                                .zip(mods)
+                                .map(Notification::new)
+                                .filter(|n| !n.is_ignored());
+                            for n in it {
+                                for (channel, _) in &channels {
+                                    debug!(
+                                        "send message to #{}: {} for {:?}",
+                                        channel, n.event.event_type, n.mod_.name,
+                                    );
+                                    let mut msg = CreateMessage::default();
+                                    n.create_message(&game, &mut msg);
+                                    tx.send((*channel, msg)).unwrap();
                                 }
-                                Ok(())
-                            },
-                        ))
-                    })
-                    .map_err(|_| ());
+                            }
+                            future::ok(())
+                        }))
+                    });
 
-                exec.spawn(task);
+                exec.spawn(async {
+                    if let Err(e) = task.await {
+                        eprintln!("{}", e);
+                    }
+                });
             }
 
             // current timestamp for the next run
-            Ok(util::current_timestamp())
+            future::ready(util::current_timestamp())
         })
         .map(|_| ())
-        .map_err(|e| warn!("interval errored: {}", e))
 }

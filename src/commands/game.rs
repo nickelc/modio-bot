@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use futures::future;
+use futures::{future, TryFutureExt, TryStreamExt};
 use modio::filter::prelude::*;
 
 use crate::commands::prelude::*;
@@ -20,21 +20,20 @@ pub fn list_games(ctx: &mut Context, msg: &Message) -> CommandResult {
 
     let (tx, rx) = mpsc::channel();
 
-    let task = modio
-        .games()
-        .iter(&Default::default())
-        .fold(ContentBuilder::default(), |mut buf, game| {
+    let task = modio.games().iter(Default::default()).try_fold(
+        ContentBuilder::default(),
+        |mut buf, game| {
             let _ = writeln!(&mut buf, "{}. {}", game.id, game.name);
-            future::ok::<_, modio::Error>(buf)
-        })
-        .and_then(move |games| {
-            tx.send(games).unwrap();
-            Ok(())
-        })
-        .map_err(|e| {
-            eprintln!("{}", e);
-        });
-    exec.spawn(task);
+            future::ok(buf)
+        },
+    );
+
+    exec.spawn(async move {
+        match task.await {
+            Ok(games) => tx.send(games).unwrap(),
+            Err(e) => eprintln!("{}", e),
+        }
+    });
 
     let games = rx.recv().unwrap();
     for content in games {
@@ -79,30 +78,27 @@ fn get_game(ctx: &mut Context, msg: &Message) -> CommandResult {
         let stats = modio
             .game(id)
             .mods()
-            .statistics(&Default::default())
-            .collect()
+            .statistics(Default::default())
+            .try_collect::<Vec<_>>()
             .and_then(|list| {
                 let total = list.len();
-                Ok(list
+                let stats = list
                     .into_iter()
                     .fold((total, 0, 0), |(total, mut dl, mut sub), s| {
                         dl += s.downloads_total;
                         sub += s.subscribers_total;
                         (total, dl, sub)
-                    }))
+                    });
+                future::ok(stats)
             });
-        let task = modio
-            .game(id)
-            .get()
-            .join(stats)
-            .and_then(move |(game, stats)| {
-                tx.send((game, stats)).unwrap();
-                Ok(())
-            })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
-        exec.spawn(task);
+        let task = future::try_join(modio.game(id).get(), stats);
+
+        exec.spawn(async move {
+            match task.await {
+                Ok(data) => tx.send(data).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
 
         let (game, stats) = rx.recv().unwrap();
         if let Err(e) = channel.send_message(&ctx, |m| game.create_message(stats, m)) {
@@ -127,16 +123,15 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
             };
             let task = modio
                 .games()
-                .list(&filter)
-                .and_then(|mut list| Ok(list.shift()))
-                .and_then(move |game| {
-                    tx.send(game).unwrap();
-                    Ok(())
-                })
-                .map_err(|e| {
-                    eprintln!("{}", e);
-                });
-            exec.spawn(task);
+                .list(filter)
+                .and_then(|mut list| future::ok(list.shift()));
+
+            exec.spawn(async move {
+                match task.await {
+                    Ok(game) => tx.send(game).unwrap(),
+                    Err(e) => eprintln!("{}", e),
+                }
+            });
 
             rx.recv().unwrap()
         };

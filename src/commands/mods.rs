@@ -1,4 +1,6 @@
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc;
+
+use futures::{future, StreamExt, TryStreamExt};
 
 use modio::filter::prelude::*;
 use modio::games::Game;
@@ -29,11 +31,17 @@ pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
         let game = modio.game(id);
         let mods = game.mods();
 
-        let task = find_mods(game, mods, &filter, None, tx);
+        let task = find_mods(game, mods, filter, None);
 
-        exec.spawn(task);
+        exec.spawn(async move {
+            match task.await {
+                Ok(data) => tx.send(data).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
 
-        send_mods(&mut ctx.clone(), channel, rx, "Mods", item);
+        let (game, mods) = rx.recv().unwrap();
+        send_mods(&mut ctx.clone(), channel, game, mods, "Mods", item);
     } else {
         let _ = channel.say(&ctx, "default game is not set.");
     }
@@ -62,17 +70,15 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
         };
 
         let game = modio.game(game_id);
-        let mods = game.mods().list(&filter);
-        let task = game
-            .get()
-            .join(mods)
-            .and_then(move |(game, list)| {
-                tx.send((game, list)).unwrap();
-                Ok(())
-            })
-            .map_err(|e| eprintln!("{}", e));
+        let mods = game.mods().list(filter);
+        let task = future::try_join(game.get(), mods);
 
-        exec.spawn(task);
+        exec.spawn(async move {
+            match task.await {
+                Ok(data) => tx.send(data).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
 
         let (game, list) = rx.recv().unwrap();
         let ret = match list.count {
@@ -136,11 +142,17 @@ pub fn popular(ctx: &mut Context, msg: &Message) -> CommandResult {
         let filter = with_limit(10).order_by(PopularFilter::desc());
         let game = modio.game(id);
         let mods = game.mods();
-        let task = find_mods(game, mods, &filter, Some(10), tx);
+        let task = find_mods(game, mods, filter, Some(10));
 
-        exec.spawn(task);
+        exec.spawn(async move {
+            match task.await {
+                Ok(data) => tx.send(data).unwrap(),
+                Err(e) => eprintln!("{}", e),
+            }
+        });
 
-        send_mods(&mut ctx.clone(), channel, rx, "Popular Mods", item);
+        let (game, mods) = rx.recv().unwrap();
+        send_mods(&mut ctx.clone(), channel, game, mods, "Popular Mods", item);
     } else {
         let _ = channel.say(&ctx, "default game is not set.");
     }
@@ -150,41 +162,35 @@ pub fn popular(ctx: &mut Context, msg: &Message) -> CommandResult {
 fn find_mods(
     game: modio::games::GameRef,
     mods: modio::mods::Mods,
-    filter: &Filter,
+    filter: Filter,
     limit: Option<usize>,
-    tx: Sender<(Game, Vec<Mod>)>,
-) -> impl Future<Item = (), Error = ()> + Send + 'static {
+) -> impl Future<Output = Result<(Game, Vec<Mod>), modio::Error>> {
     let mut limit = limit;
-    mods.iter(filter)
+    let mods = mods
+        .iter(filter)
         .take_while(move |_| match limit.as_mut() {
-            Some(ref v) if **v == 0 => Ok(false),
+            Some(ref v) if **v == 0 => future::ready(false),
             Some(v) => {
                 *v -= 1;
-                Ok(true)
+                future::ready(true)
             }
-            None => Ok(true),
+            None => future::ready(true),
         })
-        .collect()
-        .join(game.get())
-        .and_then(move |(mods, game)| {
-            tx.send((game, mods)).unwrap();
-            Ok(())
-        })
-        .map_err(|e| {
-            eprintln!("{}", e);
-        })
+        .try_collect();
+
+    future::try_join(game.get(), mods)
 }
 
 fn send_mods<F>(
     ctx: &mut Context,
     channel: ChannelId,
-    rx: Receiver<(Game, Vec<Mod>)>,
+    game: Game,
+    mods: Vec<Mod>,
     title: &'static str,
     item: F,
 ) where
     F: Fn(&Mod) -> String + Send + 'static,
 {
-    let (game, mods) = rx.recv().unwrap();
     if !mods.is_empty() {
         let mods = mods
             .iter()
