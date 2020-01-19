@@ -1,10 +1,10 @@
 <img src="https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png" width="200" align="right"/>
 
 # ModBot for Discord
-![gha-badge][gha-url]
 ![Rust version][rust-version]
 ![Rust edition][rust-edition]
 ![License][license-badge]
+[![GitHub Action][gha-badge]][gha-url]
 [![Discord][discord-badge]][discord]
 [![Invite ModBot][bot-invite-badge]][bot-invite-url]
 
@@ -114,7 +114,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 
-[rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
+[rust-version]: https://img.shields.io/badge/rust-1.39%2B-blue.svg
 [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
 [gha-badge]: https://github.com/nickelc/modio-bot/workflows/CI/badge.svg
 [gha-url]: https://github.com/nickelc/modio-bot/actions?query=workflow%3ACI
