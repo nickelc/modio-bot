@@ -57,7 +57,7 @@ fn try_main() -> CliResult {
 
     let (mut client, modio, rt) = util::initialize()?;
 
-    rt.spawn(rt.enter(|| { task(&client, modio.clone(), rt.handle().clone())}));
+    rt.spawn(rt.enter(|| task(&client, modio.clone(), rt.handle().clone())));
 
     let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
@@ -116,7 +116,16 @@ struct Owner;
 struct General;
 
 #[group]
-#[commands(list_games, game, list_mods, mod_info, popular, subscriptions, subscribe, unsubscribe)]
+#[commands(
+    list_games,
+    game,
+    list_mods,
+    mod_info,
+    popular,
+    subscriptions,
+    subscribe,
+    unsubscribe
+)]
 struct Modio;
 
 mod with_vote {

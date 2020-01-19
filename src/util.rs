@@ -218,9 +218,7 @@ fn credentials() -> Result<Credentials> {
     match (api_key, token) {
         (Ok(key), Ok(token)) => Ok(Credentials::with_token(key, token)),
         (Ok(key), _) => Ok(Credentials::new(key)),
-        (Err(NotPresent), _) => {
-            Err("Environment variable 'MODIO_API_KEY' is required".into())
-        }
+        (Err(NotPresent), _) => Err("Environment variable 'MODIO_API_KEY' is required".into()),
         (Err(NotUnicode(_)), _) => {
             Err("Environment variable 'MODIO_API_KEY' is not valid unicode".into())
         }
