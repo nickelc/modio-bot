@@ -17,7 +17,7 @@ pub fn about(ctx: &mut Context, msg: &Message) -> CommandResult {
     let dbl = if crate::dbl::is_dbl_enabled() {
         let profile = crate::dbl::get_profile(bot);
         let value = format!("[Profile]({}) | [Vote]({0}/vote)", profile);
-        Some(("discordbots.org", value, true))
+        Some(("top.gg / discordbots.org", value, true))
     } else {
         None
     };

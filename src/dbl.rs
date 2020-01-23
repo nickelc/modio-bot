@@ -12,7 +12,7 @@ use tokio::time::{interval_at, Instant};
 use crate::error::Error;
 use crate::util;
 
-const DBL_BASE_URL: &str = "https://discordbots.org/bot";
+const DBL_BASE_URL: &str = "https://top.gg/bot";
 const MIN: Duration = Duration::from_secs(60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
 
