@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dbl::{types::ShardStats, Client};
-use futures::{future, StreamExt};
 use log::error;
 use serenity::cache::CacheRwLock;
 use tokio::runtime::Handle;
@@ -40,24 +39,25 @@ pub fn task(
     let bot = get_bot_id(bot);
     let client = Arc::new(Client::new(token.to_owned()).map_err(Error::Dbl)?);
 
-    let task = interval_at(Instant::now() + MIN, SIX_HOURS).for_each(move |_| {
-        let client = Arc::clone(&client);
-        let servers = cache.read().guilds.len();
-        let stats = ShardStats::Cumulative {
-            server_count: servers as u64,
-            shard_count: None,
-        };
+    Ok(async move {
+        let mut interval = interval_at(Instant::now() + MIN, SIX_HOURS);
+        loop {
+            interval.tick().await;
+            let client = Arc::clone(&client);
+            let servers = cache.read().guilds.len();
+            let stats = ShardStats::Cumulative {
+                server_count: servers as u64,
+                shard_count: None,
+            };
 
-        handle.spawn(async move {
-            match client.update_stats(bot, stats).await {
-                Ok(_) => log::info!("Update bot stats [servers={}]", servers),
-                Err(e) => error!("Failed to update bot stats: {:?}", e),
-            }
-        });
-        future::ready(())
-    });
-
-    Ok(task)
+            handle.spawn(async move {
+                match client.update_stats(bot, stats).await {
+                    Ok(_) => log::info!("Update bot stats [servers={}]", servers),
+                    Err(e) => error!("Failed to update bot stats: {:?}", e),
+                }
+            });
+        }
+    })
 }
 
 // vim: fdm=marker

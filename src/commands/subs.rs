@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use futures::future::{self, Either};
 use futures::TryFutureExt;
-use futures::{Future, FutureExt, StreamExt, TryStreamExt};
+use futures::{Future, TryStreamExt};
 use log::debug;
 use modio::filter::prelude::*;
 use modio::games::Game;
@@ -262,8 +262,13 @@ pub fn task(client: &Client, modio: Modio, exec: Handle) -> impl Future<Output =
         let _ = channel.send_message(&http, |_| &mut msg);
     });
 
-    tokio::time::interval_at(Instant::now() + MIN, INTERVAL_DURATION)
-        .fold(util::current_timestamp(), move |tstamp, _| {
+    async move {
+        let mut interval = tokio::time::interval_at(Instant::now() + MIN, INTERVAL_DURATION);
+
+        loop {
+            let tstamp = util::current_timestamp();
+            interval.tick().await;
+
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
                     EventType::ModfileChanged,
@@ -274,8 +279,8 @@ pub fn task(client: &Client, modio: Modio, exec: Handle) -> impl Future<Output =
                 ]))
                 .order_by(Id::asc());
 
-            let data = data.read();
-            let Subscriptions(subs) = data
+            let data2 = data.read();
+            let Subscriptions(subs) = data2
                 .get::<Subscriptions>()
                 .expect("failed to get subscriptions");
 
@@ -335,9 +340,6 @@ pub fn task(client: &Client, modio: Modio, exec: Handle) -> impl Future<Output =
                     }
                 });
             }
-
-            // current timestamp for the next run
-            future::ready(util::current_timestamp())
-        })
-        .map(|_| ())
+        }
+    }
 }
