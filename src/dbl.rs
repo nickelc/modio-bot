@@ -5,7 +5,6 @@ use std::time::Duration;
 use dbl::{types::ShardStats, Client};
 use log::error;
 use serenity::cache::CacheRwLock;
-use tokio::runtime::Handle;
 use tokio::time::{interval_at, Instant};
 
 use crate::error::Error;
@@ -30,11 +29,7 @@ pub fn get_profile(bot: u64) -> String {
     format!("{}/{}", DBL_BASE_URL, get_bot_id(bot))
 }
 
-pub fn task(
-    bot: u64,
-    cache: CacheRwLock,
-    token: &str,
-) -> Result<impl Future<Output = ()>, Error> {
+pub fn task(bot: u64, cache: CacheRwLock, token: &str) -> Result<impl Future<Output = ()>, Error> {
     let bot = get_bot_id(bot);
     let client = Arc::new(Client::new(token.to_owned()).map_err(Error::Dbl)?);
 
