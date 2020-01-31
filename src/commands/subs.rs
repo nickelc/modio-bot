@@ -12,7 +12,6 @@ use modio::mods::{Event, EventType, Mod};
 use modio::Modio;
 use serenity::builder::CreateMessage;
 use serenity::prelude::*;
-use tokio::runtime::Handle;
 use tokio::time::Instant;
 
 use crate::commands::prelude::*;
@@ -252,7 +251,7 @@ impl<'n> Notification<'n> {
     }
 }
 
-pub fn task(client: &Client, modio: Modio, exec: Handle) -> impl Future<Output = ()> {
+pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
     let data = client.data.clone();
     let http = client.cache_and_http.http.clone();
     let (tx, rx) = mpsc::channel::<(ChannelId, CreateMessage<'_>)>();
@@ -334,7 +333,7 @@ pub fn task(client: &Client, modio: Modio, exec: Handle) -> impl Future<Output =
                         }))
                     });
 
-                exec.spawn(async {
+                tokio::spawn(async {
                     if let Err(e) = task.await {
                         eprintln!("{}", e);
                     }

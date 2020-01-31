@@ -57,7 +57,7 @@ fn try_main() -> CliResult {
 
     let (mut client, modio, rt) = util::initialize()?;
 
-    rt.spawn(rt.enter(|| task(&client, modio.clone(), rt.handle().clone())));
+    rt.spawn(rt.enter(|| task(&client, modio.clone())));
 
     let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
@@ -68,7 +68,7 @@ fn try_main() -> CliResult {
         log::info!("Spawning DBL task");
         let bot = *bot.as_u64();
         let cache = client.cache_and_http.cache.clone();
-        rt.spawn(dbl::task(bot, cache, &token, rt.handle().clone())?);
+        rt.spawn(dbl::task(bot, cache, &token)?);
     }
 
     client.with_framework(

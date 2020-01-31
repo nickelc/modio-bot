@@ -34,7 +34,6 @@ pub fn task(
     bot: u64,
     cache: CacheRwLock,
     token: &str,
-    handle: Handle,
 ) -> Result<impl Future<Output = ()>, Error> {
     let bot = get_bot_id(bot);
     let client = Arc::new(Client::new(token.to_owned()).map_err(Error::Dbl)?);
@@ -50,7 +49,7 @@ pub fn task(
                 shard_count: None,
             };
 
-            handle.spawn(async move {
+            tokio::spawn(async move {
                 match client.update_stats(bot, stats).await {
                     Ok(_) => log::info!("Update bot stats [servers={}]", servers),
                     Err(e) => error!("Failed to update bot stats: {:?}", e),
