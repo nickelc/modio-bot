@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 use std::time::Duration;
 
-use futures::future::{self, Either};
+use futures::future;
 use futures::TryFutureExt;
 use futures::{Future, TryStreamExt};
 use log::debug;
@@ -292,46 +292,46 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     tstamp, game, channels
                 );
                 let tx = tx.clone();
+                let filter = filter.clone();
                 let game = modio.game(game);
                 let mods = game.mods();
-                let task = mods
-                    .events(filter.clone())
-                    .try_collect::<Vec<_>>()
-                    .and_then(move |events| {
-                        if events.is_empty() {
-                            return Either::Left(future::ok(()));
+
+                let task = async move {
+                    let events = mods.events(filter).try_collect::<Vec<_>>().await?;
+
+                    if events.is_empty() {
+                        return Ok(());
+                    }
+
+                    let mid: Vec<_> = events.iter().map(|e| e.mod_id).collect();
+                    let filter = Id::_in(mid);
+
+                    let mods = game.mods();
+                    let game = game.get().await?;
+                    let mods = mods.iter(filter).try_collect::<Vec<_>>().await?;
+
+                    let mods = events
+                        .iter()
+                        .map(|e| mods.iter().find(|m| m.id == e.mod_id))
+                        .flatten();
+                    let it = events
+                        .iter()
+                        .zip(mods)
+                        .map(Notification::new)
+                        .filter(|n| !n.is_ignored());
+                    for n in it {
+                        for (channel, _) in &channels {
+                            debug!(
+                                "send message to #{}: {} for {:?}",
+                                channel, n.event.event_type, n.mod_.name,
+                            );
+                            let mut msg = CreateMessage::default();
+                            n.create_message(&game, &mut msg);
+                            tx.send((*channel, msg)).unwrap();
                         }
-                        let mid: Vec<_> = events.iter().map(|e| e.mod_id).collect();
-                        let filter = Id::_in(mid);
-
-                        let mods = game.mods();
-                        let game = game.get();
-                        let mods = mods.iter(filter).try_collect::<Vec<_>>();
-
-                        Either::Right(future::try_join(game, mods).and_then(move |(game, mods)| {
-                            let mods = events
-                                .iter()
-                                .map(|e| mods.iter().find(|m| m.id == e.mod_id))
-                                .flatten();
-                            let it = events
-                                .iter()
-                                .zip(mods)
-                                .map(Notification::new)
-                                .filter(|n| !n.is_ignored());
-                            for n in it {
-                                for (channel, _) in &channels {
-                                    debug!(
-                                        "send message to #{}: {} for {:?}",
-                                        channel, n.event.event_type, n.mod_.name,
-                                    );
-                                    let mut msg = CreateMessage::default();
-                                    n.create_message(&game, &mut msg);
-                                    tx.send((*channel, msg)).unwrap();
-                                }
-                            }
-                            future::ok(())
-                        }))
-                    });
+                    }
+                    Ok::<_, modio::Error>(())
+                };
 
                 tokio::spawn(async {
                     if let Err(e) = task.await {
