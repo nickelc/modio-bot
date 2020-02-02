@@ -8,7 +8,7 @@ use log::debug;
 use modio::filter::prelude::*;
 use modio::games::Game;
 use modio::mods::filters::events::EventType as EventTypeFilter;
-use modio::mods::{Event, EventType, Mod};
+use modio::mods::{EventType, Mod};
 use modio::Modio;
 use serenity::builder::CreateMessage;
 use serenity::prelude::*;
@@ -159,21 +159,13 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandR
 }
 
 struct Notification<'n> {
-    event: &'n Event,
+    event: &'n EventType,
     mod_: &'n Mod,
 }
 
 impl<'n> Notification<'n> {
-    fn new((event, mod_): (&'n Event, &'n Mod)) -> Notification<'n> {
+    fn new((event, mod_): (&'n EventType, &'n Mod)) -> Notification<'n> {
         Notification { event, mod_ }
-    }
-
-    fn is_ignored(&self) -> bool {
-        use EventType::*;
-        match self.event.event_type {
-            UserTeamJoin | UserTeamLeave | UserSubscribe | UserUnsubscribe | ModTeamChanged => true,
-            _ => false,
-        }
     }
 
     fn create_message<'a, 'b>(
@@ -200,7 +192,7 @@ impl<'n> Notification<'n> {
                 })
             };
 
-        match self.event.event_type {
+        match self.event {
             EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
             EventType::ModAvailable => {
                 let m = m.content("A new mod is available. :tada:");
@@ -297,37 +289,69 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                 let mods = game.mods();
 
                 let task = async move {
-                    let events = mods.events(filter).try_collect::<Vec<_>>().await?;
+                    use std::collections::BTreeMap;
+                    type Events = BTreeMap<u32, Vec<(u32, EventType)>>;
+
+                    // - Group the events by mod
+                    // - Filter `MODFILE_CHANGED` events for new mods
+                    // - Ungroup the events ordered by event id
+
+                    let mut events = mods
+                        .events(filter)
+                        .try_fold(Events::new(), |mut events, e| async {
+                            events
+                                .entry(e.mod_id)
+                                .or_default()
+                                .push((e.id, e.event_type));
+                            Ok(events)
+                        })
+                        .await?;
 
                     if events.is_empty() {
                         return Ok(());
                     }
 
-                    let mid: Vec<_> = events.iter().map(|e| e.mod_id).collect();
-                    let filter = Id::_in(mid);
+                    // Filter `MODFILE_CHANGED` events for new mods
+                    for (_, evt) in events.iter_mut() {
+                        use EventType::*;
+                        if evt.iter().any(|(_, t)| t == &ModAvailable) {
+                            let pos = evt.iter().position(|(_, t)| t == &ModfileChanged);
+                            if let Some(pos) = pos {
+                                evt.remove(pos);
+                            }
+                        }
+                    }
 
-                    let mods = game.mods();
+                    // Load the mods for the events
+                    let filter = Id::_in(events.keys().collect::<Vec<_>>());
+                    let events = game
+                        .mods()
+                        .iter(filter)
+                        .map_ok(|m| events.get(&m.id).and_then(|evt| Some((m, evt))))
+                        .try_filter_map(|e| async { Ok(e) })
+                        .try_collect::<Vec<_>>()
+                        .await?;
+
+                    // Ungroup the events ordered by event id
+                    let mut updates = BTreeMap::new();
+                    for (m, evt) in &events {
+                        for (eid, t) in *evt {
+                            updates.insert(eid, (m, t));
+                        }
+                    }
+
                     let game = game.get().await?;
-                    let mods = mods.iter(filter).try_collect::<Vec<_>>().await?;
 
-                    let mods = events
-                        .iter()
-                        .map(|e| mods.iter().find(|m| m.id == e.mod_id))
-                        .flatten();
-                    let it = events
-                        .iter()
-                        .zip(mods)
-                        .map(Notification::new)
-                        .filter(|n| !n.is_ignored());
-                    for n in it {
+                    for (m, evt) in updates.values() {
+                        let n = Notification::new((evt, m));
+                        let mut msg = CreateMessage::default();
+                        n.create_message(&game, &mut msg);
                         for (channel, _) in &channels {
                             debug!(
                                 "send message to #{}: {} for {:?}",
-                                channel, n.event.event_type, n.mod_.name,
+                                channel, n.event, n.mod_.name,
                             );
-                            let mut msg = CreateMessage::default();
-                            n.create_message(&game, &mut msg);
-                            tx.send((*channel, msg)).unwrap();
+                            tx.send((*channel, msg.clone())).unwrap();
                         }
                     }
                     Ok::<_, modio::Error>(())
