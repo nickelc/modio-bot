@@ -17,10 +17,10 @@ use serenity::model::prelude::*;
 
 mod commands;
 mod db;
-mod dbl;
 mod error;
 #[rustfmt::skip]
 mod schema;
+mod tasks;
 mod tools;
 mod util;
 
@@ -57,7 +57,7 @@ fn try_main() -> CliResult {
 
     let (mut client, modio, rt) = util::initialize()?;
 
-    rt.spawn(rt.enter(|| task(&client, modio.clone())));
+    rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
 
     let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
@@ -68,7 +68,7 @@ fn try_main() -> CliResult {
         log::info!("Spawning DBL task");
         let bot = *bot.as_u64();
         let cache = client.cache_and_http.cache.clone();
-        rt.spawn(dbl::task(bot, cache, &token)?);
+        rt.spawn(tasks::dbl::task(bot, cache, &token)?);
     }
 
     client.with_framework(
@@ -85,7 +85,7 @@ fn try_main() -> CliResult {
                 true
             })
             .group(&OWNER_GROUP)
-            .group(if dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
+            .group(if tasks::dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
             .group(&MODIO_GROUP)
             .on_dispatch_error(|ctx, msg, error| match error {
                 DispatchError::NotEnoughArguments { .. } => {

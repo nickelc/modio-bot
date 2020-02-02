@@ -14,8 +14,8 @@ pub fn about(ctx: &mut Context, msg: &Message) -> CommandResult {
     let name = ctx.cache.read().user.name.to_owned();
     let avatar = ctx.cache.read().user.avatar_url();
 
-    let dbl = if crate::dbl::is_dbl_enabled() {
-        let profile = crate::dbl::get_profile(bot);
+    let dbl = if crate::tasks::dbl::is_dbl_enabled() {
+        let profile = crate::tasks::dbl::get_profile(bot);
         let value = format!("[Profile]({}) | [Vote]({0}/vote)", profile);
         Some(("top.gg / discordbots.org", value, true))
     } else {
@@ -107,7 +107,7 @@ pub fn prefix(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult
 #[description("Get link to vote for Modbot on Discord Bot List")]
 pub fn vote(ctx: &mut Context, msg: &Message) -> CommandResult {
     let bot = *ctx.cache.read().user.id.as_u64();
-    let profile = crate::dbl::get_profile(bot);
+    let profile = crate::tasks::dbl::get_profile(bot);
     msg.channel_id.say(ctx, format!("{}/vote", profile))?;
     Ok(())
 }
