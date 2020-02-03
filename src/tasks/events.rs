@@ -104,7 +104,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     let events = game
                         .mods()
                         .iter(filter)
-                        .map_ok(|m| events.get(&m.id).and_then(|evt| Some((m, evt))))
+                        .map_ok(|m| events.get(&m.id).map(|evt| (m, evt)))
                         .try_filter_map(|e| async { Ok(e) })
                         .try_collect::<Vec<_>>()
                         .await?;
