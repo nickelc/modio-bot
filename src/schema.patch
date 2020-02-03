@@ -18,6 +18,7 @@
 -        guild -> Nullable<Integer>,
 +        channel -> BigInt,
 +        guild -> Nullable<BigInt>,
+         events -> Integer,
      }
  }
  

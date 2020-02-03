@@ -11,6 +11,7 @@ table! {
         game -> Integer,
         channel -> BigInt,
         guild -> Nullable<BigInt>,
+        events -> Integer,
     }
 }
 

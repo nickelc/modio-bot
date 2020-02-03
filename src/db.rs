@@ -112,7 +112,15 @@ impl Settings {
 }
 
 #[derive(Default)]
-pub struct Subscriptions(pub HashMap<u32, HashSet<(ChannelId, Option<GuildId>)>>);
+pub struct Subscriptions(pub HashMap<u32, HashSet<(ChannelId, Option<GuildId>, Events)>>);
+
+bitflags::bitflags! {
+    pub struct Events: i32 {
+        const NEW = 0b0001;
+        const UPD = 0b0010;
+        const ALL = Self::NEW.bits | Self::UPD.bits;
+    }
+}
 
 /// impl Display for Subscriptions {{{
 impl fmt::Display for Subscriptions {
@@ -134,7 +142,7 @@ impl fmt::Display for Subscriptions {
             write!(f, "{}: ", game)?;
             let mut has_subs = false;
             f.write_str("{")?;
-            for (channel_id, guild_id) in channels {
+            for (channel_id, guild_id, _) in channels {
                 if has_subs {
                     f.write_str(", ")?;
                 }
@@ -159,7 +167,7 @@ impl Subscriptions {
             .expect("failed to get settings map")
             .0
             .iter()
-            .filter_map(|(&k, v)| v.iter().find(|(chan, _)| chan == &channel_id).map(|_| k))
+            .filter_map(|(&k, v)| v.iter().find(|(chan, _, _)| *chan == channel_id).map(|_| k))
             .collect()
     }
 
@@ -178,7 +186,7 @@ impl Subscriptions {
                 .0
                 .entry(game_id)
                 .or_insert_with(Default::default)
-                .insert((channel_id, guild_id));
+                .insert((channel_id, guild_id, Events::ALL));
         }
 
         let data = ctx.data.read();
@@ -215,8 +223,8 @@ impl Subscriptions {
                 .expect("failed to get settings map")
                 .0
                 .entry(game_id)
-                .or_insert_with(Default::default)
-                .remove(&(channel_id, guild_id));
+                .or_default()
+                .retain(|(c, g, _)| (c, g) != (&channel_id, &guild_id));
         }
 
         let data = ctx.data.read();
@@ -279,6 +287,9 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
 
 pub fn load_subscriptions(pool: &DbPool, guilds: &[GuildId]) -> Result<Subscriptions> {
     use crate::schema::subscriptions::dsl::*;
+
+    type Record = (i32, i64, Option<i64>, i32);
+
     pool.get()
         .map_err(Error::from)
         .and_then(|conn| {
@@ -291,19 +302,18 @@ pub fn load_subscriptions(pool: &DbPool, guilds: &[GuildId]) -> Result<Subscript
             }
             Ok(conn)
         })
-        .and_then(|conn| {
-            subscriptions
-                .load::<(i32, i64, Option<i64>)>(&conn)
-                .map_err(Error::from)
-        })
+        .and_then(|conn| subscriptions.load::<Record>(&conn).map_err(Error::from))
         .and_then(|list| {
             Ok(Subscriptions(list.into_iter().fold(
                 Default::default(),
-                |mut map, (game_id, channel_id, guild_id)| {
+                |mut map, (game_id, channel_id, guild_id, evt)| {
                     let guild_id = guild_id.map(|id| GuildId(id as u64));
-                    map.entry(game_id as u32)
-                        .or_insert_with(Default::default)
-                        .insert((ChannelId(channel_id as u64), guild_id));
+                    let evt = Events::from_bits_truncate(evt);
+                    map.entry(game_id as u32).or_default().insert((
+                        ChannelId(channel_id as u64),
+                        guild_id,
+                        evt,
+                    ));
                     map
                 },
             )))

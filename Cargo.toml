@@ -10,6 +10,7 @@ keywords = ["modio", "discord"]
 edition = "2018"
 
 [dependencies]
+bitflags = "1"
 bytesize = "1"
 chrono = "0.4"
 dbl-rs = "0.2"
