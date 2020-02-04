@@ -161,13 +161,17 @@ impl fmt::Display for Subscriptions {
 /// }}}
 
 impl Subscriptions {
-    pub fn list_games(ctx: &mut Context, channel_id: ChannelId) -> Vec<u32> {
+    pub fn list_games(ctx: &mut Context, channel_id: ChannelId) -> HashMap<u32, Events> {
         let data = ctx.data.read();
         data.get::<Subscriptions>()
             .expect("failed to get settings map")
             .0
             .iter()
-            .filter_map(|(&k, v)| v.iter().find(|(chan, _, _)| *chan == channel_id).map(|_| k))
+            .filter_map(|(&k, v)| {
+                v.iter()
+                    .find(|(chan, _, _)| *chan == channel_id)
+                    .map(|(_, _, evts)| (k, *evts))
+            })
             .collect()
     }
 
@@ -176,6 +180,7 @@ impl Subscriptions {
         game_id: u32,
         channel_id: ChannelId,
         guild_id: Option<GuildId>,
+        _evts: Events,
     ) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
@@ -214,6 +219,7 @@ impl Subscriptions {
         game_id: u32,
         channel_id: ChannelId,
         guild_id: Option<GuildId>,
+        _evts: Events,
     ) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 

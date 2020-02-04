@@ -7,7 +7,7 @@ use modio::filter::prelude::*;
 use serenity::prelude::*;
 
 use crate::commands::prelude::*;
-use crate::db::Subscriptions;
+use crate::db::{Events, Subscriptions};
 use crate::util;
 
 #[command]
@@ -25,15 +25,20 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
         let exec = data.get::<ExecutorKey>().expect("get exec failed");
         let (tx, rx) = mpsc::channel();
 
-        let filter = Id::_in(games);
-        let task =
-            modio
-                .games()
-                .iter(filter)
-                .try_fold(util::ContentBuilder::default(), |mut buf, g| {
-                    let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
-                    future::ok(buf)
-                });
+        let filter = Id::_in(games.keys().collect::<Vec<_>>());
+        let task = modio.games().iter(filter).try_fold(
+            util::ContentBuilder::default(),
+            move |mut buf, g| {
+                let evts = games.get(&g.id).unwrap_or(&Events::ALL);
+                let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
+                    (true, true) | (false, false) => " (+Δ)",
+                    (true, false) => " (+)",
+                    (false, true) => " (Δ)",
+                };
+                let _ = writeln!(&mut buf, "{}. {} {}", g.id, g.name, suffix);
+                future::ok(buf)
+            },
+        );
 
         exec.spawn(async move {
             match task.await {
@@ -57,9 +62,60 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[command]
 #[description = "Subscribe the current channel to mod updates of a game"]
 #[aliases("sub")]
+#[sub_commands(subscribe_new, subscribe_update)]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn subscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub fn subscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::all())
+}
+
+#[command]
+#[description = "Subscribe the current channel to new mod notifications"]
+#[aliases("new")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn subscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::NEW)
+}
+
+#[command]
+#[description = "Subscribe the current channel to mod update notifications"]
+#[aliases("upd")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn subscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::UPD)
+}
+
+#[command]
+#[description = "Unsubscribe the current channel from mod updates of a game"]
+#[aliases("unsub")]
+#[sub_commands(unsubscribe_new, unsubscribe_update)]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn unsubscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::all())
+}
+
+#[command]
+#[description = "Unsubscribe the current channel from new mod notifications"]
+#[aliases("new")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn unsubscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::NEW)
+}
+
+#[command]
+#[description = "Unsubscribe the current channel from mod update notification"]
+#[aliases("upd")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn unsubscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::UPD)
+}
+
+fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
     let channel_id = msg.channel_id;
     let guild_id = msg.guild_id;
 
@@ -89,7 +145,7 @@ pub fn subscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandRes
     };
     if let Some(g) = game {
         let mut ctx2 = ctx.clone();
-        let ret = Subscriptions::add(&mut ctx2, g.id, channel_id, guild_id);
+        let ret = Subscriptions::add(&mut ctx2, g.id, channel_id, guild_id, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", g.name));
@@ -100,12 +156,7 @@ pub fn subscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandRes
     Ok(())
 }
 
-#[command]
-#[description = "Unsubscribe the current channel from mod updates of a game"]
-#[aliases("unsub")]
-#[min_args(1)]
-#[required_permissions("MANAGE_CHANNELS")]
-pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
     let channel_id = msg.channel_id;
     let guild_id = msg.guild_id;
 
@@ -136,7 +187,7 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandR
 
     if let Some(g) = game {
         let mut ctx2 = ctx.clone();
-        let ret = Subscriptions::remove(&mut ctx2, g.id, channel_id, guild_id);
+        let ret = Subscriptions::remove(&mut ctx2, g.id, channel_id, guild_id, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id.say(&ctx, format!("Unsubscribed to '{}'", g.name));
