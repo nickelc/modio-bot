@@ -30,11 +30,15 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
         let _ = channel.send_message(&http, |_| &mut msg);
     });
 
+    let mut tstamp = std::env::var("MODIO_DEBUG_TIMESTAMP")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok());
+
     async move {
         let mut interval = tokio::time::interval_at(Instant::now() + MIN, INTERVAL_DURATION);
 
         loop {
-            let tstamp = util::current_timestamp();
+            let tstamp = tstamp.take().unwrap_or_else(util::current_timestamp);
             interval.tick().await;
 
             let filter = DateAdded::gt(tstamp)
