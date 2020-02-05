@@ -16,7 +16,7 @@ use serenity::prelude::*;
 use tokio::runtime::Handle;
 use tokio::runtime::Runtime;
 
-use crate::db::{init_db, load_settings, load_subscriptions, DbPool, Settings, Subscriptions};
+use crate::db::{init_db, load_settings, DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
@@ -54,7 +54,7 @@ pub struct Handler;
 
 impl EventHandler for Handler {
     fn ready(&self, ctx: Context, ready: Ready) {
-        let (settings, subs) = {
+        let settings = {
             let data = ctx.data.read();
             let pool = data
                 .get::<PoolKey>()
@@ -63,15 +63,18 @@ impl EventHandler for Handler {
             let guilds = ready.guilds.iter().map(GuildStatus::id).collect::<Vec<_>>();
             info!("Guilds: {:?}", guilds);
 
-            let settings = load_settings(&pool, &guilds).unwrap_or_default();
-            let subs = load_subscriptions(&pool, &guilds).unwrap_or_default();
-            info!("Subscriptions: {}", subs);
+            let subs = data
+                .get::<Subscriptions>()
+                .expect("failed to get subscriptions");
 
-            (settings, subs)
+            if let Err(e) = subs.cleanup(&guilds) {
+                eprintln!("{}", e);
+            }
+
+            load_settings(&pool, &guilds).unwrap_or_default()
         };
         let mut data = ctx.data.write();
         data.insert::<Settings>(settings);
-        data.insert::<Subscriptions>(subs);
 
         let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
         ctx.set_activity(game);
@@ -245,7 +248,8 @@ pub fn initialize() -> Result<(Client, Modio, Runtime)> {
     let client = Client::new(&token, Handler)?;
     {
         let mut data = client.data.write();
-        data.insert::<PoolKey>(pool);
+        data.insert::<PoolKey>(pool.clone());
+        data.insert::<Subscriptions>(Subscriptions { pool });
         data.insert::<ModioKey>(modio.clone());
         data.insert::<ExecutorKey>(rt.handle().clone());
     }

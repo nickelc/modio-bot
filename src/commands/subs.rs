@@ -15,12 +15,12 @@ use crate::util;
 #[aliases("subs")]
 #[required_permissions("MANAGE_CHANNELS")]
 pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let mut ctx2 = ctx.clone();
     let channel_id = msg.channel_id;
-    let games = Subscriptions::list_games(&mut ctx2, msg.channel_id);
+    let data = ctx.data.read();
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let games = subs.list_games(msg.channel_id)?;
 
     if !games.is_empty() {
-        let data = ctx.data.read();
         let modio = data.get::<ModioKey>().expect("get modio failed");
         let exec = data.get::<ExecutorKey>().expect("get exec failed");
         let (tx, rx) = mpsc::channel();
@@ -144,8 +144,9 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
         rx.recv().unwrap()
     };
     if let Some(g) = game {
-        let mut ctx2 = ctx.clone();
-        let ret = Subscriptions::add(&mut ctx2, g.id, channel_id, guild_id, evts);
+        let data = ctx.data.read();
+        let subs = data.get::<Subscriptions>().expect("get subs failed");
+        let ret = subs.add(g.id, channel_id, guild_id, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", g.name));
@@ -158,7 +159,6 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
 
 fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
     let channel_id = msg.channel_id;
-    let guild_id = msg.guild_id;
 
     let game = {
         let data = ctx.data.read();
@@ -186,8 +186,9 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
     };
 
     if let Some(g) = game {
-        let mut ctx2 = ctx.clone();
-        let ret = Subscriptions::remove(&mut ctx2, g.id, channel_id, guild_id, evts);
+        let data = ctx.data.read();
+        let subs = data.get::<Subscriptions>().expect("get subs failed");
+        let ret = subs.remove(g.id, channel_id, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id.say(&ctx, format!("Unsubscribed to '{}'", g.name));

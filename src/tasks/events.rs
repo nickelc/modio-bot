@@ -47,12 +47,17 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                 ]))
                 .order_by(Id::asc());
 
-            let data2 = data.read();
-            let Subscriptions(subs) = data2
+            let data = data.read();
+            let subs = data
                 .get::<Subscriptions>()
-                .expect("failed to get subscriptions");
+                .expect("failed to get subscriptions")
+                .load()
+                .unwrap_or_else(|e| {
+                    eprintln!("failed to load subscriptions: {}", e);
+                    Default::default()
+                });
 
-            for (game, channels) in subs.clone() {
+            for (game, channels) in subs {
                 if channels.is_empty() {
                     continue;
                 }

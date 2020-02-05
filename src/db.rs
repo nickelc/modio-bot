@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt;
+use std::collections::HashMap;
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -111,8 +110,9 @@ impl Settings {
     }
 }
 
-#[derive(Default)]
-pub struct Subscriptions(pub HashMap<u32, HashSet<(ChannelId, Option<GuildId>, Events)>>);
+pub struct Subscriptions {
+    pub pool: DbPool,
+}
 
 bitflags::bitflags! {
     pub struct Events: i32 {
@@ -122,130 +122,131 @@ bitflags::bitflags! {
     }
 }
 
-/// impl Display for Subscriptions {{{
-impl fmt::Display for Subscriptions {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0.is_empty() {
-            return f.write_str("{}");
-        }
-        f.write_str("{")?;
-        let mut has_field = false;
-        for (game, channels) in &self.0 {
-            if has_field {
-                f.write_str(", ")?;
-            }
-            has_field = true;
-            if channels.is_empty() {
-                write!(f, "{}: {{}}", game)?;
-                continue;
-            }
-            write!(f, "{}: ", game)?;
-            let mut has_subs = false;
-            f.write_str("{")?;
-            for (channel_id, guild_id, _) in channels {
-                if has_subs {
-                    f.write_str(", ")?;
-                }
-                if let Some(guild_id) = guild_id {
-                    write!(f, "{}@{}", channel_id, guild_id)?;
-                } else {
-                    fmt::Display::fmt(&channel_id.0, f)?;
-                }
-                has_subs = true;
-            }
-            f.write_str("}")?;
-        }
-        f.write_str("}")
-    }
-}
-/// }}}
-
 impl Subscriptions {
-    pub fn list_games(ctx: &mut Context, channel_id: ChannelId) -> HashMap<u32, Events> {
-        let data = ctx.data.read();
-        data.get::<Subscriptions>()
-            .expect("failed to get settings map")
-            .0
-            .iter()
-            .filter_map(|(&k, v)| {
-                v.iter()
-                    .find(|(chan, _, _)| *chan == channel_id)
-                    .map(|(_, _, evts)| (k, *evts))
-            })
-            .collect()
+    pub fn cleanup(&self, guilds: &[GuildId]) -> Result<()> {
+        use crate::schema::subscriptions::dsl::*;
+
+        let conn = self.pool.get()?;
+        let it = guilds.iter().map(|g| g.0 as i64);
+        let ids = it.collect::<Vec<_>>();
+        let filter = subscriptions.filter(guild.ne_all(ids));
+        let num = diesel::delete(filter).execute(&conn)?;
+        info!("Deleted {} subscription(s).", num);
+        Ok(())
+    }
+
+    pub fn load(&self) -> Result<HashMap<u32, Vec<(ChannelId, Option<GuildId>, Events)>>> {
+        use crate::schema::subscriptions::dsl::*;
+
+        type Record = (i32, i64, Option<i64>, i32);
+
+        let conn = self.pool.get()?;
+        let list = subscriptions.load::<Record>(&conn)?;
+
+        Ok(list.into_iter().fold(
+            HashMap::new(),
+            |mut map, (game_id, channel_id, guild_id, evt)| {
+                let guild_id = guild_id.map(|id| GuildId(id as u64));
+                let evt = Events::from_bits_truncate(evt);
+                map.entry(game_id as u32).or_default().push((
+                    ChannelId(channel_id as u64),
+                    guild_id,
+                    evt,
+                ));
+                map
+            },
+        ))
+    }
+
+    pub fn list_games(&self, channel_id: ChannelId) -> Result<HashMap<u32, Events>> {
+        use crate::schema::subscriptions::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        let records = subscriptions
+            .select((game, events))
+            .filter(channel.eq(channel_id.0 as i64))
+            .load::<(i32, i32)>(&conn)?;
+
+        let records = records
+            .into_iter()
+            .map(|(game_id, evts)| (game_id as u32, Events::from_bits_truncate(evts)))
+            .collect();
+
+        Ok(records)
     }
 
     pub fn add(
-        ctx: &mut Context,
+        &self,
         game_id: u32,
         channel_id: ChannelId,
         guild_id: Option<GuildId>,
-        _evts: Events,
+        evts: Events,
     ) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
-        {
-            let mut data = ctx.data.write();
-            data.get_mut::<Subscriptions>()
-                .expect("failed to get settings map")
-                .0
-                .entry(game_id)
-                .or_insert_with(Default::default)
-                .insert((channel_id, guild_id, Events::ALL));
-        }
+        type Record = (i32, i64, Option<i64>, i32);
 
-        let data = ctx.data.read();
-        let pool = data
-            .get::<PoolKey>()
-            .expect("failed to get connection pool");
+        let conn = self.pool.get()?;
 
-        pool.get()
-            .map_err(Error::from)
-            .and_then(|conn| {
-                diesel::replace_into(subscriptions)
-                    .values((
-                        game.eq(game_id as i32),
-                        channel.eq(channel_id.0 as i64),
-                        guild.eq(guild_id.map(|g| g.0 as i64)),
-                    ))
-                    .execute(&conn)
-                    .map_err(Error::from)
-            })
-            .map(|_| ())
+        let pk = (game_id as i32, channel_id.0 as i64);
+        let first = subscriptions.find(pk).first::<Record>(&conn);
+
+        let (game_id, channel_id, guild_id, evts) = match first {
+            Ok((game_id, channel_id, guild_id, old_evts)) => {
+                let mut new_evts = Events::from_bits_truncate(old_evts);
+                new_evts |= evts;
+                (game_id, channel_id, guild_id, new_evts.bits)
+            }
+            Err(_) => {
+                let guild_id = guild_id.map(|g| g.0 as i64);
+                (pk.0, pk.1, guild_id, evts.bits)
+            }
+        };
+
+        diesel::replace_into(subscriptions)
+            .values((
+                game.eq(game_id),
+                channel.eq(channel_id),
+                guild.eq(guild_id),
+                events.eq(evts),
+            ))
+            .execute(&conn)?;
+
+        Ok(())
     }
 
-    pub fn remove(
-        ctx: &mut Context,
-        game_id: u32,
-        channel_id: ChannelId,
-        guild_id: Option<GuildId>,
-        _evts: Events,
-    ) -> Result<()> {
+    pub fn remove(&self, game_id: u32, channel_id: ChannelId, evts: Events) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
-        {
-            let mut data = ctx.data.write();
-            data.get_mut::<Subscriptions>()
-                .expect("failed to get settings map")
-                .0
-                .entry(game_id)
-                .or_default()
-                .retain(|(c, g, _)| (c, g) != (&channel_id, &guild_id));
+        type Record = (i32, i64, Option<i64>, i32);
+
+        let conn = self.pool.get()?;
+
+        let pk = (game_id as i32, channel_id.0 as i64);
+        let first = subscriptions.find(pk).first::<Record>(&conn);
+
+        if let Ok((game_id, channel_id, guild_id, old_evts)) = first {
+            let mut new_evts = Events::from_bits_truncate(old_evts);
+            new_evts.remove(evts);
+
+            if new_evts.is_empty() {
+                let pred = game.eq(game_id).and(channel.eq(channel_id));
+                let filter = subscriptions.filter(pred);
+                diesel::delete(filter).execute(&conn)?;
+            } else {
+                diesel::replace_into(subscriptions)
+                    .values((
+                        game.eq(game_id),
+                        channel.eq(channel_id),
+                        guild.eq(guild_id),
+                        events.eq(new_evts.bits),
+                    ))
+                    .execute(&conn)?;
+            }
         }
 
-        let data = ctx.data.read();
-        let pool = data
-            .get::<PoolKey>()
-            .expect("failed to get connection pool");
-
-        pool.get()
-            .map_err(Error::from)
-            .and_then(|conn| {
-                let pred = game.eq(game_id as i32).and(channel.eq(channel_id.0 as i64));
-                let filter = subscriptions.filter(pred);
-                diesel::delete(filter).execute(&conn).map_err(Error::from)
-            })
-            .map(|_| ())
+        Ok(())
     }
 }
 
@@ -288,41 +289,6 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
                 );
             }
             Ok(map)
-        })
-}
-
-pub fn load_subscriptions(pool: &DbPool, guilds: &[GuildId]) -> Result<Subscriptions> {
-    use crate::schema::subscriptions::dsl::*;
-
-    type Record = (i32, i64, Option<i64>, i32);
-
-    pool.get()
-        .map_err(Error::from)
-        .and_then(|conn| {
-            let it = guilds.iter().map(|g| g.0 as i64);
-            let ids = it.collect::<Vec<_>>();
-            let filter = subscriptions.filter(guild.ne_all(ids));
-            match diesel::delete(filter).execute(&conn).map_err(Error::from) {
-                Ok(num) => info!("Deleted {} subscription(s).", num),
-                Err(e) => eprintln!("{}", e),
-            }
-            Ok(conn)
-        })
-        .and_then(|conn| subscriptions.load::<Record>(&conn).map_err(Error::from))
-        .and_then(|list| {
-            Ok(Subscriptions(list.into_iter().fold(
-                Default::default(),
-                |mut map, (game_id, channel_id, guild_id, evt)| {
-                    let guild_id = guild_id.map(|id| GuildId(id as u64));
-                    let evt = Events::from_bits_truncate(evt);
-                    map.entry(game_id as u32).or_default().insert((
-                        ChannelId(channel_id as u64),
-                        guild_id,
-                        evt,
-                    ));
-                    map
-                },
-            )))
         })
 }
 
