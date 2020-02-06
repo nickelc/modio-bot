@@ -16,10 +16,12 @@ use crate::util::{PoolKey, Result};
 embed_migrations!("migrations");
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
+pub type GameId = u32;
+pub type Subscription = (ChannelId, Option<GuildId>, Events);
 
 #[derive(Default)]
 pub struct Settings {
-    pub game: Option<u32>,
+    pub game: Option<GameId>,
     pub prefix: Option<String>,
 }
 
@@ -67,13 +69,13 @@ impl Settings {
         }
     }
 
-    pub fn game(ctx: &mut Context, guild: GuildId) -> Option<u32> {
+    pub fn game(ctx: &mut Context, guild: GuildId) -> Option<GameId> {
         let data = ctx.data.read();
         let map = data.get::<Settings>().expect("failed to get settings map");
         map.get(&guild).and_then(|s| s.game)
     }
 
-    pub fn set_game(ctx: &mut Context, guild: GuildId, game: u32) {
+    pub fn set_game(ctx: &mut Context, guild: GuildId, game: GameId) {
         {
             let mut data = ctx.data.write();
             data.get_mut::<Settings>()
@@ -135,7 +137,7 @@ impl Subscriptions {
         Ok(())
     }
 
-    pub fn load(&self) -> Result<HashMap<u32, Vec<(ChannelId, Option<GuildId>, Events)>>> {
+    pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
         use crate::schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, Option<i64>, i32);
@@ -158,7 +160,7 @@ impl Subscriptions {
         ))
     }
 
-    pub fn list_games(&self, channel_id: ChannelId) -> Result<HashMap<u32, Events>> {
+    pub fn list_games(&self, channel_id: ChannelId) -> Result<HashMap<GameId, Events>> {
         use crate::schema::subscriptions::dsl::*;
 
         let conn = self.pool.get()?;
@@ -178,7 +180,7 @@ impl Subscriptions {
 
     pub fn add(
         &self,
-        game_id: u32,
+        game_id: GameId,
         channel_id: ChannelId,
         guild_id: Option<GuildId>,
         evts: Events,
@@ -216,7 +218,7 @@ impl Subscriptions {
         Ok(())
     }
 
-    pub fn remove(&self, game_id: u32, channel_id: ChannelId, evts: Events) -> Result<()> {
+    pub fn remove(&self, game_id: GameId, channel_id: ChannelId, evts: Events) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, Option<i64>, i32);
@@ -292,8 +294,8 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
         })
 }
 
-impl From<(GuildId, u32)> for ChangeSettings {
-    fn from(c: (GuildId, u32)) -> Self {
+impl From<(GuildId, GameId)> for ChangeSettings {
+    fn from(c: (GuildId, GameId)) -> Self {
         Self {
             guild: (c.0).0 as i64,
             game: Some(Some(c.1 as i32)),
