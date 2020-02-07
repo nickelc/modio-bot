@@ -1,3 +1,20 @@
+--- src/schema.rs.orig	2019-05-25 23:19:03.711325654 +0200
++++ src/schema.rs	2019-05-25 23:22:26.525025890 +0200
+@@ -1,12 +1,12 @@
+ table! {
+     blocked_guilds (guild) {
+-        guild -> Integer,
++        guild -> BigInt,
+     }
+ }
+ 
+ table! {
+     blocked_users (user) {
+-        user -> Integer,
++        user -> BigInt,
+     }
+ }
+ 
 --- src/schema.rs.orig	2019-02-10 21:15:15.827715165 +0100
 +++ src/schema.rs	2019-02-10 21:15:36.054407291 +0100
 @@ -1,6 +1,6 @@

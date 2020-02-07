@@ -1,3 +1,19 @@
+//! ![MODBOT logo][logo]
+//!
+//! ![Rust version][rust-version]
+//! ![Rust edition][rust-edition]
+//! ![License][license-badge]
+//!
+//! MODBOT is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
+//!
+//!
+//! [rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
+//! [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
+//! [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
+//! [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
+//! [mod.io]: https://mod.io
+//! [`modio-rs`]: https://github.com/nickelc/modio-rs
+//! [`serenity`]: https://github.com/serenity-rs/serenity
 #![deny(rust_2018_idioms)]
 
 #[macro_use]
@@ -55,7 +71,7 @@ fn try_main() -> CliResult {
         return Ok(());
     }
 
-    let (mut client, modio, rt) = util::initialize()?;
+    let (mut client, modio, rt, blocked) = util::initialize()?;
 
     rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
 
@@ -78,6 +94,8 @@ fn try_main() -> CliResult {
                     .dynamic_prefix(util::dynamic_prefix)
                     .on_mention(Some(bot))
                     .owners(owners)
+                    .blocked_guilds(blocked.guilds)
+                    .blocked_users(blocked.users)
             })
             .bucket("simple", |b| b.delay(1))
             .before(|_, msg, _| {

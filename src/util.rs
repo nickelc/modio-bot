@@ -16,7 +16,8 @@ use serenity::prelude::*;
 use tokio::runtime::Handle;
 use tokio::runtime::Runtime;
 
-use crate::db::{init_db, load_settings, DbPool, Settings, Subscriptions};
+use crate::db::{init_db, load_blocked, load_settings};
+use crate::db::{Blocked, DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
@@ -228,12 +229,13 @@ fn credentials() -> Result<Credentials> {
     }
 }
 
-pub fn initialize() -> Result<(Client, Modio, Runtime)> {
+pub fn initialize() -> Result<(Client, Modio, Runtime, Blocked)> {
     let token = var(DISCORD_BOT_TOKEN)?;
     let database_url = var(DATABASE_URL)?;
 
     let rt = Runtime::new()?;
     let pool = init_db(database_url)?;
+    let blocked = load_blocked(&pool)?;
 
     let modio = {
         let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
@@ -254,7 +256,7 @@ pub fn initialize() -> Result<(Client, Modio, Runtime)> {
         data.insert::<ExecutorKey>(rt.handle().clone());
     }
 
-    Ok((client, modio, rt))
+    Ok((client, modio, rt, blocked))
 }
 
 #[cfg(test)]

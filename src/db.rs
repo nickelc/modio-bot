@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -8,6 +9,7 @@ use serenity::client::Context;
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
 use serenity::model::id::GuildId;
+use serenity::model::id::UserId;
 
 use crate::error::Error;
 use crate::schema::settings;
@@ -18,6 +20,12 @@ embed_migrations!("migrations");
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
 pub type Subscription = (ChannelId, Option<GuildId>, Events);
+
+#[derive(Default, Debug, Clone)]
+pub struct Blocked {
+    pub guilds: HashSet<GuildId>,
+    pub users: HashSet<UserId>,
+}
 
 #[derive(Default)]
 pub struct Settings {
@@ -259,6 +267,21 @@ pub fn init_db(database_url: String) -> Result<DbPool> {
     embedded_migrations::run_with_output(&pool.get()?, &mut std::io::stdout())?;
 
     Ok(pool)
+}
+
+pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
+    use crate::schema::blocked_guilds::dsl::*;
+    use crate::schema::blocked_users::dsl::*;
+
+    let conn = pool.get()?;
+    let guilds = blocked_guilds
+        .load::<(i64,)>(&conn)
+        .ok()
+        .unwrap_or_default();
+    let users = blocked_users.load::<(i64,)>(&conn).ok().unwrap_or_default();
+    let guilds = guilds.iter().map(|id| GuildId(id.0 as u64)).collect();
+    let users = users.iter().map(|id| UserId(id.0 as u64)).collect();
+    Ok(Blocked { guilds, users })
 }
 
 pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, Settings>> {
