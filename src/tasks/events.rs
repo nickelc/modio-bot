@@ -84,6 +84,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
 
                     let mut events = mods
                         .events(filter)
+                        .iter()
                         .try_fold(Events::new(), |mut events, e| async {
                             events
                                 .entry(e.mod_id)
@@ -112,7 +113,8 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     let filter = Id::_in(events.keys().collect::<Vec<_>>());
                     let events = game
                         .mods()
-                        .iter(filter)
+                        .search(filter)
+                        .iter()
                         .map_ok(|m| events.get(&m.id).map(|evt| (m, evt)))
                         .try_filter_map(|e| async { Ok(e) })
                         .try_collect::<Vec<_>>()

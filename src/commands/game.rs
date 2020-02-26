@@ -20,7 +20,7 @@ pub fn list_games(ctx: &mut Context, msg: &Message) -> CommandResult {
 
     let (tx, rx) = mpsc::channel();
 
-    let task = modio.games().iter(Default::default()).try_fold(
+    let task = modio.games().search(Default::default()).iter().try_fold(
         ContentBuilder::default(),
         |mut buf, game| {
             let _ = writeln!(&mut buf, "{}. {}", game.id, game.name);
@@ -79,6 +79,7 @@ fn get_game(ctx: &mut Context, msg: &Message) -> CommandResult {
             .game(id)
             .mods()
             .statistics(Default::default())
+            .iter()
             .try_collect::<Vec<_>>()
             .and_then(|list| {
                 let total = list.len();
@@ -121,10 +122,15 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
                 Identifier::Id(id) => Id::eq(id),
                 Identifier::Search(id) => Fulltext::eq(id),
             };
-            let task = modio
-                .games()
-                .list(filter)
-                .and_then(|mut list| future::ok(list.shift()));
+            let task = modio.games().search(filter).first().and_then(|mut list| {
+                let game = if list.is_empty() {
+                    None
+                } else {
+                    Some(list.remove(0))
+                };
+
+                future::ok(game)
+            });
 
             exec.spawn(async move {
                 match task.await {

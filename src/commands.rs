@@ -1,4 +1,4 @@
-use modio::users::User;
+use modio::user::User;
 use serenity::builder::{CreateEmbedAuthor, CreateEmbedFooter};
 use serenity::framework::standard::CommandError;
 
@@ -10,7 +10,7 @@ pub mod prelude {
 
     pub use futures::{Future, Stream};
     pub use modio::filter::Operator;
-    pub use modio::users::User;
+    pub use modio::user::User;
     pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};
     pub use serenity::client::Context;
     pub use serenity::framework::standard::macros::command;

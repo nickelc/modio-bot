@@ -23,6 +23,7 @@ tokio = { version = "0.2", features = ["stream", "time"] }
 
 [dependencies.modio]
 git = "https://github.com/nickelc/modio-rs.git"
+rev = "bc645edd"
 default-features = false
 features = ["rustls-tls"]
 

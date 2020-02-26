@@ -70,7 +70,7 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
         };
 
         let game = modio.game(game_id);
-        let mods = game.mods().list(filter);
+        let mods = game.mods().search(filter).first();
         let task = future::try_join(game.get(), mods);
 
         exec.spawn(async move {
@@ -81,7 +81,7 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
         });
 
         let (game, list) = rx.recv().unwrap();
-        let ret = match list.count {
+        let ret = match list.len() {
             0 => Some(channel.say(&ctx, "no mods found.")),
             1 => {
                 let mod_ = &list[0];
@@ -167,7 +167,8 @@ fn find_mods(
 ) -> impl Future<Output = Result<(Game, Vec<Mod>), modio::Error>> {
     let mut limit = limit;
     let mods = mods
-        .iter(filter)
+        .search(filter)
+        .iter()
         .take_while(move |_| match limit.as_mut() {
             Some(ref v) if **v == 0 => future::ready(false),
             Some(v) => {

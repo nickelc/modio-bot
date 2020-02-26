@@ -26,7 +26,7 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
         let (tx, rx) = mpsc::channel();
 
         let filter = Id::_in(games.keys().collect::<Vec<_>>());
-        let task = modio.games().iter(filter).try_fold(
+        let task = modio.games().search(filter).iter().try_fold(
             util::ContentBuilder::default(),
             move |mut buf, g| {
                 let evts = games.get(&g.id).unwrap_or(&Events::ALL);
@@ -130,10 +130,14 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
         let exec = data.get::<ExecutorKey>().expect("get exec failed");
         let (tx, rx) = mpsc::channel();
 
-        let task = modio
-            .games()
-            .list(filter)
-            .and_then(|mut list| future::ok(list.shift()));
+        let task = modio.games().search(filter).first().and_then(|mut list| {
+            let game = if list.is_empty() {
+                None
+            } else {
+                Some(list.remove(0))
+            };
+            future::ok(game)
+        });
 
         exec.spawn(async move {
             match task.await {
@@ -170,10 +174,14 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
             Ok(id) => Id::eq(id),
             Err(_) => Fulltext::eq(args.rest().to_string()),
         };
-        let task = modio
-            .games()
-            .list(filter)
-            .and_then(|mut list| future::ok(list.shift()));
+        let task = modio.games().search(filter).first().and_then(|mut list| {
+            let game = if list.is_empty() {
+                None
+            } else {
+                Some(list.remove(0))
+            };
+            future::ok(game)
+        });
 
         exec.spawn(async move {
             match task.await {
