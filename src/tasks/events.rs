@@ -5,7 +5,7 @@ use std::time::Duration;
 use futures::TryStreamExt;
 use log::debug;
 use modio::filter::prelude::*;
-use modio::games::Game;
+use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{EventType, Mod};
 use modio::Modio;
@@ -184,6 +184,10 @@ fn create_message<'a, 'b>(
             })
         };
 
+    let with_ddl = game
+        .api_access_options
+        .contains(ApiAccessOptions::ALLOW_DIRECT_DOWNLOAD);
+
     match event {
         EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
         EventType::ModAvailable => {
@@ -197,8 +201,20 @@ fn create_message<'a, 'b>(
                 .as_ref()
                 .map(|f| {
                     let link = &f.download.binary_url;
-                    let no_version = || format!("[Download]({})", link);
-                    let version = |v| format!("[Version {}]({})", v, link);
+                    let no_version = || {
+                        if with_ddl {
+                            format!("[Download]({})", link)
+                        } else {
+                            String::new()
+                        }
+                    };
+                    let version = |v| {
+                        if with_ddl {
+                            format!("[Version {}]({})", v, link)
+                        } else {
+                            format!("Version {}", v)
+                        }
+                    };
                     let download = f
                         .version
                         .as_ref()

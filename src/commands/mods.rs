@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use futures::{future, StreamExt, TryStreamExt};
 
 use modio::filter::prelude::*;
-use modio::games::Game;
+use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::Popular as PopularFilter;
 use modio::mods::{Mod, Statistics};
 
@@ -234,11 +234,11 @@ pub trait ModExt {
         _: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a>;
 
-    fn create_fields(&self, is_new: bool) -> Vec<EmbedField>;
+    fn create_fields(&self, is_new: bool, with_ddl: bool) -> Vec<EmbedField>;
 }
 
 impl ModExt for Mod {
-    fn create_fields(&self, is_new: bool) -> Vec<EmbedField> {
+    fn create_fields(&self, is_new: bool, with_ddl: bool) -> Vec<EmbedField> {
         fn ratings(stats: &Statistics) -> Option<EmbedField> {
             Some((
                 "Ratings",
@@ -266,13 +266,19 @@ impl ModExt for Mod {
                 true,
             ))
         }
-        fn info(m: &Mod) -> Option<EmbedField> {
-            let mut info = String::from("Links: ");
+        fn info(m: &Mod, with_ddl: bool) -> Option<EmbedField> {
+            let mut info = if with_ddl {
+                String::from("Links: ")
+            } else {
+                String::new()
+            };
             if let Some(homepage) = &m.homepage_url {
                 let _ = write!(info, "[Homepage]({}), ", homepage);
             }
             if let Some(f) = &m.modfile {
-                let _ = writeln!(info, "[Download]({})", f.download.binary_url);
+                if with_ddl {
+                    let _ = writeln!(info, "[Download]({})", f.download.binary_url);
+                }
                 if let Some(version) = &f.version {
                     let _ = writeln!(info, "Version: {}", version);
                 }
@@ -298,9 +304,14 @@ impl ModExt for Mod {
         }
 
         let fields = if is_new {
-            vec![info(self), tags(self)]
+            vec![info(self, with_ddl), tags(self)]
         } else {
-            vec![ratings(&self.stats), info(self), dates(self), tags(self)]
+            vec![
+                ratings(&self.stats),
+                info(self, with_ddl),
+                dates(self),
+                tags(self),
+            ]
         };
         fields.into_iter().flatten().collect()
     }
@@ -310,6 +321,10 @@ impl ModExt for Mod {
         game: &Game,
         m: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a> {
+        let with_ddl = game
+            .api_access_options
+            .contains(ApiAccessOptions::ALLOW_DIRECT_DOWNLOAD);
+
         m.embed(|e| {
             e.title(self.name.to_string())
                 .url(self.profile_url.to_string())
@@ -321,7 +336,7 @@ impl ModExt for Mod {
                         .url(&game.profile_url.to_string())
                 })
                 .footer(|f| self.submitted_by.create_footer(f))
-                .fields(self.create_fields(false))
+                .fields(self.create_fields(false, with_ddl))
         })
     }
 
@@ -330,6 +345,10 @@ impl ModExt for Mod {
         game: &Game,
         m: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a> {
+        let with_ddl = game
+            .api_access_options
+            .contains(ApiAccessOptions::ALLOW_DIRECT_DOWNLOAD);
+
         m.embed(|e| {
             e.title(&self.name)
                 .url(&self.profile_url)
@@ -341,7 +360,7 @@ impl ModExt for Mod {
                         .url(&game.profile_url.to_string())
                 })
                 .footer(|f| self.submitted_by.create_footer(f))
-                .fields(self.create_fields(true))
+                .fields(self.create_fields(true, with_ddl))
         })
     }
 }
