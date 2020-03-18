@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use futures::{future, TryFutureExt, TryStreamExt};
 use modio::filter::prelude::*;
+use modio::games::ApiAccessOptions;
 
 use crate::commands::prelude::*;
 use crate::util::ContentBuilder;
@@ -143,6 +144,17 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
         };
 
         if let Some(game) = game {
+            if !game
+                .api_access_options
+                .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
+            {
+                let msg = format!(
+                    ":no_entry: Third party API access is disabled for '{}' but is required for the commands.",
+                    game.name
+                );
+                let _ = channel.say(&ctx, msg);
+                return Ok(());
+            }
             let mut ctx2 = ctx.clone();
             Settings::set_game(&mut ctx2, guild_id, game.id);
             let _ = channel.say(&ctx, format!("Game is set to '{}'", game.name));

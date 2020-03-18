@@ -4,6 +4,7 @@ use futures::future;
 use futures::TryFutureExt;
 use futures::TryStreamExt;
 use modio::filter::prelude::*;
+use modio::games::ApiAccessOptions;
 use serenity::prelude::*;
 
 use crate::commands::prelude::*;
@@ -147,13 +148,24 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
         });
         rx.recv().unwrap()
     };
-    if let Some(g) = game {
+    if let Some(game) = game {
+        if !game
+            .api_access_options
+            .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
+        {
+            let msg = format!(
+                ":no_entry: Third party API access is disabled for '{}' but is required for subscriptions.",
+                game.name
+            );
+            let _ = channel_id.say(&ctx, msg);
+            return Ok(());
+        }
         let data = ctx.data.read();
         let subs = data.get::<Subscriptions>().expect("get subs failed");
-        let ret = subs.add(g.id, channel_id, guild_id, evts);
+        let ret = subs.add(game.id, channel_id, guild_id, evts);
         match ret {
             Ok(_) => {
-                let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", g.name));
+                let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", game.name));
             }
             Err(e) => eprintln!("{}", e),
         }
