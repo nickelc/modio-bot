@@ -2,7 +2,7 @@ use std::env;
 
 use crate::config::Config;
 
-pub fn tools(config: &Config) -> bool {
+pub async fn tools(config: &Config) -> bool {
     let mut args = env::args().skip(1);
 
     let mut command = match args.next() {
@@ -14,7 +14,7 @@ pub fn tools(config: &Config) -> bool {
     let command = command.as_str();
 
     match command {
-        "print-servers" => print::print_servers(config),
+        "print-servers" => print::print_servers(config).await,
         _ => return false,
     };
 
@@ -23,11 +23,12 @@ pub fn tools(config: &Config) -> bool {
 
 mod print {
     use std::sync::{Arc, Mutex};
-    use std::thread;
     use std::time::Duration;
 
+    use serenity::async_trait;
     use serenity::model::prelude::*;
     use serenity::prelude::*;
+    use tokio::time;
 
     use crate::config::Config;
 
@@ -59,10 +60,11 @@ mod print {
 
     struct Handler;
 
+    #[async_trait]
     impl EventHandler for Handler {
-        fn ready(&self, ctx: Context, ready: Ready) {
+        async fn ready(&self, ctx: Context, ready: Ready) {
             let guilds = ready.guilds.len();
-            let mut data = ctx.data.write();
+            let mut data = ctx.data.write().await;
             let mut counter = data
                 .get_mut::<GuildCounter>()
                 .expect("failed to get GuildCounter")
@@ -72,8 +74,8 @@ mod print {
             println!("{} servers:", guilds);
         }
 
-        fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
-            let mut data = ctx.data.write();
+        async fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
+            let mut data = ctx.data.write().await;
             let mut counter = data
                 .get_mut::<GuildCounter>()
                 .expect("failed to get GuildCounter")
@@ -90,19 +92,21 @@ mod print {
         }
     }
 
-    pub fn print_servers(config: &Config) {
+    pub async fn print_servers(config: &Config) {
         let counter = Arc::new(Mutex::new(GuildCounter::default()));
 
         let thread_counter = counter.clone();
-        let token = config.bot.token.clone();
 
-        thread::spawn(move || {
-            let mut client = Client::new(&token, Handler).expect("failed to create client");
-            {
-                let mut data = client.data.write();
-                data.insert::<GuildCounter>(thread_counter);
-            }
-            client.start().expect("failed to start client");
+        let mut client = Client::builder(&config.bot.token)
+            .event_handler(Handler)
+            .await
+            .expect("failed to create client");
+        {
+            let mut data = client.data.write().await;
+            data.insert::<GuildCounter>(thread_counter);
+        }
+        tokio::spawn(async move {
+            client.start().await.expect("failed to start client");
         });
 
         loop {
@@ -116,7 +120,9 @@ mod print {
             if done {
                 break;
             }
-            thread::sleep(Duration::from_millis(200));
+            time::delay_for(Duration::from_millis(200)).await;
         }
+        println!("done");
+        std::process::exit(0);
     }
 }

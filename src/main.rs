@@ -22,7 +22,6 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 use dotenv::dotenv;
-use tokio::runtime::Runtime;
 
 mod bot;
 mod commands;
@@ -36,37 +35,37 @@ mod util;
 use db::init_db;
 use util::*;
 
-fn main() {
-    if let Err(e) = try_main() {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = try_main().await {
         eprintln!("{}", e);
         std::process::exit(1);
     }
 }
 
-fn try_main() -> CliResult {
+async fn try_main() -> CliResult {
     dotenv().ok();
     env_logger::init();
 
     let config = config::from_env()?;
 
-    if tools::tools(&config) {
+    if tools::tools(&config).await {
         return Ok(());
     }
 
-    let rt = Runtime::new()?;
     let pool = init_db(&config.bot.database_url)?;
     let modio = init_modio(&config)?;
 
-    let (mut client, bot) = bot::initialize(&config, modio.clone(), pool, rt.handle().clone())?;
+    let (mut client, bot) = bot::initialize(&config, modio.clone(), pool.clone()).await?;
 
-    rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
+    tokio::spawn(tasks::events::task(&client, modio.clone()));
 
     if let Ok(token) = util::var(config::DBL_TOKEN) {
         log::info!("Spawning DBL task");
         let cache = client.cache_and_http.cache.clone();
-        rt.spawn(tasks::dbl::task(bot, cache, &token)?);
+        tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
     }
 
-    client.start()?;
+    client.start().await?;
     Ok(())
 }

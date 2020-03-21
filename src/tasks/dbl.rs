@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use dbl::{types::ShardStats, Client};
 use log::error;
-use serenity::cache::CacheRwLock;
+use serenity::cache::Cache;
 use tokio::time::{interval_at, Instant};
 
 use crate::config::{DBL_OVERRIDE_BOT_ID, DBL_TOKEN};
@@ -30,7 +30,7 @@ pub fn get_profile(bot: u64) -> String {
     format!("{}/{}", DBL_BASE_URL, get_bot_id(bot))
 }
 
-pub fn task(bot: u64, cache: CacheRwLock, token: &str) -> Result<impl Future<Output = ()>, Error> {
+pub fn task(bot: u64, cache: Arc<Cache>, token: &str) -> Result<impl Future<Output = ()>, Error> {
     let bot = get_bot_id(bot);
     let client = Arc::new(Client::new(token.to_owned()).map_err(Error::Dbl)?);
 
@@ -39,7 +39,7 @@ pub fn task(bot: u64, cache: CacheRwLock, token: &str) -> Result<impl Future<Out
         loop {
             interval.tick().await;
             let client = Arc::clone(&client);
-            let servers = cache.read().guilds.len();
+            let servers = cache.guild_count().await;
             let stats = ShardStats::Cumulative {
                 server_count: servers as u64,
                 shard_count: None,

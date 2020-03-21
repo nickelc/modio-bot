@@ -20,8 +20,10 @@ futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 kuchiki = "0.8"
 log = "0.4"
-serenity = { version = "0.8" }
-tokio = { version = "0.2", features = ["stream", "time"] }
+tokio = { version = "0.2", features = ["stream", "time", "full"] }
+
+[dependencies.serenity]
+version = "0.9"
 
 [dependencies.modio]
 git = "https://github.com/nickelc/modio-rs.git"

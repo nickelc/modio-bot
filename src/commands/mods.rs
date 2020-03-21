@@ -1,5 +1,3 @@
-use std::sync::mpsc;
-
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::Popular as PopularFilter;
@@ -13,10 +11,10 @@ use crate::util::ContentBuilder;
 #[only_in(guilds)]
 #[bucket = "simple"]
 #[max_args(0)]
-pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
+pub async fn list_mods(ctx: &Context, msg: &Message) -> CommandResult {
     let channel = msg.channel_id;
     let game_id = {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let settings = data.get::<Settings>().expect("get settings failed");
         msg.guild_id.and_then(|id| settings.game(id))
     };
@@ -24,28 +22,18 @@ pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
     let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
 
     if let Some(id) = game_id {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
 
         let filter = Default::default();
         let game = modio.game(id);
         let mods = game.mods();
 
-        let task = find_mods(game, mods, filter, None);
+        let (game, mods) = find_mods(game, mods, filter, None).await?;
 
-        exec.spawn(async move {
-            match task.await {
-                Ok(data) => tx.send(data).unwrap(),
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-
-        let (game, mods) = rx.recv().unwrap();
-        send_mods(&mut ctx.clone(), channel, game, mods, "Mods", item);
+        send_mods(ctx, channel, game, mods, "Mods", item).await;
     } else {
-        let _ = channel.say(&ctx, "default game is not set.");
+        let _ = channel.say(ctx, "default game is not set.").await;
     }
     Ok(())
 }
@@ -56,19 +44,17 @@ pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[only_in(guilds)]
 #[bucket = "simple"]
 #[min_args(1)]
-pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn mod_info(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let channel = msg.channel_id;
     let game_id = {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let settings = data.get::<Settings>().expect("get settings failed");
         msg.guild_id.and_then(|id| settings.game(id))
     };
 
     if let Some(game_id) = game_id {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
 
         let filter = match args.single::<u32>() {
             Ok(id) => Id::eq(id),
@@ -77,21 +63,16 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
 
         let game = modio.game(game_id);
         let mods = game.mods().search(filter).first_page();
-        let task = future::try_join(game.get(), mods);
+        let (game, list) = future::try_join(game.get(), mods).await?;
 
-        exec.spawn(async move {
-            match task.await {
-                Ok(data) => tx.send(data).unwrap(),
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-
-        let (game, list) = rx.recv().unwrap();
         let ret = match list.len() {
-            0 => Some(channel.say(&ctx, "no mods found.")),
+            0 => Some(channel.say(ctx, "no mods found.").await),
             1 => {
                 let mod_ = &list[0];
-                Some(channel.send_message(&ctx, |m| mod_.create_message(&game, m)))
+                let ret = channel
+                    .send_message(ctx, |m| mod_.create_message(&game, m))
+                    .await;
+                Some(ret)
             }
             _ => {
                 let mods = list
@@ -101,9 +82,11 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
                         buf
                     });
                 for content in mods {
-                    let ret = channel.send_message(&ctx, |m| {
-                        m.embed(|e| e.title("Matching mods").description(content))
-                    });
+                    let ret = channel
+                        .send_message(ctx, |m| {
+                            m.embed(|e| e.title("Matching mods").description(content))
+                        })
+                        .await;
                     if let Err(e) = ret {
                         eprintln!("{:?}", e);
                     }
@@ -123,10 +106,10 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
 #[only_in(guilds)]
 #[bucket = "simple"]
 #[max_args(0)]
-pub fn popular(ctx: &mut Context, msg: &Message) -> CommandResult {
+pub async fn popular(ctx: &Context, msg: &Message) -> CommandResult {
     let channel = msg.channel_id;
     let game_id = {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let settings = data.get::<Settings>().expect("get settings failed");
         msg.guild_id.and_then(|id| settings.game(id))
     };
@@ -144,27 +127,17 @@ pub fn popular(ctx: &mut Context, msg: &Message) -> CommandResult {
     };
 
     if let Some(id) = game_id {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
 
         let filter = with_limit(10).order_by(PopularFilter::desc());
         let game = modio.game(id);
         let mods = game.mods();
-        let task = find_mods(game, mods, filter, Some(10));
+        let (game, mods) = find_mods(game, mods, filter, Some(10)).await?;
 
-        exec.spawn(async move {
-            match task.await {
-                Ok(data) => tx.send(data).unwrap(),
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-
-        let (game, mods) = rx.recv().unwrap();
-        send_mods(&mut ctx.clone(), channel, game, mods, "Popular Mods", item);
+        send_mods(ctx, channel, game, mods, "Popular Mods", item).await;
     } else {
-        let _ = channel.say(&ctx, "default game is not set.");
+        let _ = channel.say(ctx, "default game is not set.").await;
     }
     Ok(())
 }
@@ -191,8 +164,8 @@ fn find_mods(
     future::try_join(game.get(), mods)
 }
 
-fn send_mods<F>(
-    ctx: &mut Context,
+async fn send_mods<F>(
+    ctx: &Context,
     channel: ChannelId,
     game: Game,
     mods: Vec<Mod>,
@@ -209,21 +182,23 @@ fn send_mods<F>(
                 buf
             });
         for content in mods {
-            let ret = channel.send_message(&ctx, |m| {
-                m.embed(|e| {
-                    e.title(title).description(content).author(|a| {
-                        a.name(&game.name)
-                            .icon_url(&game.icon.thumb_64x64.to_string())
-                            .url(&game.profile_url.to_string())
+            let ret = channel
+                .send_message(ctx, |m| {
+                    m.embed(|e| {
+                        e.title(title).description(content).author(|a| {
+                            a.name(&game.name)
+                                .icon_url(&game.icon.thumb_64x64.to_string())
+                                .url(&game.profile_url.to_string())
+                        })
                     })
                 })
-            });
+                .await;
             if let Err(e) = ret {
                 eprintln!("{:?}", e);
             }
         }
     } else {
-        let ret = channel.say(&ctx, "no mods found.");
+        let ret = channel.say(ctx, "no mods found.").await;
         if let Err(e) = ret {
             eprintln!("{:?}", e);
         }

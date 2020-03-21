@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::mpsc;
 
 use futures_util::stream::FuturesUnordered;
 use modio::filter::prelude::*;
@@ -14,58 +13,48 @@ use crate::util;
 #[description = "List subscriptions of the current channel to mod updates of a game"]
 #[aliases("subs")]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
+pub async fn subscriptions(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let subs = data.get::<Subscriptions>().expect("get subs failed");
     let subs = subs.list_for_channel(msg.channel_id)?;
 
     if !subs.is_empty() {
         let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
 
         let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
-        let task = modio.games().search(filter).collect().and_then(|list| {
-            let games = list
-                .into_iter()
-                .map(|g| (g.id, g.name))
-                .collect::<HashMap<_, _>>();
-            let mut buf = util::ContentBuilder::default();
-            for (game_id, tags, evts) in subs {
-                let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
-                    (true, true) | (false, false) => " (+Δ)",
-                    (true, false) => " (+)",
-                    (false, true) => " (Δ)",
-                };
-                let tags = if tags.is_empty() {
-                    String::new()
-                } else {
-                    let mut buf = String::from(" | Tags: ");
-                    push_tags(&mut buf, tags.iter());
-                    buf
-                };
-                let name = games.get(&game_id).unwrap();
-                let _ = writeln!(&mut buf, "{}. {} {}{}", game_id, name, suffix, tags);
-            }
-            future::ok(buf)
-        });
+        let list = modio.games().search(filter).collect().await?;
+        let games = list
+            .into_iter()
+            .map(|g| (g.id, g.name))
+            .collect::<HashMap<_, _>>();
+        let mut buf = util::ContentBuilder::default();
+        for (game_id, tags, evts) in subs {
+            let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
+                (true, true) | (false, false) => " (+Δ)",
+                (true, false) => " (+)",
+                (false, true) => " (Δ)",
+            };
+            let tags = if tags.is_empty() {
+                String::new()
+            } else {
+                let mut buf = String::from(" | Tags: ");
+                push_tags(&mut buf, tags.iter());
+                buf
+            };
+            let name = games.get(&game_id).unwrap();
+            let _ = writeln!(&mut buf, "{}. {} {}{}", game_id, name, suffix, tags);
+        }
 
-        exec.spawn(async move {
-            match task.await {
-                Ok(games) => tx.send(games).unwrap(),
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-
-        let games = rx.recv().unwrap();
-        for content in games {
-            let _ = channel_id.send_message(&ctx, |m| {
-                m.embed(|e| e.title("Subscriptions").description(content))
-            });
+        for content in buf {
+            let _ = channel_id
+                .send_message(ctx, |m| {
+                    m.embed(|e| e.title("Subscriptions").description(content))
+                })
+                .await;
         }
     } else {
-        let _ = channel_id.say(&ctx, "No subscriptions found.");
+        let _ = channel_id.say(ctx, "No subscriptions found.").await;
     }
     Ok(())
 }
@@ -79,8 +68,8 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[usage("<name or id> [tag ..]")]
 #[example("snowrunner")]
 #[example("xcom \"UFO Defense\" Major")]
-pub fn subscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    _subscribe(ctx, msg, args, Events::all())
+pub async fn subscribe(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::all()).await
 }
 
 #[command]
@@ -91,8 +80,8 @@ pub fn subscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult 
 #[usage("<name or id> [tag ..]")]
 #[example("snowrunner")]
 #[example("xcom \"UFO Defense\" Major")]
-pub fn subscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    _subscribe(ctx, msg, args, Events::NEW)
+pub async fn subscribe_new(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::NEW).await
 }
 
 #[command]
@@ -103,8 +92,8 @@ pub fn subscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandRes
 #[usage("<name or id> [tag ..]")]
 #[example("snowrunner")]
 #[example("xcom \"UFO Defense\" Major")]
-pub fn subscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    _subscribe(ctx, msg, args, Events::UPD)
+pub async fn subscribe_update(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::UPD).await
 }
 
 #[command]
@@ -116,8 +105,8 @@ pub fn subscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> Command
 #[usage("<name or id> [tag ..]")]
 #[example("snowrunner")]
 #[example("xcom \"UFO Defense\" Major")]
-pub fn unsubscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    _unsubscribe(ctx, msg, args, Events::all())
+pub async fn unsubscribe(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::all()).await
 }
 
 #[command]
@@ -128,8 +117,8 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResul
 #[usage("<name or id> [tag ..]")]
 #[example("snowrunner")]
 #[example("xcom \"UFO Defense\" Major")]
-pub fn unsubscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    _unsubscribe(ctx, msg, args, Events::NEW)
+pub async fn unsubscribe_new(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::NEW).await
 }
 
 #[command]
@@ -140,51 +129,43 @@ pub fn unsubscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandR
 #[usage("<name or id> [tag ..]")]
 #[example("snowrunner")]
 #[example("xcom \"UFO Defense\" Major")]
-pub fn unsubscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    _unsubscribe(ctx, msg, args, Events::UPD)
+pub async fn unsubscribe_update(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::UPD).await
 }
 
 #[command]
 #[description = "List muted mods"]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
+pub async fn muted(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let subs = data.get::<Subscriptions>().expect("get subs failed");
     let modio = data.get::<ModioKey>().expect("get modio failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
-    let (tx, rx) = mpsc::channel();
 
     let excluded = subs.list_excluded_mods(msg.channel_id)?;
 
-    match excluded.len() {
+    let muted = match excluded.len() {
         0 => {
-            msg.channel_id.say(&ctx, "No mod is muted")?;
+            msg.channel_id.say(ctx, "No mod is muted").await?;
+            return Ok(());
         }
         1 => {
             let (game, mods) = excluded.into_iter().next().unwrap();
             let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
-            let task = modio
+            modio
                 .game(game)
                 .mods()
                 .search(filter)
                 .iter()
-                .and_then(|iter| {
-                    iter.try_fold(util::ContentBuilder::default(), |mut buf, m| {
-                        let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
-                        future::ok(buf)
-                    })
-                });
-
-            exec.spawn(async move {
-                match task.await {
-                    Ok(muted) => tx.send(muted).unwrap(),
-                    Err(e) => eprintln!("{}", e),
-                }
-            });
+                .await?
+                .try_fold(util::ContentBuilder::default(), |mut buf, m| {
+                    let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                    future::ok(buf)
+                })
+                .await?
         }
         _ => {
-            let task = excluded
+            excluded
                 .into_iter()
                 .map(|(game, mods)| {
                     let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
@@ -201,22 +182,17 @@ pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
                     }
                     let _ = writeln!(&mut buf);
                     future::ok(buf)
-                });
-
-            exec.spawn(async move {
-                match task.await {
-                    Ok(muted) => tx.send(muted).unwrap(),
-                    Err(e) => eprintln!("{}", e),
-                }
-            });
+                })
+                .await?
         }
-    }
+    };
 
-    let muted = rx.recv().unwrap();
     for content in muted {
-        let _ = channel_id.send_message(&ctx, |m| {
-            m.embed(|e| e.title("Muted mods").description(content))
-        });
+        let _ = channel_id
+            .send_message(ctx, |m| {
+                m.embed(|e| e.title("Muted mods").description(content))
+            })
+            .await;
     }
     Ok(())
 }
@@ -225,7 +201,7 @@ pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[description = "Mute update notifications for a mod"]
 #[min_args(2)]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn mute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn mute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let game_filter = match args.single::<u32>() {
         Ok(id) => Id::eq(id),
         Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
@@ -235,35 +211,31 @@ pub fn mute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
         Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
     };
 
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let modio = data.get::<ModioKey>().expect("get modio failed");
     let subs = data.get::<Subscriptions>().expect("get subs failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
-    let (tx, rx) = mpsc::channel();
 
-    let task = find_game_mod(modio.clone(), game_filter, mod_filter);
-
-    exec.spawn(async move {
-        match task.await {
-            Ok(game) => tx.send(game).unwrap(),
-            Err(e) => eprintln!("{}", e),
-        }
-    });
+    let game_mod = find_game_mod(modio.clone(), game_filter, mod_filter).await?;
 
     let channel = msg.channel_id;
-    match rx.recv().unwrap() {
+
+    match game_mod {
         (None, _) => {
-            channel.say(&ctx, "Game not found")?;
+            channel.say(ctx, "Game not found").await?;
         }
         (_, None) => {
-            channel.say(&ctx, "Mod not found")?;
+            channel.say(ctx, "Mod not found").await?;
         }
         (Some(game), Some(mod_)) => {
             if let Err(e) = subs.mute_mod(game.id, msg.channel_id, msg.guild_id, mod_.id) {
                 eprintln!("{}", e);
-                channel.say(&ctx, format!("Failed to mute '{}'", mod_.name))?;
+                channel
+                    .say(ctx, format!("Failed to mute '{}'", mod_.name))
+                    .await?;
             } else {
-                channel.say(&ctx, format!("The mod '{}' is now muted", mod_.name))?;
+                channel
+                    .say(ctx, format!("The mod '{}' is now muted", mod_.name))
+                    .await?;
             }
         }
     }
@@ -274,7 +246,7 @@ pub fn mute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
 #[description = "Unmute update notifications for a mod"]
 #[min_args(2)]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn unmute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn unmute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let game_filter = match args.single::<u32>() {
         Ok(id) => Id::eq(id),
         Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
@@ -284,35 +256,31 @@ pub fn unmute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult
         Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
     };
 
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let modio = data.get::<ModioKey>().expect("get modio failed");
     let subs = data.get::<Subscriptions>().expect("get subs failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
-    let (tx, rx) = mpsc::channel();
 
-    let task = find_game_mod(modio.clone(), game_filter, mod_filter);
-
-    exec.spawn(async move {
-        match task.await {
-            Ok(game) => tx.send(game).unwrap(),
-            Err(e) => eprintln!("{}", e),
-        }
-    });
+    let game_mod = find_game_mod(modio.clone(), game_filter, mod_filter).await?;
 
     let channel = msg.channel_id;
-    match rx.recv().unwrap() {
+
+    match game_mod {
         (None, _) => {
-            channel.say(&ctx, "Game not found")?;
+            channel.say(ctx, "Game not found").await?;
         }
         (_, None) => {
-            channel.say(&ctx, "Mod not found")?;
+            channel.say(ctx, "Mod not found").await?;
         }
         (Some(game), Some(mod_)) => {
             if let Err(e) = subs.unmute_mod(game.id, msg.channel_id, mod_.id) {
                 eprintln!("{}", e);
-                channel.say(&ctx, format!("Failed to unmute '{}'", mod_.name))?;
+                channel
+                    .say(ctx, format!("Failed to unmute '{}'", mod_.name))
+                    .await?;
             } else {
-                channel.say(&ctx, format!("The mod '{}' is now unmuted", mod_.name))?;
+                channel
+                    .say(ctx, format!("The mod '{}' is now unmuted", mod_.name))
+                    .await?;
             }
         }
     }
@@ -322,19 +290,18 @@ pub fn unmute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult
 #[command("muted-users")]
 #[description = "List muted users"]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn muted_users(ctx: &mut Context, msg: &Message) -> CommandResult {
+pub async fn muted_users(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let subs = data.get::<Subscriptions>().expect("get subs failed");
     let modio = data.get::<ModioKey>().expect("get modio failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
-    let (tx, rx) = mpsc::channel();
 
     let excluded = subs.list_excluded_users(msg.channel_id)?;
 
-    match excluded.len() {
+    let muted = match excluded.len() {
         0 => {
-            msg.channel_id.say(&ctx, "No user is muted")?;
+            msg.channel_id.say(ctx, "No user is muted").await?;
+            return Ok(());
         }
         1 => {
             let (_game, users) = excluded.into_iter().next().unwrap();
@@ -343,10 +310,10 @@ pub fn muted_users(ctx: &mut Context, msg: &Message) -> CommandResult {
             for (i, name) in users.iter().enumerate() {
                 let _ = writeln!(&mut muted, "{}. {}", i + 1, name);
             }
-            tx.send(muted).unwrap();
+            muted
         }
         _ => {
-            let task = excluded
+            excluded
                 .into_iter()
                 .map(|(game, users)| {
                     future::try_join(modio.game(game).get(), future::ready(Ok(users)))
@@ -359,22 +326,17 @@ pub fn muted_users(ctx: &mut Context, msg: &Message) -> CommandResult {
                     }
                     let _ = writeln!(&mut buf);
                     future::ok(buf)
-                });
-
-            exec.spawn(async move {
-                match task.await {
-                    Ok(muted) => tx.send(muted).unwrap(),
-                    Err(e) => eprintln!("{}", e),
-                }
-            });
+                })
+                .await?
         }
-    }
+    };
 
-    let muted = rx.recv().unwrap();
     for content in muted {
-        let _ = channel_id.send_message(&ctx, |m| {
-            m.embed(|e| e.title("Muted users").description(content))
-        });
+        let _ = channel_id
+            .send_message(&ctx, |m| {
+                m.embed(|e| e.title("Muted users").description(content))
+            })
+            .await;
     }
     Ok(())
 }
@@ -384,42 +346,37 @@ pub fn muted_users(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[min_args(2)]
 #[usage("<game> <username>")]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn mute_user(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn mute_user(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let game_filter = match args.single::<u32>() {
         Ok(id) => Id::eq(id),
         Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
     };
     let name = args.rest();
 
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let modio = data.get::<ModioKey>().expect("get modio failed");
     let subs = data.get::<Subscriptions>().expect("get subs failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
-    let (tx, rx) = mpsc::channel();
 
-    let task = modio.games().search(game_filter).first();
-
-    exec.spawn(async move {
-        match task.await {
-            Ok(game) => tx.send(game).unwrap(),
-            Err(e) => eprintln!("{}", e),
-        }
-    });
+    let game = modio.games().search(game_filter).first().await?;
 
     let channel = msg.channel_id;
-    match rx.recv().unwrap() {
+    match game {
         None => {
-            channel.say(&ctx, "Game not found")?;
+            channel.say(ctx, "Game not found").await?;
         }
         Some(game) => {
             if let Err(e) = subs.mute_user(game.id, msg.channel_id, msg.guild_id, name) {
                 eprintln!("{}", e);
-                channel.say(&ctx, format!("Failed to mute '{}'", name))?;
+                channel
+                    .say(ctx, format!("Failed to mute '{}'", name))
+                    .await?;
             } else {
-                channel.say(
-                    &ctx,
-                    format!("The user '{}' is now muted for '{}'", name, game.name),
-                )?;
+                channel
+                    .say(
+                        ctx,
+                        format!("The user '{}' is now muted for '{}'", name, game.name),
+                    )
+                    .await?;
             }
         }
     }
@@ -431,49 +388,44 @@ pub fn mute_user(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandRes
 #[min_args(2)]
 #[usage("<game> <username>")]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn unmute_user(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn unmute_user(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let game_filter = match args.single::<u32>() {
         Ok(id) => Id::eq(id),
         Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
     };
     let name = args.rest();
 
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let modio = data.get::<ModioKey>().expect("get modio failed");
     let subs = data.get::<Subscriptions>().expect("get subs failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
-    let (tx, rx) = mpsc::channel();
 
-    let task = modio.games().search(game_filter).first();
-
-    exec.spawn(async move {
-        match task.await {
-            Ok(game) => tx.send(game).unwrap(),
-            Err(e) => eprintln!("{}", e),
-        }
-    });
+    let game = modio.games().search(game_filter).first().await?;
 
     let channel = msg.channel_id;
-    match rx.recv().unwrap() {
+    match game {
         None => {
-            channel.say(&ctx, "Game not found")?;
+            channel.say(ctx, "Game not found").await?;
         }
         Some(game) => {
             if let Err(e) = subs.unmute_user(game.id, msg.channel_id, name) {
                 eprintln!("{}", e);
-                channel.say(&ctx, format!("Failed to unmute '{}'", name))?;
+                channel
+                    .say(ctx, format!("Failed to unmute '{}'", name))
+                    .await?;
             } else {
-                channel.say(
-                    &ctx,
-                    format!("The user '{}' is now unmuted for '{}'", name, game.name),
-                )?;
+                channel
+                    .say(
+                        ctx,
+                        format!("The user '{}' is now unmuted for '{}'", name, game.name),
+                    )
+                    .await?;
             }
         }
     }
     Ok(())
 }
 
-fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
+async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
     let channel_id = msg.channel_id;
     let guild_id = msg.guild_id;
 
@@ -482,22 +434,11 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
         Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
     };
 
-    let game = {
-        let data = ctx.data.read();
-        let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
 
-        let task = modio.games().search(filter).first();
+    let game = modio.games().search(filter).first().await?;
 
-        exec.spawn(async move {
-            match task.await {
-                Ok(game) => tx.send(game).unwrap(),
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-        rx.recv().unwrap()
-    };
     if let Some(game) = game {
         if !game
             .api_access_options
@@ -507,10 +448,10 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
                 ":no_entry: Third party API access is disabled for '{}' but is required for subscriptions.",
                 game.name
             );
-            let _ = channel_id.say(&ctx, msg);
+            let _ = channel_id.say(ctx, msg).await;
             return Ok(());
         }
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let subs = data.get::<Subscriptions>().expect("get subs failed");
         let game_tags = game
             .tag_options
@@ -529,14 +470,16 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
             msg.push_str("\nAvailable tags: ");
             push_tags(&mut msg, game_tags.iter());
 
-            channel_id.say(&ctx, msg)?;
+            channel_id.say(ctx, msg).await?;
             return Ok(());
         }
 
         let ret = subs.add(game.id, channel_id, sub_tags, guild_id, evts);
         match ret {
             Ok(_) => {
-                let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", game.name));
+                let _ = channel_id
+                    .say(ctx, format!("Subscribed to '{}'", game.name))
+                    .await;
             }
             Err(e) => eprintln!("{}", e),
         }
@@ -544,33 +487,20 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
     Ok(())
 }
 
-fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
+async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
     let channel_id = msg.channel_id;
 
-    let game = {
-        let data = ctx.data.read();
-        let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
 
-        let filter = match args.single::<u32>() {
-            Ok(id) => Id::eq(id),
-            Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
-        };
-        let task = modio.games().search(filter).first();
-
-        exec.spawn(async move {
-            match task.await {
-                Ok(game) => tx.send(game).unwrap(),
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-
-        rx.recv().unwrap()
+    let filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
     };
+    let game = modio.games().search(filter).first().await?;
 
     if let Some(game) = game {
-        let data = ctx.data.read();
+        let data = ctx.data.read().await;
         let subs = data.get::<Subscriptions>().expect("get subs failed");
         let game_tags = game
             .tag_options
@@ -589,14 +519,16 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
             msg.push_str("\nAvailable tags: ");
             push_tags(&mut msg, game_tags.iter());
 
-            channel_id.say(&ctx, msg)?;
+            channel_id.say(ctx, msg).await?;
             return Ok(());
         }
 
         let ret = subs.remove(game.id, channel_id, sub_tags, evts);
         match ret {
             Ok(_) => {
-                let _ = channel_id.say(&ctx, format!("Unsubscribed from '{}'", game.name));
+                let _ = channel_id
+                    .say(ctx, format!("Unsubscribed from '{}'", game.name))
+                    .await;
             }
             Err(e) => eprintln!("{}", e),
         }

@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::future::Future;
-use std::sync::mpsc;
 use std::time::Duration;
 
 use futures_util::TryStreamExt;
@@ -12,6 +11,7 @@ use modio::mods::{EventType, Mod};
 use modio::Modio;
 use serenity::builder::CreateMessage;
 use serenity::prelude::*;
+use tokio::sync::mpsc;
 use tokio::time::Instant;
 
 use crate::commands::prelude::*;
@@ -24,14 +24,17 @@ const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
     let data = client.data.clone();
     let http = client.cache_and_http.http.clone();
-    let (tx, rx) = mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>)>();
+    let (tx, mut rx) = mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>)>(100);
 
-    std::thread::spawn(move || loop {
-        let (channels, msg) = rx.recv().unwrap();
-        for channel in channels {
-            let mut msg = msg.clone();
-            if let Err(e) = channel.send_message(&http, |_| &mut msg) {
-                eprintln!("{}", e);
+    tokio::spawn(async move {
+        loop {
+            if let Some((channels, msg)) = rx.recv().await {
+                for channel in channels {
+                    let mut msg = msg.clone();
+                    if let Err(e) = channel.send_message(&http, |_| &mut msg).await {
+                        eprintln!("{}", e);
+                    }
+                }
             }
         }
     });
@@ -57,7 +60,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                 ]))
                 .order_by(Id::asc());
 
-            let data = data.read();
+            let data = data.read().await;
             let subs = data
                 .get::<Subscriptions>()
                 .expect("failed to get subscriptions")
@@ -75,7 +78,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     "polling events at {} for game={} channels: {:?}",
                     tstamp, game, channels
                 );
-                let tx = tx.clone();
+                let mut tx = tx.clone();
                 let filter = filter.clone();
                 let game = modio.game(game);
                 let mods = game.mods();
@@ -138,15 +141,15 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
 
                     let game = game.get().await?;
 
-                    for (m, evt) in updates.values() {
+                    for (_, (m, evt)) in updates.into_iter() {
                         let mut msg = CreateMessage::default();
                         create_message(&game, m, evt, &mut msg);
                         let mut effected_channels = BTreeSet::new();
 
                         for (channel, tags, _, evts, excluded_mods, excluded_users) in &channels {
-                            if *evt == &EventType::ModAvailable
+                            if *evt == EventType::ModAvailable
                                 && !evts.contains(crate::db::Events::NEW)
-                                || *evt == &EventType::ModfileChanged
+                                || *evt == EventType::ModfileChanged
                                     && !evts.contains(crate::db::Events::UPD)
                             {
                                 debug!("event ignored #{}: {} for {:?}", channel, evt, m.name,);
@@ -180,7 +183,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                             "send message {} for {:?} to {:?}",
                             evt, m.name, effected_channels
                         );
-                        if let Err(e) = tx.send((effected_channels, msg)) {
+                        if let Err(e) = tx.send((effected_channels, msg)).await {
                             eprintln!("{}", e);
                         }
                     }

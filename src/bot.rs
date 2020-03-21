@@ -1,10 +1,12 @@
 use modio::Modio;
-use serenity::framework::standard::{DispatchError, StandardFramework};
+use serenity::async_trait;
+use serenity::framework::standard::macros::hook;
+use serenity::framework::standard::StandardFramework;
+use serenity::http::Http;
 use serenity::model::channel::Message;
 use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::prelude::*;
-use tokio::runtime::Handle;
 
 use crate::commands::*;
 use crate::config::Config;
@@ -32,17 +34,13 @@ impl TypeMapKey for ModioKey {
     type Value = Modio;
 }
 
-pub struct ExecutorKey;
-
-impl TypeMapKey for ExecutorKey {
-    type Value = Handle;
-}
 pub struct Handler;
 
+#[async_trait]
 impl EventHandler for Handler {
-    fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         let settings = {
-            let data = ctx.data.read();
+            let data = ctx.data.read().await;
             let pool = data
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
@@ -60,77 +58,64 @@ impl EventHandler for Handler {
 
             load_settings(&pool, &guilds).unwrap_or_default()
         };
-        let mut data = ctx.data.write();
+        let mut data = ctx.data.write().await;
         data.get_mut::<Settings>()
             .expect("get settings failed")
             .data
             .extend(settings);
 
         let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
-        ctx.set_activity(game);
+        ctx.set_activity(game).await;
     }
 }
 
-fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
-    let data = ctx.data.read();
+#[hook]
+async fn dynamic_prefix(ctx: &Context, msg: &Message) -> Option<String> {
+    let data = ctx.data.read().await;
     data.get::<Settings>()
         .map(|s| s.prefix(msg.guild_id))
         .flatten()
 }
 
-pub fn initialize(
-    config: &Config,
-    modio: Modio,
-    pool: DbPool,
-    handle: Handle,
-) -> Result<(Client, u64)> {
+pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(Client, u64)> {
     let blocked = load_blocked(&pool)?;
 
-    let mut client = Client::new(&config.bot.token, Handler)?;
+    let http = Http::new_with_token(&config.bot.token);
 
-    let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
+    let (bot, owners) = match http.get_current_application_info().await {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
         Err(e) => panic!("Couldn't get application info: {}", e),
     };
 
-    client.with_framework(
-        StandardFramework::new()
-            .configure(|c| {
-                c.prefix("~")
-                    .dynamic_prefix(dynamic_prefix)
-                    .on_mention(Some(bot))
-                    .owners(owners)
-                    .blocked_guilds(blocked.guilds)
-                    .blocked_users(blocked.users)
-            })
-            .bucket("simple", |b| b.delay(1))
-            .before(|_, msg, _| {
-                log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
-                true
-            })
-            .group(&OWNER_GROUP)
-            .group(if crate::tasks::dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
-            .group(&BASIC_GROUP)
-            .group(&SUBSCRIPTIONS_GROUP)
-            .on_dispatch_error(|ctx, msg, error| match error {
-                DispatchError::NotEnoughArguments { .. } => {
-                    let _ = msg.channel_id.say(ctx, "Not enough arguments.");
-                }
-                DispatchError::LackingPermissions(_) => {
-                    let _ = msg
-                        .channel_id
-                        .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
-                }
-                DispatchError::Ratelimited(_) => {
-                    let _ = msg.channel_id.say(ctx, "Try again in 1 second.");
-                }
-                e => eprintln!("Dispatch error: {:?}", e),
-            })
-            .help(&HELP),
-    );
+    let framework = StandardFramework::new()
+        .configure(|c| {
+            c.prefix("~")
+                .dynamic_prefix(dynamic_prefix)
+                .on_mention(Some(bot))
+                .owners(owners)
+                .blocked_guilds(blocked.guilds)
+                .blocked_users(blocked.users)
+        })
+        .bucket("simple", |b| b.delay(1))
+        .await
+        .before(before)
+        .group(&OWNER_GROUP)
+        .group(if crate::tasks::dbl::is_dbl_enabled() {
+            &with_vote::GENERAL_GROUP
+        } else {
+            &GENERAL_GROUP
+        })
+        .group(&BASIC_GROUP)
+        .group(&SUBSCRIPTIONS_GROUP)
+        .on_dispatch_error(dispatch_error)
+        .help(&HELP);
 
+    let client = Client::builder(&config.bot.token)
+        .event_handler(Handler)
+        .framework(framework)
+        .await?;
     {
-        let mut data = client.data.write();
+        let mut data = client.data.write().await;
         data.insert::<PoolKey>(pool.clone());
         data.insert::<Settings>(Settings {
             pool: pool.clone(),
@@ -138,7 +123,6 @@ pub fn initialize(
         });
         data.insert::<Subscriptions>(Subscriptions { pool });
         data.insert::<ModioKey>(modio);
-        data.insert::<ExecutorKey>(handle);
     }
 
     Ok((client, *bot.as_u64()))

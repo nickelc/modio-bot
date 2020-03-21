@@ -35,6 +35,8 @@ pub enum Error {
     Query(QueryError),
 }
 
+impl std::error::Error for Error {}
+
 #[derive(Default, Debug, Clone)]
 pub struct Blocked {
     pub guilds: HashSet<GuildId>,

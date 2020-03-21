@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use modio::user::User;
 use serenity::builder::{CreateEmbedAuthor, CreateEmbedFooter};
 use serenity::client::Context;
-use serenity::framework::standard::macros::{group, help};
+use serenity::framework::standard::macros::{group, help, hook};
 use serenity::framework::standard::{
-    help_commands, Args, CommandGroup, CommandResult, HelpOptions,
+    help_commands, Args, CommandGroup, CommandResult, DispatchError, HelpOptions,
 };
 use serenity::model::prelude::*;
 
@@ -27,7 +27,7 @@ pub mod prelude {
     pub use serenity::model::id::ChannelId;
 
     pub use super::{EmbedField, UserExt};
-    pub use crate::bot::{ExecutorKey, ModioKey};
+    pub use crate::bot::ModioKey;
     pub use crate::db::Settings;
     pub use crate::error::Error;
     pub use crate::util::format_timestamp;
@@ -78,16 +78,42 @@ pub mod with_vote {
     struct General;
 }
 
+#[hook]
+pub async fn before(_: &Context, msg: &Message, _: &str) -> bool {
+    log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
+    true
+}
+
+#[hook]
+pub async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) -> () {
+    match error {
+        DispatchError::NotEnoughArguments { .. } => {
+            let _ = msg.channel_id.say(ctx, "Not enough arguments.").await;
+        }
+        DispatchError::LackingPermissions(_) => {
+            let _ = msg
+                .channel_id
+                .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.")
+                .await;
+        }
+        DispatchError::Ratelimited(_) => {
+            let _ = msg.channel_id.say(ctx, "Try again in 1 second.").await;
+        }
+        e => eprintln!("Dispatch error: {:?}", e),
+    }
+}
+
 #[help]
-fn help(
-    context: &mut Context,
+async fn help(
+    context: &Context,
     msg: &Message,
     args: Args,
     help_options: &'static HelpOptions,
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    help_commands::with_embeds(context, msg, args, help_options, groups, owners)
+    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+    Ok(())
 }
 
 pub trait UserExt {

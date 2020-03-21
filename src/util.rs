@@ -26,18 +26,19 @@ pub fn init_modio(config: &Config) -> Result<Modio> {
     Ok(modio)
 }
 
-pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
+pub async fn guild_stats(ctx: &Context) -> (usize, usize) {
     // ignore Discord Bot List server
     let dbl = GuildId(264_445_053_596_991_498);
-    ctx.cache
-        .read()
-        .guilds
-        .iter()
-        .filter(|&(&id, _)| dbl != id)
-        .fold((0, 0), |(count, sum), (_, guild)| {
-            let guild = guild.read();
-            (count + 1, sum + guild.members.len())
-        })
+    let guilds = ctx.cache.guilds().await;
+    let guilds = guilds.into_iter().filter(|&id| dbl != id);
+
+    let (mut servers, mut members) = (0, 0);
+    for id in guilds {
+        let count = ctx.cache.guild_field(id, |g| g.members.len()).await;
+        servers += 1;
+        members += count.unwrap_or_default();
+    }
+    (servers, members)
 }
 
 #[derive(Debug)]
