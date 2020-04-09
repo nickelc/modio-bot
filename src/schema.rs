@@ -27,9 +27,19 @@ table! {
     }
 }
 
+table! {
+    subscriptions_exclude_mods (game, channel, mod_id) {
+        game -> Integer,
+        channel -> BigInt,
+        guild -> Nullable<BigInt>,
+        mod_id -> Integer,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     blocked_guilds,
     blocked_users,
     settings,
     subscriptions,
+    subscriptions_exclude_mods,
 );
