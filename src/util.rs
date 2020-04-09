@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::env;
 use std::env::VarError;
 use std::fmt;
@@ -26,7 +25,7 @@ pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl TypeMapKey for Settings {
-    type Value = HashMap<GuildId, Settings>;
+    type Value = Settings;
 }
 
 impl TypeMapKey for Subscriptions {
@@ -75,7 +74,10 @@ impl EventHandler for Handler {
             load_settings(&pool, &guilds).unwrap_or_default()
         };
         let mut data = ctx.data.write();
-        data.insert::<Settings>(settings);
+        data.get_mut::<Settings>()
+            .expect("get settings failed")
+            .data
+            .extend(settings);
 
         let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
         ctx.set_activity(game);
@@ -97,7 +99,8 @@ pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
 }
 
 pub fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
-    Settings::prefix(ctx, msg)
+    let data = ctx.data.read();
+    data.get::<Settings>().map(|s| s.prefix(msg)).flatten()
 }
 
 #[derive(Debug, Clone)]
@@ -251,6 +254,10 @@ pub fn initialize() -> Result<(Client, Modio, Runtime, Blocked)> {
     {
         let mut data = client.data.write();
         data.insert::<PoolKey>(pool.clone());
+        data.insert::<Settings>(Settings {
+            pool: pool.clone(),
+            data: Default::default(),
+        });
         data.insert::<Subscriptions>(Subscriptions { pool });
         data.insert::<ModioKey>(modio.clone());
         data.insert::<ExecutorKey>(rt.handle().clone());

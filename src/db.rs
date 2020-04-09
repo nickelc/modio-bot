@@ -5,7 +5,6 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::info;
-use serenity::client::Context;
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
 use serenity::model::id::GuildId;
@@ -13,7 +12,7 @@ use serenity::model::id::UserId;
 
 use crate::error::Error;
 use crate::schema::settings;
-use crate::util::{PoolKey, Result};
+use crate::util::Result;
 
 embed_migrations!("migrations");
 
@@ -28,9 +27,9 @@ pub struct Blocked {
 }
 
 #[derive(Default)]
-pub struct Settings {
-    pub game: Option<GameId>,
-    pub prefix: Option<String>,
+pub struct GuildSettings {
+    game: Option<GameId>,
+    prefix: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset)]
@@ -42,16 +41,16 @@ struct ChangeSettings {
     pub prefix: Option<Option<String>>,
 }
 
+pub struct Settings {
+    pub pool: DbPool,
+    pub data: HashMap<GuildId, GuildSettings>,
+}
+
 impl Settings {
-    fn persist(ctx: &mut Context, change: ChangeSettings) {
+    fn persist(&self, change: ChangeSettings) {
         use crate::schema::settings::dsl::*;
 
-        let data = ctx.data.read();
-        let pool = data
-            .get::<PoolKey>()
-            .expect("failed to get connection pool");
-
-        let ret = pool.get().map_err(Error::from).and_then(|conn| {
+        let ret = self.pool.get().map_err(Error::from).and_then(|conn| {
             let target = settings.filter(guild.eq(change.guild));
             let query = diesel::update(target).set(&change);
 
@@ -77,46 +76,27 @@ impl Settings {
         }
     }
 
-    pub fn game(ctx: &mut Context, guild: GuildId) -> Option<GameId> {
-        let data = ctx.data.read();
-        let map = data.get::<Settings>().expect("failed to get settings map");
-        map.get(&guild).and_then(|s| s.game)
+    pub fn game(&self, guild: GuildId) -> Option<GameId> {
+        self.data.get(&guild).and_then(|s| s.game)
     }
 
-    pub fn set_game(ctx: &mut Context, guild: GuildId, game: GameId) {
-        {
-            let mut data = ctx.data.write();
-            data.get_mut::<Settings>()
-                .expect("failed to get settings map")
-                .entry(guild)
-                .or_insert_with(Default::default)
-                .game = Some(game);
-        }
+    pub fn set_game(&mut self, guild: GuildId, game: GameId) {
+        self.data.entry(guild).or_default().game = Some(game);
 
         let change = (guild, game);
-        Settings::persist(ctx, change.into());
+        self.persist(change.into());
     }
 
-    pub fn prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
-        msg.guild_id.and_then(|id| {
-            let data = ctx.data.read();
-            let map = data.get::<Settings>().expect("failed to get settings map");
-            map.get(&id).and_then(|s| s.prefix.clone())
-        })
+    pub fn prefix(&self, msg: &Message) -> Option<String> {
+        msg.guild_id
+            .and_then(|id| self.data.get(&id).and_then(|s| s.prefix.clone()))
     }
 
-    pub fn set_prefix(ctx: &mut Context, guild: GuildId, prefix: Option<String>) {
-        {
-            let mut data = ctx.data.write();
-            data.get_mut::<Settings>()
-                .expect("failed to get settings map")
-                .entry(guild)
-                .or_insert_with(Default::default)
-                .prefix = prefix.clone();
-        }
+    pub fn set_prefix(&mut self, guild: GuildId, prefix: Option<String>) {
+        self.data.entry(guild).or_default().prefix = prefix.clone();
 
         let change = (guild, prefix);
-        Settings::persist(ctx, change.into());
+        self.persist(change.into());
     }
 }
 
@@ -284,37 +264,33 @@ pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
     Ok(Blocked { guilds, users })
 }
 
-pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, Settings>> {
+pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, GuildSettings>> {
     use crate::schema::settings::dsl::*;
 
     type Record = (i64, Option<i32>, Option<String>);
 
-    pool.get()
-        .map_err(Error::from)
-        .and_then(|conn| {
-            let it = guilds.iter().map(|g| g.0 as i64);
-            let ids = it.collect::<Vec<_>>();
-            let filter = settings.filter(guild.ne_all(ids));
-            match diesel::delete(filter).execute(&conn).map_err(Error::from) {
-                Ok(num) => info!("Deleted {} guild(s).", num),
-                Err(e) => eprintln!("{}", e),
-            }
-            Ok(conn)
-        })
-        .and_then(|conn| settings.load::<Record>(&conn).map_err(Error::from))
-        .and_then(|list| {
-            let mut map = HashMap::new();
-            for r in list {
-                map.insert(
-                    GuildId(r.0 as u64),
-                    Settings {
-                        game: r.1.map(|id| id as u32),
-                        prefix: r.2,
-                    },
-                );
-            }
-            Ok(map)
-        })
+    let conn = pool.get()?;
+
+    let it = guilds.iter().map(|g| g.0 as i64);
+    let ids = it.collect::<Vec<_>>();
+    let filter = settings.filter(guild.ne_all(ids));
+    match diesel::delete(filter).execute(&conn).map_err(Error::from) {
+        Ok(num) => info!("Deleted {} guild(s).", num),
+        Err(e) => eprintln!("{}", e),
+    }
+
+    let list = settings.load::<Record>(&conn).unwrap_or_default();
+    let mut map = HashMap::new();
+    for r in list {
+        map.insert(
+            GuildId(r.0 as u64),
+            GuildSettings {
+                game: r.1.map(|id| id as u32),
+                prefix: r.2,
+            },
+        );
+    }
+    Ok(map)
 }
 
 impl From<(GuildId, GameId)> for ChangeSettings {

@@ -99,7 +99,9 @@ pub fn prefix(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult
             .say(&ctx, format!("Prefix is set to `{}`", prefix))?,
         None => msg.channel_id.say(&ctx, "Prefix is set to `~`")?,
     };
-    Settings::set_prefix(ctx, msg.guild_id.expect("guild only"), prefix);
+    let mut data = ctx.data.write();
+    let settings = data.get_mut::<Settings>().expect("get settings failed");
+    settings.set_prefix(msg.guild_id.expect("guild only"), prefix);
     Ok(())
 }
 

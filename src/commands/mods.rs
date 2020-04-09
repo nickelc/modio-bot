@@ -17,7 +17,11 @@ use crate::util::ContentBuilder;
 #[max_args(0)]
 pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
     let channel = msg.channel_id;
-    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
+    let game_id = {
+        let data = ctx.data.read();
+        let settings = data.get::<Settings>().expect("get settings failed");
+        msg.guild_id.and_then(|id| settings.game(id))
+    };
 
     let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
 
@@ -56,7 +60,11 @@ pub fn list_mods(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[min_args(1)]
 pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
     let channel = msg.channel_id;
-    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
+    let game_id = {
+        let data = ctx.data.read();
+        let settings = data.get::<Settings>().expect("get settings failed");
+        msg.guild_id.and_then(|id| settings.game(id))
+    };
 
     if let Some(game_id) = game_id {
         let data = ctx.data.read();
@@ -119,7 +127,11 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
 #[max_args(0)]
 pub fn popular(ctx: &mut Context, msg: &Message) -> CommandResult {
     let channel = msg.channel_id;
-    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
+    let game_id = {
+        let data = ctx.data.read();
+        let settings = data.get::<Settings>().expect("get settings failed");
+        msg.guild_id.and_then(|id| settings.game(id))
+    };
 
     let item = |m: &Mod| {
         format!(

@@ -67,12 +67,13 @@ pub fn game(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
 }
 
 fn get_game(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let channel = msg.channel_id;
-    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
-
     let data = ctx.data.read();
+    let settings = data.get::<Settings>().expect("get settings failed");
     let modio = data.get::<ModioKey>().expect("get modio failed");
     let exec = data.get::<ExecutorKey>().expect("get exec failed");
+
+    let channel = msg.channel_id;
+    let game_id = msg.guild_id.and_then(|id| settings.game(id));
 
     if let Some(id) = game_id {
         let (tx, rx) = mpsc::channel();
@@ -155,8 +156,11 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
                 let _ = channel.say(&ctx, msg);
                 return Ok(());
             }
-            let mut ctx2 = ctx.clone();
-            Settings::set_game(&mut ctx2, guild_id, game.id);
+            {
+                let mut data = ctx.data.write();
+                let settings = data.get_mut::<Settings>().expect("get settings failed");
+                settings.set_game(guild_id, game.id);
+            }
             let _ = channel.say(&ctx, format!("Game is set to '{}'", game.name));
         } else {
             let _ = channel.say(&ctx, "Game not found");
