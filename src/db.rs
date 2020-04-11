@@ -120,9 +120,16 @@ impl Subscriptions {
         let conn = self.pool.get()?;
         let it = guilds.iter().map(|g| g.0 as i64);
         let ids = it.collect::<Vec<_>>();
-        let filter = subscriptions.filter(guild.ne_all(ids));
+        let filter = subscriptions.filter(guild.ne_all(&ids));
         let num = diesel::delete(filter).execute(&conn)?;
         info!("Deleted {} subscription(s).", num);
+
+        {
+            use crate::schema::subscriptions_exclude_mods::dsl::*;
+            let filter = subscriptions_exclude_mods.filter(guild.ne_all(ids));
+            let num = diesel::delete(filter).execute(&conn)?;
+            info!("Deleted {} excluded mods.", num);
+        }
         Ok(())
     }
 
@@ -244,6 +251,13 @@ impl Subscriptions {
                 let pred = game.eq(game_id).and(channel.eq(channel_id));
                 let filter = subscriptions.filter(pred);
                 diesel::delete(filter).execute(&conn)?;
+
+                {
+                    use crate::schema::subscriptions_exclude_mods::dsl::*;
+                    let pred = game.eq(game_id).and(channel.eq(channel_id));
+                    let filter = subscriptions_exclude_mods.filter(pred);
+                    diesel::delete(filter).execute(&conn)?;
+                }
             } else {
                 diesel::replace_into(subscriptions)
                     .values((
