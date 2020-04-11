@@ -133,13 +133,17 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     for (m, evt) in updates.values() {
                         let mut msg = CreateMessage::default();
                         create_message(&game, m, evt, &mut msg);
-                        for (channel, _, evts) in &channels {
+                        for (channel, _, evts, excluded) in &channels {
                             if *evt == &EventType::ModAvailable
                                 && !evts.contains(crate::db::Events::NEW)
                                 || *evt == &EventType::ModfileChanged
                                     && !evts.contains(crate::db::Events::UPD)
                             {
                                 debug!("event ignored #{}: {} for {:?}", channel, evt, m.name,);
+                                continue;
+                            }
+                            if excluded.contains(&m.id) {
+                                debug!("mod ignored #{}: {} for {:?}", channel, evt, m.name,);
                                 continue;
                             }
                             debug!("send message to #{}: {} for {:?}", channel, evt, m.name,);

@@ -18,7 +18,8 @@ embed_migrations!("migrations");
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
-pub type Subscription = (ChannelId, Option<GuildId>, Events);
+pub type ExcludeMods = HashSet<u32>;
+pub type Subscription = (ChannelId, Option<GuildId>, Events, ExcludeMods);
 
 #[derive(Default, Debug, Clone)]
 pub struct Blocked {
@@ -133,19 +134,38 @@ impl Subscriptions {
         let conn = self.pool.get()?;
         let list = subscriptions.load::<Record>(&conn)?;
 
+        let mut excluded = self.load_excluded_mods()?;
+
         Ok(list.into_iter().fold(
             HashMap::new(),
             |mut map, (game_id, channel_id, guild_id, evt)| {
+                let game_id = game_id as GameId;
+                let channel_id = ChannelId(channel_id as u64);
                 let guild_id = guild_id.map(|id| GuildId(id as u64));
                 let evt = Events::from_bits_truncate(evt);
-                map.entry(game_id as u32).or_default().push((
-                    ChannelId(channel_id as u64),
-                    guild_id,
-                    evt,
-                ));
+                let excluded = excluded.remove(&(game_id, channel_id)).unwrap_or_default();
+                map.entry(game_id)
+                    .or_default()
+                    .push((channel_id, guild_id, evt, excluded));
                 map
             },
         ))
+    }
+
+    fn load_excluded_mods(&self) -> Result<HashMap<(GameId, ChannelId), ExcludeMods>> {
+        use crate::schema::subscriptions_exclude_mods::dsl::*;
+
+        type Record = (i32, i64, Option<i64>, i32);
+
+        let conn = self.pool.get()?;
+        let list = subscriptions_exclude_mods.load::<Record>(&conn)?;
+        Ok(list
+            .into_iter()
+            .fold(HashMap::new(), |mut map, (game_id, channel_id, _, mid)| {
+                let key = (game_id as GameId, ChannelId(channel_id as u64));
+                map.entry(key).or_default().insert(mid as u32);
+                map
+            }))
     }
 
     pub fn list_games(&self, channel_id: ChannelId) -> Result<HashMap<GameId, Events>> {
