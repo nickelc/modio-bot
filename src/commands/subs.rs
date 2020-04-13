@@ -116,6 +116,104 @@ pub fn unsubscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> Comma
     _unsubscribe(ctx, msg, args, Events::UPD)
 }
 
+#[command]
+#[description = "Mute update notifications for a mod"]
+#[min_args(2)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn mute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+    let game_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+    let mod_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+
+    let data = ctx.data.read();
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let exec = data.get::<ExecutorKey>().expect("get exec failed");
+    let (tx, rx) = mpsc::channel();
+
+    let task = find_game_mod(modio.clone(), game_filter, mod_filter);
+
+    exec.spawn(async move {
+        match task.await {
+            Ok(game) => tx.send(game).unwrap(),
+            Err(e) => eprintln!("{}", e),
+        }
+    });
+
+    let channel = msg.channel_id;
+    match rx.recv().unwrap() {
+        (None, _) => {
+            channel.say(&ctx, "Game not found")?;
+        }
+        (_, None) => {
+            channel.say(&ctx, "Mod not found")?;
+        }
+        (Some(game), Some(mod_)) => {
+            if let Err(e) = subs.mute_mod(game.id, msg.channel_id, msg.guild_id, mod_.id) {
+                eprintln!("{}", e);
+                channel.say(&ctx, format!("Failed to mute '{}'", mod_.name))?;
+            } else {
+                channel.say(&ctx, format!("The mod '{}' is now muted", mod_.name))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[command]
+#[description = "Unmute update notifications for a mod"]
+#[min_args(2)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn unmute(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+    let game_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+    let mod_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+
+    let data = ctx.data.read();
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let exec = data.get::<ExecutorKey>().expect("get exec failed");
+    let (tx, rx) = mpsc::channel();
+
+    let task = find_game_mod(modio.clone(), game_filter, mod_filter);
+
+    exec.spawn(async move {
+        match task.await {
+            Ok(game) => tx.send(game).unwrap(),
+            Err(e) => eprintln!("{}", e),
+        }
+    });
+
+    let channel = msg.channel_id;
+    match rx.recv().unwrap() {
+        (None, _) => {
+            channel.say(&ctx, "Game not found")?;
+        }
+        (_, None) => {
+            channel.say(&ctx, "Mod not found")?;
+        }
+        (Some(game), Some(mod_)) => {
+            if let Err(e) = subs.unmute_mod(game.id, msg.channel_id, mod_.id) {
+                eprintln!("{}", e);
+                channel.say(&ctx, format!("Failed to unmute '{}'", mod_.name))?;
+            } else {
+                channel.say(&ctx, format!("The mod '{}' is now unmuted", mod_.name))?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
     let channel_id = msg.channel_id;
     let guild_id = msg.guild_id;
@@ -217,4 +315,33 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
         }
     }
     Ok(())
+}
+
+use modio::filter::Filter;
+use modio::games::Game;
+use modio::mods::Mod;
+use modio::{Modio, Result};
+
+async fn find_game_mod(
+    modio: Modio,
+    game_filter: Filter,
+    mod_filter: Filter,
+) -> Result<(Option<Game>, Option<Mod>)> {
+    let mut games = modio.games().search(game_filter).first().await?;
+    if games.is_empty() {
+        return Ok((None, None));
+    }
+    let game = games.remove(0);
+
+    let mut mods = modio
+        .game(game.id)
+        .mods()
+        .search(mod_filter)
+        .first()
+        .await?;
+
+    if mods.is_empty() {
+        return Ok((Some(game), None));
+    }
+    Ok((Some(game), Some(mods.remove(0))))
 }

@@ -272,6 +272,42 @@ impl Subscriptions {
 
         Ok(())
     }
+
+    pub fn mute_mod(
+        &self,
+        game_id: GameId,
+        channel_id: ChannelId,
+        guild_id: Option<GuildId>,
+        id: u32,
+    ) -> Result<()> {
+        use crate::schema::subscriptions_exclude_mods::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        diesel::insert_into(subscriptions_exclude_mods)
+            .values((
+                game.eq(game_id as i32),
+                channel.eq(channel_id.0 as i64),
+                guild.eq(guild_id.map(|g| g.0 as i64)),
+                mod_id.eq(id as i32),
+            ))
+            .execute(&conn)?;
+        Ok(())
+    }
+
+    pub fn unmute_mod(&self, game_id: GameId, channel_id: ChannelId, id: u32) -> Result<()> {
+        use crate::schema::subscriptions_exclude_mods::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        let filter = subscriptions_exclude_mods.filter(
+            game.eq(game_id as i32)
+                .and(channel.eq(channel_id.0 as i64))
+                .and(mod_id.eq(id as i32)),
+        );
+        diesel::delete(filter).execute(&conn)?;
+        Ok(())
+    }
 }
 
 pub fn init_db(database_url: String) -> Result<DbPool> {

@@ -142,7 +142,9 @@ struct General;
     popular,
     subscriptions,
     subscribe,
-    unsubscribe
+    unsubscribe,
+    mute,
+    unmute
 )]
 struct Modio;
 
