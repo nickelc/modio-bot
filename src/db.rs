@@ -18,8 +18,8 @@ embed_migrations!("migrations");
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
-pub type ExcludeMods = HashSet<u32>;
-pub type Subscription = (ChannelId, Option<GuildId>, Events, ExcludeMods);
+pub type ExcludedMods = HashSet<u32>;
+pub type Subscription = (ChannelId, Option<GuildId>, Events, ExcludedMods);
 
 #[derive(Default, Debug, Clone)]
 pub struct Blocked {
@@ -159,7 +159,7 @@ impl Subscriptions {
         ))
     }
 
-    fn load_excluded_mods(&self) -> Result<HashMap<(GameId, ChannelId), ExcludeMods>> {
+    fn load_excluded_mods(&self) -> Result<HashMap<(GameId, ChannelId), ExcludedMods>> {
         use crate::schema::subscriptions_exclude_mods::dsl::*;
 
         type Record = (i32, i64, Option<i64>, i32);
@@ -193,7 +193,7 @@ impl Subscriptions {
         Ok(records)
     }
 
-    pub fn list_excluded(&self, channel_id: ChannelId) -> Result<HashMap<GameId, ExcludeMods>> {
+    pub fn list_excluded(&self, channel_id: ChannelId) -> Result<HashMap<GameId, ExcludedMods>> {
         use crate::schema::subscriptions_exclude_mods::dsl::*;
 
         let conn = self.pool.get()?;
@@ -203,7 +203,7 @@ impl Subscriptions {
             .filter(channel.eq(channel_id.0 as i64))
             .load::<(i32, i32)>(&conn)?;
 
-        let records: HashMap<GameId, ExcludeMods> =
+        let records: HashMap<GameId, ExcludedMods> =
             records
                 .into_iter()
                 .fold(HashMap::new(), |mut map, (game_id, mid)| {

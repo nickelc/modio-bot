@@ -146,7 +146,7 @@ pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
 
             exec.spawn(async move {
                 match task.await {
-                    Ok(games) => tx.send(games).unwrap(),
+                    Ok(muted) => tx.send(muted).unwrap(),
                     Err(e) => eprintln!("{}", e),
                 }
             });
@@ -167,13 +167,13 @@ pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
                     for m in mods {
                         let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
                     }
-                    let _ = writeln!(&mut buf, "");
+                    let _ = writeln!(&mut buf);
                     future::ok(buf)
                 });
 
             exec.spawn(async move {
                 match task.await {
-                    Ok(games) => tx.send(games).unwrap(),
+                    Ok(muted) => tx.send(muted).unwrap(),
                     Err(e) => eprintln!("{}", e),
                 }
             });
