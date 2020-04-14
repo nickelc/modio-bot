@@ -193,6 +193,26 @@ impl Subscriptions {
         Ok(records)
     }
 
+    pub fn list_excluded(&self, channel_id: ChannelId) -> Result<HashMap<GameId, ExcludeMods>> {
+        use crate::schema::subscriptions_exclude_mods::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        let records = subscriptions_exclude_mods
+            .select((game, mod_id))
+            .filter(channel.eq(channel_id.0 as i64))
+            .load::<(i32, i32)>(&conn)?;
+
+        let records: HashMap<GameId, ExcludeMods> =
+            records
+                .into_iter()
+                .fold(HashMap::new(), |mut map, (game_id, mid)| {
+                    map.entry(game_id as GameId).or_default().insert(mid as u32);
+                    map
+                });
+        Ok(records)
+    }
+
     pub fn add(
         &self,
         game_id: GameId,

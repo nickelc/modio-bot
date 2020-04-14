@@ -117,6 +117,79 @@ pub fn unsubscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> Comma
 }
 
 #[command]
+#[description = "List muted mods"]
+#[required_permissions("MANAGE_CHANNELS")]
+pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
+    let channel_id = msg.channel_id;
+    let data = ctx.data.read();
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let exec = data.get::<ExecutorKey>().expect("get exec failed");
+    let (tx, rx) = mpsc::channel();
+
+    let excluded = subs.list_excluded(msg.channel_id)?;
+
+    match excluded.len() {
+        0 => {
+            msg.channel_id.say(&ctx, "No mod is muted")?;
+        }
+        1 => {
+            let (game, mods) = excluded.into_iter().next().unwrap();
+            let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
+            let task = modio.game(game).mods().search(filter).iter().try_fold(
+                util::ContentBuilder::default(),
+                |mut buf, m| {
+                    let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                    future::ok(buf)
+                },
+            );
+
+            exec.spawn(async move {
+                match task.await {
+                    Ok(games) => tx.send(games).unwrap(),
+                    Err(e) => eprintln!("{}", e),
+                }
+            });
+        }
+        _ => {
+            let task = excluded
+                .into_iter()
+                .map(|(game, mods)| {
+                    let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
+                    future::try_join(
+                        modio.game(game).get(),
+                        modio.game(game).mods().search(filter).collect(),
+                    )
+                })
+                .collect::<futures::stream::FuturesUnordered<_>>()
+                .try_fold(util::ContentBuilder::default(), |mut buf, (game, mods)| {
+                    let _ = writeln!(&mut buf, "**{}**", game.name);
+                    for m in mods {
+                        let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                    }
+                    let _ = writeln!(&mut buf, "");
+                    future::ok(buf)
+                });
+
+            exec.spawn(async move {
+                match task.await {
+                    Ok(games) => tx.send(games).unwrap(),
+                    Err(e) => eprintln!("{}", e),
+                }
+            });
+        }
+    }
+
+    let muted = rx.recv().unwrap();
+    for content in muted {
+        let _ = channel_id.send_message(&ctx, |m| {
+            m.embed(|e| e.title("Muted mods").description(content))
+        });
+    }
+    Ok(())
+}
+
+#[command]
 #[description = "Mute update notifications for a mod"]
 #[min_args(2)]
 #[required_permissions("MANAGE_CHANNELS")]

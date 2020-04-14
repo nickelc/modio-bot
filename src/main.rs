@@ -143,6 +143,7 @@ struct General;
     subscriptions,
     subscribe,
     unsubscribe,
+    muted,
     mute,
     unmute
 )]
