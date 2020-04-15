@@ -78,7 +78,7 @@ pub fn mod_info(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResu
         };
 
         let game = modio.game(game_id);
-        let mods = game.mods().search(filter).first();
+        let mods = game.mods().search(filter).first_page();
         let task = future::try_join(game.get(), mods);
 
         exec.spawn(async move {

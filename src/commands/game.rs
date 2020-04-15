@@ -124,15 +124,7 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
                 Identifier::Id(id) => Id::eq(id),
                 Identifier::Search(id) => Fulltext::eq(id),
             };
-            let task = modio.games().search(filter).first().and_then(|mut list| {
-                let game = if list.is_empty() {
-                    None
-                } else {
-                    Some(list.remove(0))
-                };
-
-                future::ok(game)
-            });
+            let task = modio.games().search(filter).first();
 
             exec.spawn(async move {
                 match task.await {

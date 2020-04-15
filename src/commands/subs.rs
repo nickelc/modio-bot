@@ -1,7 +1,6 @@
 use std::sync::mpsc;
 
 use futures::future;
-use futures::TryFutureExt;
 use futures::TryStreamExt;
 use modio::filter::prelude::*;
 use modio::games::ApiAccessOptions;
@@ -302,14 +301,7 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
         let exec = data.get::<ExecutorKey>().expect("get exec failed");
         let (tx, rx) = mpsc::channel();
 
-        let task = modio.games().search(filter).first().and_then(|mut list| {
-            let game = if list.is_empty() {
-                None
-            } else {
-                Some(list.remove(0))
-            };
-            future::ok(game)
-        });
+        let task = modio.games().search(filter).first();
 
         exec.spawn(async move {
             match task.await {
@@ -357,14 +349,7 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
             Ok(id) => Id::eq(id),
             Err(_) => Fulltext::eq(args.rest().to_string()),
         };
-        let task = modio.games().search(filter).first().and_then(|mut list| {
-            let game = if list.is_empty() {
-                None
-            } else {
-                Some(list.remove(0))
-            };
-            future::ok(game)
-        });
+        let task = modio.games().search(filter).first();
 
         exec.spawn(async move {
             match task.await {
@@ -400,21 +385,22 @@ async fn find_game_mod(
     game_filter: Filter,
     mod_filter: Filter,
 ) -> Result<(Option<Game>, Option<Mod>)> {
-    let mut games = modio.games().search(game_filter).first().await?;
-    if games.is_empty() {
+    let game = if let Some(game) = modio.games().search(game_filter).first().await? {
+        game
+    } else {
         return Ok((None, None));
-    }
-    let game = games.remove(0);
+    };
 
-    let mut mods = modio
+    let mod_ = modio
         .game(game.id)
         .mods()
         .search(mod_filter)
         .first()
         .await?;
 
-    if mods.is_empty() {
-        return Ok((Some(game), None));
+    if let Some(mod_) = mod_ {
+        Ok((Some(game), Some(mod_)))
+    } else {
+        Ok((Some(game), None))
     }
-    Ok((Some(game), Some(mods.remove(0))))
 }
