@@ -85,13 +85,15 @@ async fn set_game(ctx: &Context, msg: &Message, id: Identifier) -> CommandResult
     let channel = msg.channel_id;
 
     if let Some(guild_id) = msg.guild_id {
-        let data = ctx.data.read().await;
-        let modio = data.get::<ModioKey>().expect("get modio failed");
-        let filter = match id {
-            Identifier::Id(id) => Id::eq(id),
-            Identifier::Search(id) => Fulltext::eq(id),
+        let game = {
+            let data = ctx.data.read().await;
+            let modio = data.get::<ModioKey>().expect("get modio failed");
+            let filter = match id {
+                Identifier::Id(id) => Id::eq(id),
+                Identifier::Search(id) => Fulltext::eq(id),
+            };
+            modio.games().search(filter).first().await?
         };
-        let game = modio.games().search(filter).first().await?;
 
         if let Some(game) = game {
             if !game
