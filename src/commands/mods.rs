@@ -7,7 +7,6 @@ use modio::mods::filters::Popular as PopularFilter;
 use modio::mods::{Mod, Statistics};
 
 use crate::commands::prelude::*;
-use crate::util::ContentBuilder;
 
 #[command("mod")]
 #[description = "Search mods or show the details for a single mod."]
@@ -116,95 +115,47 @@ pub async fn popular(ctx: &Context, msg: &Message) -> CommandResult {
         msg.guild_id.and_then(|id| settings.game(id))
     };
 
-    let item = |m: &Mod| {
-        format!(
-            "{:02}. [{}]({}) ({}) +{}/-{}\n",
-            m.stats.popularity.rank_position,
-            m.name,
-            m.profile_url,
-            m.id,
-            m.stats.ratings.positive,
-            m.stats.ratings.negative,
-        )
-    };
-
     if let Some(id) = game_id {
         let data = ctx.data.read().await;
         let modio = data.get::<ModioKey>().expect("get modio failed");
 
         let filter = with_limit(10).order_by(PopularFilter::desc());
         let game = modio.game(id);
-        let mods = game.mods();
-        let (game, mods) = find_mods(game, mods, filter, Some(10)).await?;
+        let mods = game.mods().search(filter).first_page().await?;
+        let game = game.get().await?;
 
-        send_mods(ctx, channel, game, mods, "Popular Mods", item).await;
-    } else {
-        let _ = channel.say(ctx, "default game is not set.").await;
-    }
-    Ok(())
-}
-
-fn find_mods(
-    game: modio::games::GameRef,
-    mods: modio::mods::Mods,
-    filter: Filter,
-    limit: Option<usize>,
-) -> impl Future<Output = Result<(Game, Vec<Mod>), modio::Error>> {
-    let mut limit = limit;
-    let mods = mods.search(filter).iter().and_then(move |iter| {
-        iter.take_while(move |_| match limit.as_mut() {
-            Some(ref v) if **v == 0 => future::ready(false),
-            Some(v) => {
-                *v -= 1;
-                future::ready(true)
-            }
-            None => future::ready(true),
-        })
-        .try_collect()
-    });
-
-    future::try_join(game.get(), mods)
-}
-
-async fn send_mods<F>(
-    ctx: &Context,
-    channel: ChannelId,
-    game: Game,
-    mods: Vec<Mod>,
-    title: &'static str,
-    item: F,
-) where
-    F: Fn(&Mod) -> String + Send + 'static,
-{
-    if !mods.is_empty() {
-        let mods = mods
-            .iter()
-            .fold(ContentBuilder::default(), |mut buf, mod_| {
-                let _ = buf.write_str(&item(&mod_));
-                buf
-            });
-        for content in mods {
-            let ret = channel
+        if !mods.is_empty() {
+            let content = mods.iter().try_fold(String::new(), |mut buf, mod_| {
+                writeln!(
+                    &mut buf,
+                    "{:02}. [{}]({}) ({}) +{}/-{}",
+                    mod_.stats.popularity.rank_position,
+                    mod_.name,
+                    mod_.profile_url,
+                    mod_.id,
+                    mod_.stats.ratings.positive,
+                    mod_.stats.ratings.negative,
+                )?;
+                Ok::<_, std::fmt::Error>(buf)
+            })?;
+            channel
                 .send_message(ctx, |m| {
                     m.embed(|e| {
-                        e.title(title).description(content).author(|a| {
+                        e.title("Popular Mods").description(content).author(|a| {
                             a.name(&game.name)
                                 .icon_url(&game.icon.thumb_64x64.to_string())
                                 .url(&game.profile_url.to_string())
                         })
                     })
                 })
-                .await;
-            if let Err(e) = ret {
-                eprintln!("{:?}", e);
-            }
+                .await?;
+        } else {
+            channel.say(ctx, "no mods found.").await?;
         }
     } else {
-        let ret = channel.say(ctx, "no mods found.").await;
-        if let Err(e) = ret {
-            eprintln!("{:?}", e);
-        }
+        channel.say(ctx, "default game is not set.").await?;
     }
+    Ok(())
 }
 
 pub trait ModExt {
