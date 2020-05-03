@@ -1,3 +1,6 @@
+use std::borrow::Cow;
+use std::time::Duration;
+
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::Popular as PopularFilter;
@@ -6,45 +9,22 @@ use modio::mods::{Mod, Statistics};
 use crate::commands::prelude::*;
 use crate::util::ContentBuilder;
 
-#[command("mods")]
-#[description = "List mods of the default game"]
-#[only_in(guilds)]
-#[bucket = "simple"]
-#[max_args(0)]
-pub async fn list_mods(ctx: &Context, msg: &Message) -> CommandResult {
-    let channel = msg.channel_id;
-    let game_id = {
-        let data = ctx.data.read().await;
-        let settings = data.get::<Settings>().expect("get settings failed");
-        msg.guild_id.and_then(|id| settings.game(id))
-    };
-
-    let item = |m: &Mod| format!("{}. {}\n", m.id, m.name);
-
-    if let Some(id) = game_id {
-        let data = ctx.data.read().await;
-        let modio = data.get::<ModioKey>().expect("get modio failed");
-
-        let filter = Default::default();
-        let game = modio.game(id);
-        let mods = game.mods();
-
-        let (game, mods) = find_mods(game, mods, filter, None).await?;
-
-        send_mods(ctx, channel, game, mods, "Mods", item).await;
-    } else {
-        let _ = channel.say(ctx, "default game is not set.").await;
-    }
-    Ok(())
-}
-
 #[command("mod")]
 #[description = "Search mods or show the details for a single mod."]
 #[usage = "mod <id|search>"]
 #[only_in(guilds)]
 #[bucket = "simple"]
 #[min_args(1)]
-pub async fn mod_info(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn mod_info(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    list_mods(ctx, msg, args).await
+}
+
+#[command("mods")]
+#[description = "List mods of the default game"]
+#[usage = "mods [id|search]"]
+#[only_in(guilds)]
+#[bucket = "simple"]
+pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let channel = msg.channel_id;
     let game_id = {
         let data = ctx.data.read().await;
@@ -52,50 +32,72 @@ pub async fn mod_info(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
         msg.guild_id.and_then(|id| settings.game(id))
     };
 
-    if let Some(game_id) = game_id {
+    if let Some(id) = game_id {
         let data = ctx.data.read().await;
         let modio = data.get::<ModioKey>().expect("get modio failed");
 
-        let filter = match args.single::<u32>() {
-            Ok(id) => Id::eq(id),
-            Err(_) => Fulltext::eq(args.rest()),
-        };
-
-        let game = modio.game(game_id);
-        let mods = game.mods().search(filter).first_page();
-        let (game, list) = future::try_join(game.get(), mods).await?;
-
-        let ret = match list.len() {
-            0 => Some(channel.say(ctx, "no mods found.").await),
-            1 => {
-                let mod_ = &list[0];
-                let ret = channel
-                    .send_message(ctx, |m| mod_.create_message(&game, m))
-                    .await;
-                Some(ret)
+        let (filter, title): (Filter, Cow<'_, _>) = if args.is_empty() {
+            (Filter::default(), "Mods".into())
+        } else {
+            match args.single::<u32>() {
+                Ok(id) => (Id::eq(id), "Mods".into()),
+                Err(_) => (
+                    Fulltext::eq(args.rest()),
+                    format!("Mods matching: '{}'", args.rest()).into(),
+                ),
             }
-            _ => {
-                let mods = list
-                    .into_iter()
-                    .fold(ContentBuilder::default(), |mut buf, mod_| {
-                        let _ = writeln!(&mut buf, "{}. {}", mod_.id, mod_.name);
-                        buf
-                    });
-                for content in mods {
-                    let ret = channel
-                        .send_message(ctx, |m| {
-                            m.embed(|e| e.title("Matching mods").description(content))
-                        })
-                        .await;
-                    if let Err(e) = ret {
-                        eprintln!("{:?}", e);
-                    }
+        };
+        let game = modio.game(id);
+        let mods = game.mods();
+
+        let mut first = true;
+        let mut st = mods.search(filter.and(with_limit(20))).paged().await?;
+        loop {
+            match st.try_next().await? {
+                None if first => {
+                    channel.say(ctx, "no mods found.").await?;
+                    break;
                 }
-                None
+                None => {
+                    channel.say(ctx, "no other mods found.").await?;
+                    break;
+                }
+                Some(list) if list.len() == 1 && first => {
+                    let game = game.get().await?;
+                    let mod_ = &list[0];
+                    channel
+                        .send_message(ctx, |m| mod_.create_message(&game, m))
+                        .await?;
+                    break;
+                }
+                Some(list) => {
+                    let content = list.iter().try_fold(String::new(), |mut buf, mod_| {
+                        writeln!(&mut buf, "{}. {}", mod_.id, mod_.name)?;
+                        Ok::<_, std::fmt::Error>(buf)
+                    })?;
+                    channel
+                        .send_message(ctx, |m| {
+                            m.embed(|e| {
+                                e.title(&title)
+                                    .description(content)
+                                    .footer(|f| f.text("Type `next` within 15s for the next page"))
+                            })
+                        })
+                        .await?;
+                }
             }
-        };
-        if let Some(Err(e)) = ret {
-            eprintln!("{:?}", e);
+            first = false;
+
+            let collector = msg
+                .author
+                .await_reply(ctx)
+                .channel_id(channel)
+                .filter(|m| m.content.to_lowercase() == "next")
+                .timeout(Duration::from_secs(15));
+
+            if collector.await.is_none() {
+                break;
+            }
         }
     }
     Ok(())

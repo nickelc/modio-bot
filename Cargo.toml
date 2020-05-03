@@ -24,6 +24,7 @@ tokio = { version = "0.2", features = ["stream", "time", "full"] }
 
 [dependencies.serenity]
 version = "0.9"
+features = ["collector"]
 
 [dependencies.modio]
 git = "https://github.com/nickelc/modio-rs.git"
