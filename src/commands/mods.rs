@@ -70,6 +70,14 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                     break;
                 }
                 Some(list) => {
+                    let footer = match (list.current(), list.page_count()) {
+                        (page, count) if page == count => format!("{}/{}", page, count),
+                        (page, count) => format!(
+                            "{}/{} - Type `next` within 15s for the next page",
+                            page, count
+                        ),
+                    };
+
                     let content = list.iter().try_fold(String::new(), |mut buf, mod_| {
                         writeln!(&mut buf, "{}. {}", mod_.id, mod_.name)?;
                         Ok::<_, std::fmt::Error>(buf)
@@ -79,7 +87,7 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                             m.embed(|e| {
                                 e.title(&title)
                                     .description(content)
-                                    .footer(|f| f.text("Type `next` within 15s for the next page"))
+                                    .footer(|f| f.text(footer))
                             })
                         })
                         .await?;
