@@ -50,7 +50,7 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
         let mods = game.mods();
 
         let mut first = true;
-        let mut st = mods.search(filter.and(with_limit(20))).paged().await?;
+        let mut st = mods.search(filter.limit(20)).paged().await?;
         loop {
             match st.try_next().await? {
                 None if first => {
