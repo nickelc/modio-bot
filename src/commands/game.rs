@@ -2,12 +2,10 @@ use std::sync::mpsc;
 
 use futures::{future, TryFutureExt, TryStreamExt};
 use modio::filter::prelude::*;
-use modio::games::ApiAccessOptions;
+use modio::games::{ApiAccessOptions, Statistics};
 
 use crate::commands::prelude::*;
 use crate::util::ContentBuilder;
-
-type Stats = (usize, u32, u32);
 
 #[command("games")]
 #[description = "List all games on <https://mod.io>"]
@@ -80,23 +78,7 @@ fn get_game(ctx: &mut Context, msg: &Message) -> CommandResult {
 
     if let Some(id) = game_id {
         let (tx, rx) = mpsc::channel();
-        let stats = modio
-            .game(id)
-            .mods()
-            .statistics(Default::default())
-            .iter()
-            .and_then(|iter| iter.try_collect::<Vec<_>>())
-            .and_then(|list| {
-                let total = list.len();
-                let stats = list
-                    .into_iter()
-                    .fold((total, 0, 0), |(total, mut dl, mut sub), s| {
-                        dl += s.downloads_total;
-                        sub += s.subscribers_total;
-                        (total, dl, sub)
-                    });
-                future::ok(stats)
-            });
+        let stats = modio.game(id).statistics();
         let task = future::try_join(modio.game(id).get(), stats);
 
         exec.spawn(async move {
@@ -165,17 +147,17 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
 }
 
 trait GameExt {
-    fn create_fields(&self, _: Stats) -> Vec<EmbedField>;
+    fn create_fields(&self, _: Statistics) -> Vec<EmbedField>;
 
     fn create_message<'a, 'b>(
         &self,
-        _: Stats,
+        _: Statistics,
         m: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a>;
 }
 
 impl GameExt for modio::games::Game {
-    fn create_fields(&self, s: Stats) -> Vec<EmbedField> {
+    fn create_fields(&self, s: Statistics) -> Vec<EmbedField> {
         fn info(g: &modio::games::Game) -> EmbedField {
             (
                 "Info",
@@ -190,8 +172,10 @@ impl GameExt for modio::games::Game {
                 true,
             )
         }
-        fn stats(stats: Stats) -> EmbedField {
-            let (total, downloads, subs) = stats;
+        fn stats(stats: Statistics) -> EmbedField {
+            let total = stats.mods_total;
+            let subs = stats.subscribers_total;
+            let downloads = stats.downloads.total;
             (
                 "Stats",
                 format!(
@@ -208,7 +192,7 @@ impl GameExt for modio::games::Game {
 
     fn create_message<'a, 'b>(
         &self,
-        stats: Stats,
+        stats: Statistics,
         m: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a> {
         m.embed(|e| {
