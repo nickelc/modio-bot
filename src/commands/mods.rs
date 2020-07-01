@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{future, StreamExt, TryFutureExt, TryStreamExt};
 
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
@@ -178,10 +178,8 @@ fn find_mods(
     limit: Option<usize>,
 ) -> impl Future<Output = Result<(Game, Vec<Mod>), modio::Error>> {
     let mut limit = limit;
-    let mods = mods
-        .search(filter)
-        .iter()
-        .take_while(move |_| match limit.as_mut() {
+    let mods = mods.search(filter).iter().and_then(move |iter| {
+        iter.take_while(move |_| match limit.as_mut() {
             Some(ref v) if **v == 0 => future::ready(false),
             Some(v) => {
                 *v -= 1;
@@ -189,7 +187,8 @@ fn find_mods(
             }
             None => future::ready(true),
         })
-        .try_collect();
+        .try_collect()
+    });
 
     future::try_join(game.get(), mods)
 }

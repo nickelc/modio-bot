@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use futures::future;
-use futures::TryStreamExt;
+use futures::{TryFutureExt, TryStreamExt};
 use modio::filter::prelude::*;
 use modio::games::ApiAccessOptions;
 use serenity::prelude::*;
@@ -26,9 +26,8 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
         let (tx, rx) = mpsc::channel();
 
         let filter = Id::_in(games.keys().collect::<Vec<_>>());
-        let task = modio.games().search(filter).iter().try_fold(
-            util::ContentBuilder::default(),
-            move |mut buf, g| {
+        let task = modio.games().search(filter).iter().and_then(|iter| {
+            iter.try_fold(util::ContentBuilder::default(), move |mut buf, g| {
                 let evts = games.get(&g.id).unwrap_or(&Events::ALL);
                 let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
                     (true, true) | (false, false) => " (+Δ)",
@@ -37,8 +36,8 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
                 };
                 let _ = writeln!(&mut buf, "{}. {} {}", g.id, g.name, suffix);
                 future::ok(buf)
-            },
-        );
+            })
+        });
 
         exec.spawn(async move {
             match task.await {
@@ -135,13 +134,17 @@ pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
         1 => {
             let (game, mods) = excluded.into_iter().next().unwrap();
             let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
-            let task = modio.game(game).mods().search(filter).iter().try_fold(
-                util::ContentBuilder::default(),
-                |mut buf, m| {
-                    let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
-                    future::ok(buf)
-                },
-            );
+            let task = modio
+                .game(game)
+                .mods()
+                .search(filter)
+                .iter()
+                .and_then(|iter| {
+                    iter.try_fold(util::ContentBuilder::default(), |mut buf, m| {
+                        let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                        future::ok(buf)
+                    })
+                });
 
             exec.spawn(async move {
                 match task.await {

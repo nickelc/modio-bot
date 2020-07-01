@@ -245,7 +245,7 @@ pub fn initialize() -> Result<(Client, Modio, Runtime, Blocked)> {
 
         Modio::builder(credentials()?)
             .host(host)
-            .agent("modbot")
+            .user_agent("modbot")
             .build()
             .map_err(Error::from)?
     };
