@@ -29,20 +29,20 @@
 +++ src/schema.rs	2019-02-24 22:40:13.184879005 +0100
 @@ -9,8 +9,8 @@
  table! {
-     subscriptions (game, channel) {
+     subscriptions (game, channel, tags) {
          game -> Integer,
 -        channel -> Integer,
--        guild -> Nullable<Integer>,
 +        channel -> BigInt,
+         tags -> Text,
+-        guild -> Nullable<Integer>,
 +        guild -> Nullable<BigInt>,
          events -> Integer,
      }
  }
- 
 diff --git a/src/schema.rs b/src/schema.rs
 index c5e7b4f..fff5254 100644
---- a/src/schema.rs
-+++ b/src/schema.rs
+--- src/schema.rs
++++ src/schema.rs
 @@ -30,8 +30,8 @@ table! {
  table! {
      subscriptions_exclude_mods (game, channel, mod_id) {

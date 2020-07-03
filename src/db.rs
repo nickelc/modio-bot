@@ -136,7 +136,7 @@ impl Subscriptions {
     pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
         use crate::schema::subscriptions::dsl::*;
 
-        type Record = (i32, i64, Option<i64>, i32);
+        type Record = (i32, i64, String, Option<i64>, i32);
 
         let conn = self.pool.get()?;
         let list = subscriptions.load::<Record>(&conn)?;
@@ -145,7 +145,7 @@ impl Subscriptions {
 
         Ok(list.into_iter().fold(
             HashMap::new(),
-            |mut map, (game_id, channel_id, guild_id, evt)| {
+            |mut map, (game_id, channel_id, _tags, guild_id, evt)| {
                 let game_id = game_id as GameId;
                 let channel_id = ChannelId(channel_id as u64);
                 let guild_id = guild_id.map(|id| GuildId(id as u64));
@@ -222,22 +222,25 @@ impl Subscriptions {
     ) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
-        type Record = (i32, i64, Option<i64>, i32);
+        type Record = (i32, i64, String, Option<i64>, i32);
 
         let conn = self.pool.get()?;
 
-        let pk = (game_id as i32, channel_id.0 as i64);
+        let game_id = game_id as i32;
+        let channel_id = channel_id.0 as i64;
+
+        let pk = (game_id, channel_id, String::new());
         let first = subscriptions.find(pk).first::<Record>(&conn);
 
-        let (game_id, channel_id, guild_id, evts) = match first {
-            Ok((game_id, channel_id, guild_id, old_evts)) => {
+        let (game_id, channel_id, _tags, guild_id, evts) = match first {
+            Ok((game_id, channel_id, _tags, guild_id, old_evts)) => {
                 let mut new_evts = Events::from_bits_truncate(old_evts);
                 new_evts |= evts;
-                (game_id, channel_id, guild_id, new_evts.bits)
+                (game_id, channel_id, String::new(), guild_id, new_evts.bits)
             }
             Err(_) => {
                 let guild_id = guild_id.map(|g| g.0 as i64);
-                (pk.0, pk.1, guild_id, evts.bits)
+                (game_id, channel_id, String::new(), guild_id, evts.bits)
             }
         };
 
@@ -245,6 +248,7 @@ impl Subscriptions {
             .values((
                 game.eq(game_id),
                 channel.eq(channel_id),
+                tags.eq(_tags),
                 guild.eq(guild_id),
                 events.eq(evts),
             ))
@@ -256,14 +260,14 @@ impl Subscriptions {
     pub fn remove(&self, game_id: GameId, channel_id: ChannelId, evts: Events) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
-        type Record = (i32, i64, Option<i64>, i32);
+        type Record = (i32, i64, String, Option<i64>, i32);
 
         let conn = self.pool.get()?;
 
-        let pk = (game_id as i32, channel_id.0 as i64);
+        let pk = (game_id as i32, channel_id.0 as i64, String::new());
         let first = subscriptions.find(pk).first::<Record>(&conn);
 
-        if let Ok((game_id, channel_id, guild_id, old_evts)) = first {
+        if let Ok((game_id, channel_id, _tags, guild_id, old_evts)) = first {
             let mut new_evts = Events::from_bits_truncate(old_evts);
             new_evts.remove(evts);
 

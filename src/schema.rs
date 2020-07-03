@@ -19,9 +19,10 @@ table! {
 }
 
 table! {
-    subscriptions (game, channel) {
+    subscriptions (game, channel, tags) {
         game -> Integer,
         channel -> BigInt,
+        tags -> Text,
         guild -> Nullable<BigInt>,
         events -> Integer,
     }
