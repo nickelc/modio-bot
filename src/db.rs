@@ -1,3 +1,4 @@
+use std::borrow::ToOwned;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -19,6 +20,7 @@ embed_migrations!("migrations");
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
 pub type ExcludedMods = HashSet<u32>;
+pub type Tags = HashSet<String>;
 pub type Subscription = (ChannelId, Option<GuildId>, Events, ExcludedMods);
 
 #[derive(Default, Debug, Clone)]
@@ -113,6 +115,12 @@ bitflags::bitflags! {
     }
 }
 
+impl Default for Events {
+    fn default() -> Self {
+        Events::ALL
+    }
+}
+
 impl Subscriptions {
     pub fn cleanup(&self, guilds: &[GuildId]) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
@@ -175,19 +183,26 @@ impl Subscriptions {
             }))
     }
 
-    pub fn list_games(&self, channel_id: ChannelId) -> Result<HashMap<GameId, Events>> {
+    pub fn list_for_channel(&self, channel_id: ChannelId) -> Result<Vec<(GameId, Tags, Events)>> {
         use crate::schema::subscriptions::dsl::*;
 
         let conn = self.pool.get()?;
 
         let records = subscriptions
-            .select((game, events))
+            .select((game, tags, events))
             .filter(channel.eq(channel_id.0 as i64))
-            .load::<(i32, i32)>(&conn)?;
+            .load::<(i32, String, i32)>(&conn)?;
 
         let records = records
             .into_iter()
-            .map(|(game_id, evts)| (game_id as u32, Events::from_bits_truncate(evts)))
+            .map(|(game_id, _tags, evts)| {
+                let _tags = _tags
+                    .split('\n')
+                    .filter(|s| !s.is_empty())
+                    .map(ToOwned::to_owned)
+                    .collect();
+                (game_id as u32, _tags, Events::from_bits_truncate(evts))
+            })
             .collect();
 
         Ok(records)
@@ -217,6 +232,7 @@ impl Subscriptions {
         &self,
         game_id: GameId,
         channel_id: ChannelId,
+        _tags: Tags,
         guild_id: Option<GuildId>,
         evts: Events,
     ) -> Result<()> {
@@ -229,18 +245,22 @@ impl Subscriptions {
         let game_id = game_id as i32;
         let channel_id = channel_id.0 as i64;
 
-        let pk = (game_id, channel_id, String::new());
+        let mut _tags = _tags.into_iter().collect::<Vec<_>>();
+        _tags.sort();
+        let _tags = _tags.join("\n");
+
+        let pk = (game_id, channel_id, _tags.clone());
         let first = subscriptions.find(pk).first::<Record>(&conn);
 
         let (game_id, channel_id, _tags, guild_id, evts) = match first {
             Ok((game_id, channel_id, _tags, guild_id, old_evts)) => {
                 let mut new_evts = Events::from_bits_truncate(old_evts);
                 new_evts |= evts;
-                (game_id, channel_id, String::new(), guild_id, new_evts.bits)
+                (game_id, channel_id, _tags, guild_id, new_evts.bits)
             }
             Err(_) => {
                 let guild_id = guild_id.map(|g| g.0 as i64);
-                (game_id, channel_id, String::new(), guild_id, evts.bits)
+                (game_id, channel_id, _tags, guild_id, evts.bits)
             }
         };
 
@@ -257,14 +277,24 @@ impl Subscriptions {
         Ok(())
     }
 
-    pub fn remove(&self, game_id: GameId, channel_id: ChannelId, evts: Events) -> Result<()> {
+    pub fn remove(
+        &self,
+        game_id: GameId,
+        channel_id: ChannelId,
+        _tags: Tags,
+        evts: Events,
+    ) -> Result<()> {
         use crate::schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
         let conn = self.pool.get()?;
 
-        let pk = (game_id as i32, channel_id.0 as i64, String::new());
+        let mut _tags = _tags.into_iter().collect::<Vec<_>>();
+        _tags.sort();
+        let _tags = _tags.join("\n");
+
+        let pk = (game_id as i32, channel_id.0 as i64, _tags);
         let first = subscriptions.find(pk).first::<Record>(&conn);
 
         if let Ok((game_id, channel_id, _tags, guild_id, old_evts)) = first {
@@ -272,11 +302,19 @@ impl Subscriptions {
             new_evts.remove(evts);
 
             if new_evts.is_empty() {
-                let pred = game.eq(game_id).and(channel.eq(channel_id));
+                let pred = game
+                    .eq(game_id)
+                    .and(channel.eq(channel_id))
+                    .and(tags.eq(_tags));
                 let filter = subscriptions.filter(pred);
                 diesel::delete(filter).execute(&conn)?;
 
-                {
+                let count = subscriptions
+                    .select(diesel::dsl::count_star())
+                    .filter(game.eq(game_id).and(channel.eq(channel_id)))
+                    .first::<i64>(&conn)?;
+
+                if count == 0 {
                     use crate::schema::subscriptions_exclude_mods::dsl::*;
                     let pred = game.eq(game_id).and(channel.eq(channel_id));
                     let filter = subscriptions_exclude_mods.filter(pred);
@@ -287,6 +325,7 @@ impl Subscriptions {
                     .values((
                         game.eq(game_id),
                         channel.eq(channel_id),
+                        tags.eq(_tags),
                         guild.eq(guild_id),
                         events.eq(new_evts.bits),
                     ))

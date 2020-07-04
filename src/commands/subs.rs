@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::mpsc;
 
 use futures::future;
@@ -7,7 +8,7 @@ use modio::games::ApiAccessOptions;
 use serenity::prelude::*;
 
 use crate::commands::prelude::*;
-use crate::db::{Events, Subscriptions};
+use crate::db::{Events, Subscriptions, Tags};
 use crate::util;
 
 #[command]
@@ -18,25 +19,37 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
     let data = ctx.data.read();
     let subs = data.get::<Subscriptions>().expect("get subs failed");
-    let games = subs.list_games(msg.channel_id)?;
+    let subs = subs.list_for_channel(msg.channel_id)?;
 
-    if !games.is_empty() {
+    if !subs.is_empty() {
         let modio = data.get::<ModioKey>().expect("get modio failed");
         let exec = data.get::<ExecutorKey>().expect("get exec failed");
         let (tx, rx) = mpsc::channel();
 
-        let filter = Id::_in(games.keys().collect::<Vec<_>>());
-        let task = modio.games().search(filter).iter().and_then(|iter| {
-            iter.try_fold(util::ContentBuilder::default(), move |mut buf, g| {
-                let evts = games.get(&g.id).unwrap_or(&Events::ALL);
+        let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
+        let task = modio.games().search(filter).collect().and_then(|list| {
+            let games = list
+                .into_iter()
+                .map(|g| (g.id, g.name))
+                .collect::<HashMap<_, _>>();
+            let mut buf = util::ContentBuilder::default();
+            for (game_id, tags, evts) in subs {
                 let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
                     (true, true) | (false, false) => " (+Δ)",
                     (true, false) => " (+)",
                     (false, true) => " (Δ)",
                 };
-                let _ = writeln!(&mut buf, "{}. {} {}", g.id, g.name, suffix);
-                future::ok(buf)
-            })
+                let tags = if tags.is_empty() {
+                    String::new()
+                } else {
+                    let mut buf = String::from(" | Tags: ");
+                    push_tags(&mut buf, tags.iter());
+                    buf
+                };
+                let name = games.get(&game_id).unwrap();
+                let _ = writeln!(&mut buf, "{}. {} {}{}", game_id, name, suffix, tags);
+            }
+            future::ok(buf)
         });
 
         exec.spawn(async move {
@@ -295,7 +308,7 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
 
     let filter = match args.single::<u32>() {
         Ok(id) => Id::eq(id),
-        Err(_) => Fulltext::eq(args.rest().to_string()),
+        Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
     };
 
     let game = {
@@ -328,7 +341,28 @@ fn _subscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) ->
         }
         let data = ctx.data.read();
         let subs = data.get::<Subscriptions>().expect("get subs failed");
-        let ret = subs.add(game.id, channel_id, guild_id, evts);
+        let game_tags = game
+            .tag_options
+            .into_iter()
+            .map(|opt| opt.tags)
+            .flatten()
+            .collect::<Tags>();
+
+        let sub_tags = args.iter().quoted().flatten().collect::<Tags>();
+
+        if !sub_tags.is_subset(&game_tags) {
+            let mut msg = format!("Failed to subscribe to '{}'.\n", game.name);
+            msg.push_str("Invalid tag(s): ");
+            push_tags(&mut msg, sub_tags.difference(&game_tags));
+
+            msg.push_str("\nAvailable tags: ");
+            push_tags(&mut msg, game_tags.iter());
+
+            channel_id.say(&ctx, msg)?;
+            return Ok(());
+        }
+
+        let ret = subs.add(game.id, channel_id, sub_tags, guild_id, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", game.name));
@@ -350,7 +384,7 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
 
         let filter = match args.single::<u32>() {
             Ok(id) => Id::eq(id),
-            Err(_) => Fulltext::eq(args.rest().to_string()),
+            Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
         };
         let task = modio.games().search(filter).first();
 
@@ -364,13 +398,34 @@ fn _unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args, evts: Events) 
         rx.recv().unwrap()
     };
 
-    if let Some(g) = game {
+    if let Some(game) = game {
         let data = ctx.data.read();
         let subs = data.get::<Subscriptions>().expect("get subs failed");
-        let ret = subs.remove(g.id, channel_id, evts);
+        let game_tags = game
+            .tag_options
+            .into_iter()
+            .map(|opt| opt.tags)
+            .flatten()
+            .collect::<Tags>();
+
+        let sub_tags = args.iter().quoted().flatten().collect::<Tags>();
+
+        if !sub_tags.is_subset(&game_tags) {
+            let mut msg = format!("Failed to unsubscribe from '{}'.\n", game.name);
+            msg.push_str("Invalid tag(s): ");
+            push_tags(&mut msg, sub_tags.difference(&game_tags));
+
+            msg.push_str("\nAvailable tags: ");
+            push_tags(&mut msg, game_tags.iter());
+
+            channel_id.say(&ctx, msg)?;
+            return Ok(());
+        }
+
+        let ret = subs.remove(game.id, channel_id, sub_tags, evts);
         match ret {
             Ok(_) => {
-                let _ = channel_id.say(&ctx, format!("Unsubscribed to '{}'", g.name));
+                let _ = channel_id.say(&ctx, format!("Unsubscribed from '{}'", game.name));
             }
             Err(e) => eprintln!("{}", e),
         }
@@ -405,5 +460,20 @@ async fn find_game_mod(
         Ok((Some(game), Some(mod_)))
     } else {
         Ok((Some(game), None))
+    }
+}
+
+fn push_tags<'a, I>(s: &mut String, iter: I)
+where
+    I: std::iter::Iterator<Item = &'a String>,
+{
+    let mut iter = iter.peekable();
+    while let Some(t) = iter.next() {
+        s.push('`');
+        s.push_str(&t);
+        s.push('`');
+        if iter.peek().is_some() {
+            s.push_str(", ");
+        }
     }
 }
