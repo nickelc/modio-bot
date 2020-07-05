@@ -17,6 +17,7 @@ dbl-rs = "0.2"
 dotenv = "0.15"
 env_logger = "0.7"
 futures = "0.3"
+kuchiki = "0.8"
 log = "0.4"
 serenity = { version = "0.8" }
 tokio = { version = "0.2", features = ["stream", "time"] }

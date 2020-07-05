@@ -204,6 +204,15 @@ pub fn format_timestamp(seconds: i64) -> impl fmt::Display {
     NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M")
 }
 
+pub fn strip_html_tags<S>(input: S) -> String
+where
+    S: AsRef<str>,
+{
+    use kuchiki::traits::*;
+
+    kuchiki::parse_html().one(input.as_ref()).text_contents()
+}
+
 pub fn var(key: &'static str) -> Result<String> {
     env::var(key).map_err(|e| Error::Env(key, e))
 }

@@ -238,6 +238,7 @@ fn create_message<'a, 'b>(
                     let changelog = f
                         .changelog
                         .as_ref()
+                        .map(util::strip_html_tags)
                         .filter(|c| !c.is_empty())
                         .map(|c| {
                             let it = c.char_indices().rev().scan(c.len(), |state, (pos, _)| {
@@ -249,9 +250,8 @@ fn create_message<'a, 'b>(
                                 }
                             });
                             let pos = it.last().unwrap_or_else(|| c.len());
-                            &c[..pos]
-                        })
-                        .map(|c| ("Changelog", c.to_owned(), true));
+                            ("Changelog", c[..pos].to_owned(), true)
+                        });
                     let desc = format!("A new version is available. {}", download);
 
                     (desc, changelog)
