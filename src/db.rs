@@ -21,7 +21,7 @@ pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
 pub type ExcludedMods = HashSet<u32>;
 pub type Tags = HashSet<String>;
-pub type Subscription = (ChannelId, Option<GuildId>, Events, ExcludedMods);
+pub type Subscription = (ChannelId, Tags, Option<GuildId>, Events, ExcludedMods);
 
 #[derive(Default, Debug, Clone)]
 pub struct Blocked {
@@ -156,12 +156,17 @@ impl Subscriptions {
             |mut map, (game_id, channel_id, _tags, guild_id, evt)| {
                 let game_id = game_id as GameId;
                 let channel_id = ChannelId(channel_id as u64);
+                let _tags = _tags
+                    .split('\n')
+                    .filter(|t| !t.is_empty())
+                    .map(ToOwned::to_owned)
+                    .collect();
                 let guild_id = guild_id.map(|id| GuildId(id as u64));
                 let evt = Events::from_bits_truncate(evt);
                 let excluded = excluded.remove(&(game_id, channel_id)).unwrap_or_default();
                 map.entry(game_id)
                     .or_default()
-                    .push((channel_id, guild_id, evt, excluded));
+                    .push((channel_id, _tags, guild_id, evt, excluded));
                 map
             },
         ))

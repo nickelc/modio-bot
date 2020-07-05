@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use futures::TryStreamExt;
-use log::debug;
+use log::{debug, trace};
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::events::EventType as EventTypeFilter;
@@ -135,7 +135,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     for (m, evt) in updates.values() {
                         let mut msg = CreateMessage::default();
                         create_message(&game, m, evt, &mut msg);
-                        for (channel, _, evts, excluded) in &channels {
+                        for (channel, tags, _, evts, excluded) in &channels {
                             if *evt == &EventType::ModAvailable
                                 && !evts.contains(crate::db::Events::NEW)
                                 || *evt == &EventType::ModfileChanged
@@ -147,6 +147,15 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                             if excluded.contains(&m.id) {
                                 debug!("mod ignored #{}: {} for {:?}", channel, evt, m.name,);
                                 continue;
+                            }
+                            if !tags.is_empty() {
+                                let mod_tags = m.tags.iter().map(|t| t.name.clone()).collect();
+
+                                if !tags.is_subset(&mod_tags) {
+                                    debug!("mod ignored #{}: {} for {:?}", channel, evt, m.name);
+                                    trace!("mod tags: {:?}; sub tags: {:?}", mod_tags, tags);
+                                    continue;
+                                }
                             }
                             debug!("send message to #{}: {} for {:?}", channel, evt, m.name,);
                             tx.send((*channel, msg.clone())).unwrap();
