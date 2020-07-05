@@ -77,6 +77,9 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[sub_commands(subscribe_new, subscribe_update)]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
 pub fn subscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     _subscribe(ctx, msg, args, Events::all())
 }
@@ -86,6 +89,9 @@ pub fn subscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult 
 #[aliases("new")]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
 pub fn subscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     _subscribe(ctx, msg, args, Events::NEW)
 }
@@ -95,6 +101,9 @@ pub fn subscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandRes
 #[aliases("upd")]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
 pub fn subscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     _subscribe(ctx, msg, args, Events::UPD)
 }
@@ -105,6 +114,9 @@ pub fn subscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> Command
 #[sub_commands(unsubscribe_new, unsubscribe_update)]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
 pub fn unsubscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     _unsubscribe(ctx, msg, args, Events::all())
 }
@@ -114,6 +126,9 @@ pub fn unsubscribe(ctx: &mut Context, msg: &Message, args: Args) -> CommandResul
 #[aliases("new")]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
 pub fn unsubscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     _unsubscribe(ctx, msg, args, Events::NEW)
 }
@@ -123,6 +138,9 @@ pub fn unsubscribe_new(ctx: &mut Context, msg: &Message, args: Args) -> CommandR
 #[aliases("upd")]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
 pub fn unsubscribe_update(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     _unsubscribe(ctx, msg, args, Events::UPD)
 }
