@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::future::Future;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -23,11 +24,14 @@ const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
     let data = client.data.clone();
     let http = client.cache_and_http.http.clone();
-    let (tx, rx) = mpsc::channel::<(ChannelId, CreateMessage<'_>)>();
+    let (tx, rx) = mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>)>();
 
     std::thread::spawn(move || loop {
-        let (channel, mut msg) = rx.recv().unwrap();
-        let _ = channel.send_message(&http, |_| &mut msg);
+        let (channels, msg) = rx.recv().unwrap();
+        for channel in channels {
+            let mut msg = msg.clone();
+            let _ = channel.send_message(&http, |_| &mut msg);
+        }
     });
 
     let mut tstamp = std::env::var("MODIO_DEBUG_TIMESTAMP")
@@ -135,6 +139,8 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                     for (m, evt) in updates.values() {
                         let mut msg = CreateMessage::default();
                         create_message(&game, m, evt, &mut msg);
+                        let mut effected_channels = BTreeSet::new();
+
                         for (channel, tags, _, evts, excluded) in &channels {
                             if *evt == &EventType::ModAvailable
                                 && !evts.contains(crate::db::Events::NEW)
@@ -157,9 +163,13 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                                     continue;
                                 }
                             }
-                            debug!("send message to #{}: {} for {:?}", channel, evt, m.name,);
-                            tx.send((*channel, msg.clone())).unwrap();
+                            effected_channels.insert(*channel);
                         }
+                        debug!(
+                            "send message {} for {:?} to {:?}",
+                            evt, m.name, effected_channels
+                        );
+                        tx.send((effected_channels, msg)).unwrap();
                     }
                     Ok::<_, modio::Error>(())
                 };
