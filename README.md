@@ -35,15 +35,32 @@ Popular commands include:
 
  * `~help` show these commands
  * `~prefix CHARACTER` change the default prefix from `~` to something else
- * `~game ID|Name` set the default game
+ * `~game <ID|Name>` set the default game
  * `~game` return information about the default game
  * `~games` return a list of all games
- * `~mod ID|Name` return information about the mod(s) requested
+ * `~mod <ID|Name>` return information about the mod(s) requested
  * `~mods` return a list of all mods belonging to the default game
  * `~popular` return a list of mods ordered by popularity
- * `~subscribe ID|Name` subscribe to a game for updates (mods added/edited)
- * `~subscriptions` see all games subscribed too
- * `~unsubscribe ID|Name` unsubscribe from a game
+ * `~subscribe <ID|Name> [Tag..]` subscribe to a game for updates (mods added/edited) \[alias: `sub`\]
+   ```
+   ~sub 51
+   ~sub xcom
+   ~sub xcom "UFO Defense" Major
+   ~sub "Skate XL" "Real World Spot"
+   ~sub skate Gear Deck
+   ```
+ * `~subscriptions` see all games subscribed too \[alias: `subs`\]
+ * `~unsubscribe <ID|Name> [Tag..]` unsubscribe from a game \[alias: `unsub`\]
+   ```
+   ~unsub 51
+   ~unsub OpenXcom
+   ~unsub xcom "UFO Defense" Major
+   ~unsub "Skate XL" "Real World Spot"
+   ~unsub skate Gear Deck
+   ```
+ * `~mute <Game> <Mod>` mute a mod from update notifications
+ * `~muted` return a list of all muted mods
+ * `~unmute <Game> <Mod>` unmute a mod from update notifications
 
 ## Building
 
@@ -79,7 +96,9 @@ $ $HOME/.cargo/bin/modbot
 Set up the environment variables with `export` or by creating a `.env` file.
 
 - `DISCORD_BOT_TOKEN`
-- `MODIO_API_KEY` or `MODIO_TOKEN`
+- `MODIO_API_KEY`
+- `DATABASE_URL`
+- `MODIO_TOKEN` (optional)
 - `MODIO_HOST` (optional)
 
 A `.env` sample is provided as [`.env.sample`](.env.sample).
