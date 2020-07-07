@@ -30,7 +30,9 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
         let (channels, msg) = rx.recv().unwrap();
         for channel in channels {
             let mut msg = msg.clone();
-            let _ = channel.send_message(&http, |_| &mut msg);
+            if let Err(e) = channel.send_message(&http, |_| &mut msg) {
+                eprintln!("{}", e);
+            }
         }
     });
 
@@ -169,7 +171,9 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                             "send message {} for {:?} to {:?}",
                             evt, m.name, effected_channels
                         );
-                        tx.send((effected_channels, msg)).unwrap();
+                        if let Err(e) = tx.send((effected_channels, msg)) {
+                            eprintln!("{}", e);
+                        }
                     }
                     Ok::<_, modio::Error>(())
                 };
