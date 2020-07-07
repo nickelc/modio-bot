@@ -7,6 +7,7 @@ use chrono::prelude::*;
 use log::info;
 use modio::auth::Credentials;
 use modio::Modio;
+use serenity::framework::standard::{DispatchError, StandardFramework};
 use serenity::model::channel::Message;
 use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
@@ -15,8 +16,9 @@ use serenity::prelude::*;
 use tokio::runtime::Handle;
 use tokio::runtime::Runtime;
 
+use crate::commands::*;
 use crate::db::{init_db, load_blocked, load_settings};
-use crate::db::{Blocked, DbPool, Settings, Subscriptions};
+use crate::db::{DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
 use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
@@ -241,7 +243,7 @@ fn credentials() -> Result<Credentials> {
     }
 }
 
-pub fn initialize() -> Result<(Client, Modio, Runtime, Blocked)> {
+pub fn initialize() -> Result<(Client, Modio, Runtime, u64)> {
     let token = var(DISCORD_BOT_TOKEN)?;
     let database_url = var(DATABASE_URL)?;
 
@@ -259,7 +261,48 @@ pub fn initialize() -> Result<(Client, Modio, Runtime, Blocked)> {
             .map_err(Error::from)?
     };
 
-    let client = Client::new(&token, Handler)?;
+    let mut client = Client::new(&token, Handler)?;
+
+    let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
+        Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
+        Err(e) => panic!("Couldn't get application info: {}", e),
+    };
+
+    client.with_framework(
+        StandardFramework::new()
+            .configure(|c| {
+                c.prefix("~")
+                    .dynamic_prefix(dynamic_prefix)
+                    .on_mention(Some(bot))
+                    .owners(owners)
+                    .blocked_guilds(blocked.guilds)
+                    .blocked_users(blocked.users)
+            })
+            .bucket("simple", |b| b.delay(1))
+            .before(|_, msg, _| {
+                log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
+                true
+            })
+            .group(&OWNER_GROUP)
+            .group(if crate::tasks::dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
+            .group(&MODIO_GROUP)
+            .on_dispatch_error(|ctx, msg, error| match error {
+                DispatchError::NotEnoughArguments { .. } => {
+                    let _ = msg.channel_id.say(ctx, "Not enough arguments.");
+                }
+                DispatchError::LackingPermissions(_) => {
+                    let _ = msg
+                        .channel_id
+                        .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
+                }
+                DispatchError::Ratelimited(_) => {
+                    let _ = msg.channel_id.say(ctx, "Try again in 1 second.");
+                }
+                e => eprintln!("Dispatch error: {:?}", e),
+            })
+            .help(&HELP),
+    );
+
     {
         let mut data = client.data.write();
         data.insert::<PoolKey>(pool.clone());
@@ -272,7 +315,7 @@ pub fn initialize() -> Result<(Client, Modio, Runtime, Blocked)> {
         data.insert::<ExecutorKey>(rt.handle().clone());
     }
 
-    Ok((client, modio, rt, blocked))
+    Ok((client, modio, rt, *bot.as_u64()))
 }
 
 #[cfg(test)]

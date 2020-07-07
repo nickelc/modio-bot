@@ -22,7 +22,6 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 use dotenv::dotenv;
-use serenity::framework::standard::{DispatchError, StandardFramework};
 
 mod commands;
 mod db;
@@ -60,56 +59,16 @@ fn try_main() -> CliResult {
         return Ok(());
     }
 
-    let (mut client, modio, rt, blocked) = util::initialize()?;
+    let (mut client, modio, rt, bot) = util::initialize()?;
 
     rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
 
-    let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
-        Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
-        Err(e) => panic!("Couldn't get application info: {}", e),
-    };
-
     if let Ok(token) = util::var(DBL_TOKEN) {
         log::info!("Spawning DBL task");
-        let bot = *bot.as_u64();
         let cache = client.cache_and_http.cache.clone();
         rt.spawn(tasks::dbl::task(bot, cache, &token)?);
     }
 
-    client.with_framework(
-        StandardFramework::new()
-            .configure(|c| {
-                c.prefix("~")
-                    .dynamic_prefix(util::dynamic_prefix)
-                    .on_mention(Some(bot))
-                    .owners(owners)
-                    .blocked_guilds(blocked.guilds)
-                    .blocked_users(blocked.users)
-            })
-            .bucket("simple", |b| b.delay(1))
-            .before(|_, msg, _| {
-                log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
-                true
-            })
-            .group(&commands::OWNER_GROUP)
-            .group(if tasks::dbl::is_dbl_enabled() { &commands::with_vote::GENERAL_GROUP } else { &commands::GENERAL_GROUP })
-            .group(&commands::MODIO_GROUP)
-            .on_dispatch_error(|ctx, msg, error| match error {
-                DispatchError::NotEnoughArguments { .. } => {
-                    let _ = msg.channel_id.say(ctx, "Not enough arguments.");
-                }
-                DispatchError::LackingPermissions(_) => {
-                    let _ = msg
-                        .channel_id
-                        .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
-                }
-                DispatchError::Ratelimited(_) => {
-                    let _ = msg.channel_id.say(ctx, "Try again in 1 second.");
-                }
-                e => eprintln!("Dispatch error: {:?}", e),
-            })
-            .help(&commands::HELP),
-    );
     client.start()?;
     Ok(())
 }
