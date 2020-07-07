@@ -21,15 +21,8 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-use std::collections::HashSet;
-
 use dotenv::dotenv;
-use serenity::client::Context;
-use serenity::framework::standard::macros::{group, help};
-use serenity::framework::standard::{
-    help_commands, Args, CommandGroup, CommandResult, DispatchError, HelpOptions, StandardFramework,
-};
-use serenity::model::prelude::*;
+use serenity::framework::standard::{DispatchError, StandardFramework};
 
 mod commands;
 mod db;
@@ -40,10 +33,6 @@ mod tasks;
 mod tools;
 mod util;
 
-use commands::basic::*;
-use commands::game::*;
-use commands::mods::*;
-use commands::subs::*;
 use util::*;
 
 const DATABASE_URL: &str = "DATABASE_URL";
@@ -102,9 +91,9 @@ fn try_main() -> CliResult {
                 log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
                 true
             })
-            .group(&OWNER_GROUP)
-            .group(if tasks::dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
-            .group(&MODIO_GROUP)
+            .group(&commands::OWNER_GROUP)
+            .group(if tasks::dbl::is_dbl_enabled() { &commands::with_vote::GENERAL_GROUP } else { &commands::GENERAL_GROUP })
+            .group(&commands::MODIO_GROUP)
             .on_dispatch_error(|ctx, msg, error| match error {
                 DispatchError::NotEnoughArguments { .. } => {
                     let _ = msg.channel_id.say(ctx, "Not enough arguments.");
@@ -119,52 +108,8 @@ fn try_main() -> CliResult {
                 }
                 e => eprintln!("Dispatch error: {:?}", e),
             })
-            .help(&HELP),
+            .help(&commands::HELP),
     );
     client.start()?;
     Ok(())
-}
-
-#[group]
-#[commands(servers)]
-struct Owner;
-
-#[group]
-#[commands(about, prefix, invite, guide)]
-struct General;
-
-#[group]
-#[commands(
-    list_games,
-    game,
-    list_mods,
-    mod_info,
-    popular,
-    subscriptions,
-    subscribe,
-    unsubscribe,
-    muted,
-    mute,
-    unmute
-)]
-struct Modio;
-
-mod with_vote {
-    use super::*;
-
-    #[group]
-    #[commands(about, prefix, invite, guide, vote)]
-    struct General;
-}
-
-#[help]
-fn help(
-    context: &mut Context,
-    msg: &Message,
-    args: Args,
-    help_options: &'static HelpOptions,
-    groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>,
-) -> CommandResult {
-    help_commands::with_embeds(context, msg, args, help_options, groups, owners)
 }
