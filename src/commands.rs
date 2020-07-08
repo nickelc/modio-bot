@@ -25,9 +25,10 @@ pub mod prelude {
     pub use serenity::model::id::ChannelId;
 
     pub use super::{EmbedField, UserExt};
+    pub use crate::bot::{ExecutorKey, ModioKey};
     pub use crate::db::Settings;
     pub use crate::error::Error;
-    pub use crate::util::{format_timestamp, ExecutorKey, Identifier, ModioKey};
+    pub use crate::util::format_timestamp;
 }
 
 mod basic;

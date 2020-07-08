@@ -23,6 +23,7 @@ extern crate diesel_migrations;
 
 use dotenv::dotenv;
 
+mod bot;
 mod commands;
 mod db;
 mod error;
@@ -59,7 +60,7 @@ fn try_main() -> CliResult {
         return Ok(());
     }
 
-    let (mut client, modio, rt, bot) = util::initialize()?;
+    let (mut client, modio, rt, bot) = bot::initialize()?;
 
     rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
 

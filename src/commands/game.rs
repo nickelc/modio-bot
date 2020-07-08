@@ -7,6 +7,11 @@ use modio::games::{ApiAccessOptions, Statistics};
 use crate::commands::prelude::*;
 use crate::util::ContentBuilder;
 
+enum Identifier {
+    Id(u32),
+    Search(String),
+}
+
 #[command("games")]
 #[description = "List all games on <https://mod.io>"]
 #[bucket = "simple"]
