@@ -25,6 +25,7 @@ use dotenv::dotenv;
 
 mod bot;
 mod commands;
+mod config;
 mod db;
 mod error;
 #[rustfmt::skip]
@@ -34,16 +35,6 @@ mod tools;
 mod util;
 
 use util::*;
-
-const DATABASE_URL: &str = "DATABASE_URL";
-const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
-const DBL_TOKEN: &str = "DBL_TOKEN";
-const DBL_OVERRIDE_BOT_ID: &str = "DBL_OVERRIDE_BOT_ID";
-const MODIO_HOST: &str = "MODIO_HOST";
-const MODIO_API_KEY: &str = "MODIO_API_KEY";
-const MODIO_TOKEN: &str = "MODIO_TOKEN";
-
-const DEFAULT_MODIO_HOST: &str = "https://api.mod.io/v1";
 
 fn main() {
     if let Err(e) = try_main() {
@@ -56,15 +47,17 @@ fn try_main() -> CliResult {
     dotenv().ok();
     env_logger::init();
 
-    if tools::tools() {
+    let config = config::from_env()?;
+
+    if tools::tools(&config) {
         return Ok(());
     }
 
-    let (mut client, modio, rt, bot) = bot::initialize()?;
+    let (mut client, modio, rt, bot) = bot::initialize(config)?;
 
     rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
 
-    if let Ok(token) = util::var(DBL_TOKEN) {
+    if let Ok(token) = util::var(config::DBL_TOKEN) {
         log::info!("Spawning DBL task");
         let cache = client.cache_and_http.cache.clone();
         rt.spawn(tasks::dbl::task(bot, cache, &token)?);

@@ -378,7 +378,7 @@ impl Subscriptions {
     }
 }
 
-pub fn init_db(database_url: String) -> Result<DbPool> {
+pub fn init_db(database_url: &str) -> Result<DbPool> {
     let mgr = ConnectionManager::new(database_url);
     let pool = Pool::new(mgr)?;
 

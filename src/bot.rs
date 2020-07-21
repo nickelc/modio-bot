@@ -9,11 +9,10 @@ use tokio::runtime::Handle;
 use tokio::runtime::Runtime;
 
 use crate::commands::*;
+use crate::config::Config;
 use crate::db::{init_db, load_blocked, load_settings};
 use crate::db::{DbPool, Settings, Subscriptions};
-use crate::util::{var, var_or, Result};
-use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
-use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
+use crate::Result;
 
 impl TypeMapKey for Settings {
     type Value = Settings;
@@ -74,45 +73,30 @@ impl EventHandler for Handler {
     }
 }
 
-fn credentials() -> Result<Credentials> {
-    use std::env::VarError::*;
-
-    let api_key = std::env::var(MODIO_API_KEY);
-    let token = std::env::var(MODIO_TOKEN);
-
-    match (api_key, token) {
-        (Ok(key), Ok(token)) => Ok(Credentials::with_token(key, token)),
-        (Ok(key), _) => Ok(Credentials::new(key)),
-        (Err(NotPresent), _) => Err("Environment variable 'MODIO_API_KEY' is required".into()),
-        (Err(NotUnicode(_)), _) => {
-            Err("Environment variable 'MODIO_API_KEY' is not valid unicode".into())
-        }
-    }
-}
-
 fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
     let data = ctx.data.read();
     data.get::<Settings>().map(|s| s.prefix(msg)).flatten()
 }
 
-pub fn initialize() -> Result<(Client, Modio, Runtime, u64)> {
-    let token = var(DISCORD_BOT_TOKEN)?;
-    let database_url = var(DATABASE_URL)?;
-
+pub fn initialize(config: Config) -> Result<(Client, Modio, Runtime, u64)> {
     let rt = Runtime::new()?;
-    let pool = init_db(database_url)?;
+    let pool = init_db(&config.bot.database_url)?;
     let blocked = load_blocked(&pool)?;
 
     let modio = {
-        let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
+        let host = config.modio.host;
+        let credentials = match (config.modio.api_key, config.modio.token) {
+            (key, None) => Credentials::new(key),
+            (key, Some(token)) => Credentials::with_token(key, token),
+        };
 
-        Modio::builder(credentials()?)
+        Modio::builder(credentials)
             .host(host)
             .user_agent("modbot")
             .build()?
     };
 
-    let mut client = Client::new(&token, Handler)?;
+    let mut client = Client::new(&config.bot.token, Handler)?;
 
     let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
         Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),

@@ -1,6 +1,8 @@
 use std::env;
 
-pub fn tools() -> bool {
+use crate::config::Config;
+
+pub fn tools(config: &Config) -> bool {
     let mut args = env::args().skip(1);
 
     let mut command = match args.next() {
@@ -12,7 +14,7 @@ pub fn tools() -> bool {
     let command = command.as_str();
 
     match command {
-        "print-servers" => print::print_servers(),
+        "print-servers" => print::print_servers(config),
         _ => return false,
     };
 
@@ -26,6 +28,8 @@ mod print {
 
     use serenity::model::prelude::*;
     use serenity::prelude::*;
+
+    use crate::config::Config;
 
     #[derive(Default)]
     struct GuildCounter {
@@ -86,15 +90,13 @@ mod print {
         }
     }
 
-    pub fn print_servers() {
+    pub fn print_servers(config: &Config) {
         let counter = Arc::new(Mutex::new(GuildCounter::default()));
 
         let thread_counter = counter.clone();
+        let token = config.bot.token.clone();
 
         thread::spawn(move || {
-            let token =
-                crate::util::var(crate::DISCORD_BOT_TOKEN).expect("failed to get discord token");
-
             let mut client = Client::new(&token, Handler).expect("failed to create client");
             {
                 let mut data = client.data.write();
