@@ -7,7 +7,7 @@ use log::error;
 use serenity::cache::CacheRwLock;
 use tokio::time::{interval_at, Instant};
 
-use crate::config::{DBL_TOKEN, DBL_OVERRIDE_BOT_ID};
+use crate::config::{DBL_OVERRIDE_BOT_ID, DBL_TOKEN};
 use crate::error::Error;
 use crate::util;
 
