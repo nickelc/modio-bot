@@ -28,8 +28,6 @@ mod commands;
 mod config;
 mod db;
 mod error;
-#[rustfmt::skip]
-mod schema;
 mod tasks;
 mod tools;
 mod util;

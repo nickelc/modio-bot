@@ -12,10 +12,14 @@ use serenity::model::id::GuildId;
 use serenity::model::id::UserId;
 
 use crate::error::Error;
-use crate::schema::settings;
 use crate::util::Result;
 
 embed_migrations!("migrations");
+
+#[rustfmt::skip]
+mod schema;
+
+use schema::settings;
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
@@ -51,7 +55,7 @@ pub struct Settings {
 
 impl Settings {
     fn persist(&self, change: ChangeSettings) {
-        use crate::schema::settings::dsl::*;
+        use schema::settings::dsl::*;
 
         let ret = self.pool.get().map_err(Error::from).and_then(|conn| {
             let target = settings.filter(guild.eq(change.guild));
@@ -123,7 +127,7 @@ impl Default for Events {
 
 impl Subscriptions {
     pub fn cleanup(&self, guilds: &[GuildId]) -> Result<()> {
-        use crate::schema::subscriptions::dsl::*;
+        use schema::subscriptions::dsl::*;
 
         let conn = self.pool.get()?;
         let it = guilds.iter().map(|g| g.0 as i64);
@@ -133,7 +137,7 @@ impl Subscriptions {
         info!("Deleted {} subscription(s).", num);
 
         {
-            use crate::schema::subscriptions_exclude_mods::dsl::*;
+            use schema::subscriptions_exclude_mods::dsl::*;
             let filter = subscriptions_exclude_mods.filter(guild.ne_all(ids));
             let num = diesel::delete(filter).execute(&conn)?;
             info!("Deleted {} excluded mods.", num);
@@ -142,7 +146,7 @@ impl Subscriptions {
     }
 
     pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
-        use crate::schema::subscriptions::dsl::*;
+        use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
@@ -173,7 +177,7 @@ impl Subscriptions {
     }
 
     fn load_excluded_mods(&self) -> Result<HashMap<(GameId, ChannelId), ExcludedMods>> {
-        use crate::schema::subscriptions_exclude_mods::dsl::*;
+        use schema::subscriptions_exclude_mods::dsl::*;
 
         type Record = (i32, i64, Option<i64>, i32);
 
@@ -189,7 +193,7 @@ impl Subscriptions {
     }
 
     pub fn list_for_channel(&self, channel_id: ChannelId) -> Result<Vec<(GameId, Tags, Events)>> {
-        use crate::schema::subscriptions::dsl::*;
+        use schema::subscriptions::dsl::*;
 
         let conn = self.pool.get()?;
 
@@ -214,7 +218,7 @@ impl Subscriptions {
     }
 
     pub fn list_excluded(&self, channel_id: ChannelId) -> Result<HashMap<GameId, ExcludedMods>> {
-        use crate::schema::subscriptions_exclude_mods::dsl::*;
+        use schema::subscriptions_exclude_mods::dsl::*;
 
         let conn = self.pool.get()?;
 
@@ -241,7 +245,7 @@ impl Subscriptions {
         guild_id: Option<GuildId>,
         evts: Events,
     ) -> Result<()> {
-        use crate::schema::subscriptions::dsl::*;
+        use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
@@ -289,7 +293,7 @@ impl Subscriptions {
         _tags: Tags,
         evts: Events,
     ) -> Result<()> {
-        use crate::schema::subscriptions::dsl::*;
+        use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
@@ -320,7 +324,7 @@ impl Subscriptions {
                     .first::<i64>(&conn)?;
 
                 if count == 0 {
-                    use crate::schema::subscriptions_exclude_mods::dsl::*;
+                    use schema::subscriptions_exclude_mods::dsl::*;
                     let pred = game.eq(game_id).and(channel.eq(channel_id));
                     let filter = subscriptions_exclude_mods.filter(pred);
                     diesel::delete(filter).execute(&conn)?;
@@ -348,7 +352,7 @@ impl Subscriptions {
         guild_id: Option<GuildId>,
         id: u32,
     ) -> Result<()> {
-        use crate::schema::subscriptions_exclude_mods::dsl::*;
+        use schema::subscriptions_exclude_mods::dsl::*;
 
         let conn = self.pool.get()?;
 
@@ -364,7 +368,7 @@ impl Subscriptions {
     }
 
     pub fn unmute_mod(&self, game_id: GameId, channel_id: ChannelId, id: u32) -> Result<()> {
-        use crate::schema::subscriptions_exclude_mods::dsl::*;
+        use schema::subscriptions_exclude_mods::dsl::*;
 
         let conn = self.pool.get()?;
 
@@ -388,8 +392,8 @@ pub fn init_db(database_url: &str) -> Result<DbPool> {
 }
 
 pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
-    use crate::schema::blocked_guilds::dsl::*;
-    use crate::schema::blocked_users::dsl::*;
+    use schema::blocked_guilds::dsl::*;
+    use schema::blocked_users::dsl::*;
 
     let conn = pool.get()?;
     let guilds = blocked_guilds
@@ -403,7 +407,7 @@ pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
 }
 
 pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, GuildSettings>> {
-    use crate::schema::settings::dsl::*;
+    use schema::settings::dsl::*;
 
     type Record = (i64, Option<i32>, Option<String>);
 
