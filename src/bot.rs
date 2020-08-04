@@ -75,7 +75,9 @@ impl EventHandler for Handler {
 
 fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
     let data = ctx.data.read();
-    data.get::<Settings>().map(|s| s.prefix(msg)).flatten()
+    data.get::<Settings>()
+        .map(|s| s.prefix(msg.guild_id))
+        .flatten()
 }
 
 pub fn initialize(config: Config) -> Result<(Client, Modio, Runtime, u64)> {
