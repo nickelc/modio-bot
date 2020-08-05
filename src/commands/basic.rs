@@ -101,7 +101,7 @@ pub fn prefix(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult
     };
     let mut data = ctx.data.write();
     let settings = data.get_mut::<Settings>().expect("get settings failed");
-    settings.set_prefix(msg.guild_id.expect("guild only"), prefix);
+    settings.set_prefix(msg.guild_id.expect("guild only"), prefix)?;
     Ok(())
 }
 

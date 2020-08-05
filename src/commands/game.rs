@@ -141,7 +141,7 @@ fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
             {
                 let mut data = ctx.data.write();
                 let settings = data.get_mut::<Settings>().expect("get settings failed");
-                settings.set_game(guild_id, game.id);
+                settings.set_game(guild_id, game.id)?;
             }
             let _ = channel.say(&ctx, format!("Game is set to '{}'", game.name));
         } else {

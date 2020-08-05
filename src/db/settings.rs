@@ -4,7 +4,6 @@ use diesel::prelude::*;
 use serenity::model::id::GuildId;
 
 use super::{schema, DbPool, GameId};
-use crate::error::Error;
 use crate::Result;
 use schema::settings;
 
@@ -29,54 +28,42 @@ pub struct Settings {
 }
 
 impl Settings {
-    fn persist(&self, change: ChangeSettings) {
+    fn persist(&self, change: ChangeSettings) -> Result<()> {
         use schema::settings::dsl::*;
 
-        let ret = self.pool.get().map_err(Error::from).map(|conn| {
-            let target = settings.filter(guild.eq(change.guild));
-            let query = diesel::update(target).set(&change);
+        let conn = self.pool.get()?;
+        let target = settings.filter(guild.eq(change.guild));
+        let query = diesel::update(target).set(&change);
 
-            match query.execute(&conn).map_err(Error::from) {
-                Ok(0) => {
-                    let query = diesel::insert_into(settings).values(&change);
-                    let ret = query.execute(&conn).map_err(Error::from);
-
-                    if let Err(e) = ret {
-                        eprintln!("{}", e);
-                    }
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("{}", e);
-                }
-            }
-        });
-
-        if let Err(e) = ret {
-            eprintln!("{}", e);
+        if query.execute(&conn)? == 0 {
+            let query = diesel::insert_into(settings).values(&change);
+            query.execute(&conn)?;
         }
+        Ok(())
     }
 
     pub fn game(&self, guild: GuildId) -> Option<GameId> {
         self.data.get(&guild).and_then(|s| s.game)
     }
 
-    pub fn set_game(&mut self, guild: GuildId, game: GameId) {
-        self.data.entry(guild).or_default().game = Some(game);
-
+    pub fn set_game(&mut self, guild: GuildId, game: GameId) -> Result<()> {
         let change = (guild, game);
-        self.persist(change.into());
+        self.persist(change.into())?;
+
+        self.data.entry(guild).or_default().game = Some(game);
+        Ok(())
     }
 
     pub fn prefix(&self, guild: Option<GuildId>) -> Option<String> {
         self.data.get(&guild?).and_then(|s| s.prefix.clone())
     }
 
-    pub fn set_prefix(&mut self, guild: GuildId, prefix: Option<String>) {
-        self.data.entry(guild).or_default().prefix = prefix.clone();
+    pub fn set_prefix(&mut self, guild: GuildId, prefix: Option<String>) -> Result<()> {
+        let change = (guild, prefix.clone());
+        self.persist(change.into())?;
 
-        let change = (guild, prefix);
-        self.persist(change.into());
+        self.data.entry(guild).or_default().prefix = prefix;
+        Ok(())
     }
 }
 
@@ -90,7 +77,7 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
     let it = guilds.iter().map(|g| g.0 as i64);
     let ids = it.collect::<Vec<_>>();
     let filter = settings.filter(guild.ne_all(ids));
-    match diesel::delete(filter).execute(&conn).map_err(Error::from) {
+    match diesel::delete(filter).execute(&conn) {
         Ok(num) => log::info!("Deleted {} guild(s).", num),
         Err(e) => eprintln!("{}", e),
     }
