@@ -14,6 +14,12 @@ use crate::db::{load_blocked, load_settings};
 use crate::db::{DbPool, Settings, Subscriptions};
 use crate::Result;
 
+pub struct EnableDBL;
+
+impl TypeMapKey for EnableDBL {
+    type Value = bool;
+}
+
 impl TypeMapKey for Settings {
     type Value = Settings;
 }
@@ -100,7 +106,7 @@ pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(
         .await
         .before(before)
         .group(&OWNER_GROUP)
-        .group(if crate::tasks::dbl::is_dbl_enabled() {
+        .group(if config.bot.dbl_token.is_some() {
             &with_vote::GENERAL_GROUP
         } else {
             &GENERAL_GROUP
@@ -117,6 +123,7 @@ pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(
     {
         let mut data = client.data.write().await;
         data.insert::<PoolKey>(pool.clone());
+        data.insert::<EnableDBL>(config.bot.dbl_token.is_some());
         data.insert::<Settings>(Settings {
             pool: pool.clone(),
             data: Default::default(),

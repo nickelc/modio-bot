@@ -93,20 +93,21 @@ $ $HOME/.cargo/bin/modbot
 
 ## Usage
 
-Set up the environment variables with `export` or by creating a `.env` file.
+Create a `bot.toml` config file in the working directory.
 
-- `DISCORD_BOT_TOKEN`
-- `MODIO_API_KEY`
-- `DATABASE_URL`
-- `MODIO_TOKEN` (optional)
-- `MODIO_HOST` (optional)
+```toml
+[bot]
+token="your discord bot token"
+database_url="/path/to/sqlite.db"
 
-A `.env` sample is provided as [`.env.sample`](.env.sample).
+[modio]
+api_key="your mod.io api key"
+```
+
+A example is provided as [`bot.example.toml`](bot.example.toml).
 
 #### Running the bot
 ```bash
-DISCORD_BOT_TOKEN="your token" \
-MODIO_API_KEY="your api key" \
 ./path/to/modbot
 ```
 

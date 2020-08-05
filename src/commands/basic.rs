@@ -3,6 +3,7 @@ use serenity::framework::standard::macros::command;
 use serenity::framework::standard::Args;
 use serenity::model::channel::Message;
 
+use crate::bot::EnableDBL;
 use crate::commands::CommandResult;
 use crate::db::Settings;
 
@@ -14,7 +15,12 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
         .current_user_field(|u| (*u.id.as_u64(), u.name.clone(), u.avatar_url()))
         .await;
 
-    let dbl = if crate::tasks::dbl::is_dbl_enabled() {
+    let dbl_enabled = {
+        let data = ctx.data.read().await;
+        data.get::<EnableDBL>().copied().unwrap_or(false)
+    };
+
+    let dbl = if dbl_enabled {
         let profile = crate::tasks::dbl::get_profile(bot);
         let value = format!("[Profile]({}) | [Vote]({0}/vote)", profile);
         Some(("top.gg / discordbots.org", value, true))

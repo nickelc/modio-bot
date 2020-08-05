@@ -1,4 +1,3 @@
-use std::env;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -104,18 +103,6 @@ where
     use kuchiki::traits::*;
 
     kuchiki::parse_html().one(input.as_ref()).text_contents()
-}
-
-pub fn var(key: &'static str) -> Result<String> {
-    env::var(key).map_err(|e| Error::Env(key, e))
-}
-
-pub fn var_or<S: Into<String>>(key: &'static str, default: S) -> Result<String> {
-    match env::var(key) {
-        Ok(v) => Ok(v),
-        Err(env::VarError::NotPresent) => Ok(default.into()),
-        Err(e) => Err(Error::Env(key, e)),
-    }
 }
 
 #[cfg(test)]

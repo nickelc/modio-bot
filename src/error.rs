@@ -1,10 +1,10 @@
-use std::env::VarError;
 use std::fmt;
 use std::io::Error as IoError;
 
 use dbl::Error as DblError;
 use modio::Error as ModioError;
 use serenity::Error as SerenityError;
+use toml::de::Error as TomlError;
 
 use crate::db::Error as DatabaseError;
 use crate::db::InitError as DatabaseInitError;
@@ -17,7 +17,7 @@ pub enum Error {
     Dbl(DblError),
     Database(DatabaseErrorInner),
     Serenity(SerenityError),
-    Env(&'static str, VarError),
+    Config(TomlError),
 }
 
 #[derive(Debug)]
@@ -36,12 +36,7 @@ impl fmt::Display for Error {
             Error::Database(DatabaseErrorInner::Query(e)) => e.fmt(fmt),
             Error::Modio(e) => e.fmt(fmt),
             Error::Dbl(e) => e.fmt(fmt),
-            Error::Env(key, VarError::NotPresent) => {
-                write!(fmt, "Environment variable '{}' not found", key)
-            }
-            Error::Env(key, VarError::NotUnicode(_)) => {
-                write!(fmt, "Environment variable '{}' was not valid unicode", key)
-            }
+            Error::Config(e) => e.fmt(fmt),
         }
     }
 }
@@ -61,6 +56,12 @@ impl From<&str> for Error {
 impl From<IoError> for Error {
     fn from(e: IoError) -> Error {
         Error::Io(e)
+    }
+}
+
+impl From<TomlError> for Error {
+    fn from(e: TomlError) -> Error {
+        Error::Config(e)
     }
 }
 

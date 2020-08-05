@@ -7,20 +7,15 @@ use serenity::cache::Cache;
 use tokio::time::{interval_at, Instant};
 use tracing::{error, info};
 
-use crate::config::{DBL_OVERRIDE_BOT_ID, DBL_TOKEN};
+use crate::config::DBL_OVERRIDE_BOT_ID;
 use crate::error::Error;
-use crate::util;
 
 const DBL_BASE_URL: &str = "https://top.gg/bot";
 const MIN: Duration = Duration::from_secs(60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
 
-pub fn is_dbl_enabled() -> bool {
-    util::var(DBL_TOKEN).is_ok()
-}
-
 fn get_bot_id(bot: u64) -> u64 {
-    util::var(DBL_OVERRIDE_BOT_ID)
+    std::env::var(DBL_OVERRIDE_BOT_ID)
         .ok()
         .and_then(|id| id.parse::<u64>().ok())
         .unwrap_or(bot)
