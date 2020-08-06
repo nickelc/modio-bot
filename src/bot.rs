@@ -1,4 +1,3 @@
-use modio::auth::Credentials;
 use modio::Modio;
 use serenity::framework::standard::{DispatchError, StandardFramework};
 use serenity::model::channel::Message;
@@ -6,11 +5,10 @@ use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::prelude::*;
 use tokio::runtime::Handle;
-use tokio::runtime::Runtime;
 
 use crate::commands::*;
 use crate::config::Config;
-use crate::db::{init_db, load_blocked, load_settings};
+use crate::db::{load_blocked, load_settings};
 use crate::db::{DbPool, Settings, Subscriptions};
 use crate::Result;
 
@@ -80,23 +78,13 @@ fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
         .flatten()
 }
 
-pub fn initialize(config: Config) -> Result<(Client, Modio, Runtime, u64)> {
-    let rt = Runtime::new()?;
-    let pool = init_db(&config.bot.database_url)?;
+pub fn initialize(
+    config: &Config,
+    modio: Modio,
+    pool: DbPool,
+    handle: Handle,
+) -> Result<(Client, u64)> {
     let blocked = load_blocked(&pool)?;
-
-    let modio = {
-        let host = config.modio.host;
-        let credentials = match (config.modio.api_key, config.modio.token) {
-            (key, None) => Credentials::new(key),
-            (key, Some(token)) => Credentials::with_token(key, token),
-        };
-
-        Modio::builder(credentials)
-            .host(host)
-            .user_agent("modbot")
-            .build()?
-    };
 
     let mut client = Client::new(&config.bot.token, Handler)?;
 
@@ -148,9 +136,9 @@ pub fn initialize(config: Config) -> Result<(Client, Modio, Runtime, u64)> {
             data: Default::default(),
         });
         data.insert::<Subscriptions>(Subscriptions { pool });
-        data.insert::<ModioKey>(modio.clone());
-        data.insert::<ExecutorKey>(rt.handle().clone());
+        data.insert::<ModioKey>(modio);
+        data.insert::<ExecutorKey>(handle);
     }
 
-    Ok((client, modio, rt, *bot.as_u64()))
+    Ok((client, *bot.as_u64()))
 }

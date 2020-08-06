@@ -22,6 +22,7 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 use dotenv::dotenv;
+use tokio::runtime::Runtime;
 
 mod bot;
 mod commands;
@@ -32,6 +33,7 @@ mod tasks;
 mod tools;
 mod util;
 
+use db::init_db;
 use util::*;
 
 fn main() {
@@ -51,7 +53,11 @@ fn try_main() -> CliResult {
         return Ok(());
     }
 
-    let (mut client, modio, rt, bot) = bot::initialize(config)?;
+    let rt = Runtime::new()?;
+    let pool = init_db(&config.bot.database_url)?;
+    let modio = init_modio(&config)?;
+
+    let (mut client, bot) = bot::initialize(&config, modio.clone(), pool, rt.handle().clone())?;
 
     rt.spawn(rt.enter(|| tasks::events::task(&client, modio.clone())));
 

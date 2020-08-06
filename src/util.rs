@@ -3,13 +3,28 @@ use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::prelude::*;
+use modio::{Credentials, Modio};
 use serenity::client::Context;
 use serenity::model::id::GuildId;
 
+use crate::config::Config;
 use crate::error::Error;
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub fn init_modio(config: &Config) -> Result<Modio> {
+    let credentials = match (&config.modio.api_key, &config.modio.token) {
+        (key, None) => Credentials::new(key),
+        (key, Some(token)) => Credentials::with_token(key, token),
+    };
+
+    let modio = Modio::builder(credentials)
+        .host(&config.modio.host)
+        .user_agent("modbot")
+        .build()?;
+    Ok(modio)
+}
 
 pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
     // ignore Discord Bot List server
