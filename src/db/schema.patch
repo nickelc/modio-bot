@@ -67,3 +67,16 @@ index 3d8b460..a28e031 100644
          user -> Text,
      }
  }
+diff --git a/src/db/schema.rs b/src/db/schema.rs
+index e352848..89897f0 100644
+--- a/src/db/schema.rs
++++ b/src/db/schema.rs
+@@ -39,7 +39,7 @@ table! {
+ 
+ table! {
+     users (id) {
+-        id -> Integer,
++        id -> BigInt,
+         access_token -> Text,
+         refresh_token -> Text,
+         expired_at -> Timestamp,
