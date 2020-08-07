@@ -46,6 +46,15 @@ table! {
     }
 }
 
+table! {
+    users (id) {
+        id -> BigInt,
+        access_token -> Text,
+        refresh_token -> Text,
+        expired_at -> Timestamp,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     blocked_guilds,
     blocked_users,
@@ -53,4 +62,5 @@ allow_tables_to_appear_in_same_query!(
     subscriptions,
     subscriptions_exclude_mods,
     subscriptions_exclude_users,
+    users,
 );
