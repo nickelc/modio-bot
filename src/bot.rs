@@ -11,7 +11,7 @@ use serenity::prelude::*;
 use crate::commands::*;
 use crate::config::Config;
 use crate::db::{load_blocked, load_settings};
-use crate::db::{DbPool, Settings, Subscriptions};
+use crate::db::{DbPool, Settings, Subscriptions, Users};
 use crate::metrics::Metrics;
 use crate::Result;
 
@@ -21,6 +21,10 @@ impl TypeMapKey for Settings {
 
 impl TypeMapKey for Subscriptions {
     type Value = Subscriptions;
+}
+
+impl TypeMapKey for Users {
+    type Value = Users;
 }
 
 pub struct PoolKey;
@@ -142,6 +146,7 @@ pub async fn initialize(
         .group(&OWNER_GROUP)
         .group(&GENERAL_GROUP)
         .group(&BASIC_GROUP)
+        .group(&USER_GROUP)
         .group(&SUBSCRIPTIONS_GROUP)
         .on_dispatch_error(dispatch_error)
         .help(&HELP);
@@ -158,7 +163,8 @@ pub async fn initialize(
             pool: pool.clone(),
             data: Default::default(),
         });
-        data.insert::<Subscriptions>(Subscriptions { pool });
+        data.insert::<Subscriptions>(Subscriptions { pool: pool.clone() });
+        data.insert::<Users>(Users { pool });
         data.insert::<ModioKey>(modio);
         data.insert::<Metrics>(metrics);
     }

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use modio::user::User;
+use modio::user::User as ModioUser;
 use serenity::builder::{CreateEmbedAuthor, CreateEmbedFooter};
 use serenity::client::Context;
 use serenity::framework::standard::macros::{group, help, hook};
@@ -36,6 +36,7 @@ pub mod prelude {
 mod basic;
 mod game;
 pub mod mods;
+mod mysubs;
 mod subs;
 
 use crate::metrics::Metrics;
@@ -43,6 +44,7 @@ use crate::metrics::Metrics;
 use basic::*;
 use game::*;
 use mods::*;
+use mysubs::*;
 use subs::*;
 
 #[group]
@@ -56,6 +58,10 @@ struct General;
 #[group]
 #[commands(list_games, game, list_mods, mod_info, popular)]
 struct Basic;
+
+#[group]
+#[commands(mysubs)]
+struct User;
 
 #[group]
 #[commands(
@@ -133,7 +139,7 @@ pub trait UserExt {
     fn create_footer<'a>(&self, _: &'a mut CreateEmbedFooter) -> &'a mut CreateEmbedFooter;
 }
 
-impl UserExt for User {
+impl UserExt for ModioUser {
     fn create_author<'a>(&self, mut a: &'a mut CreateEmbedAuthor) -> &'a mut CreateEmbedAuthor {
         a = a.name(&self.username).url(&self.profile_url.to_string());
         if let Some(avatar) = &self.avatar {
