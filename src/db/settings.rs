@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use diesel::prelude::*;
 use serenity::model::id::GuildId;
 
-use super::{schema, DbPool, GameId};
-use crate::Result;
+use super::{schema, DbPool, GameId, Result};
 use schema::settings;
 
 #[derive(Default)]

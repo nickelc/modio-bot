@@ -5,8 +5,7 @@ use diesel::prelude::*;
 use serenity::model::id::ChannelId;
 use serenity::model::id::GuildId;
 
-use super::{schema, DbPool, GameId};
-use crate::Result;
+use super::{schema, DbPool, GameId, Result};
 
 pub type ExcludedMods = HashSet<u32>;
 pub type Tags = HashSet<String>;

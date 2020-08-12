@@ -3,11 +3,11 @@ use std::fmt;
 use std::io::Error as IoError;
 
 use dbl::Error as DblError;
-use diesel::r2d2::PoolError;
-use diesel::result::Error as QueryError;
-use diesel_migrations::RunMigrationsError;
 use modio::Error as ModioError;
 use serenity::Error as SerenityError;
+
+use crate::db::Error as DatabaseError;
+use crate::db::InitError as DatabaseInitError;
 
 #[derive(Debug)]
 pub enum Error {
@@ -15,16 +15,15 @@ pub enum Error {
     Io(IoError),
     Modio(ModioError),
     Dbl(DblError),
-    Database(DatabaseError),
+    Database(DatabaseErrorInner),
     Serenity(SerenityError),
     Env(&'static str, VarError),
 }
 
 #[derive(Debug)]
-pub enum DatabaseError {
-    Connection(PoolError),
-    Query(QueryError),
-    Migrations(RunMigrationsError),
+pub enum DatabaseErrorInner {
+    Init(DatabaseInitError),
+    Query(DatabaseError),
 }
 
 impl fmt::Display for Error {
@@ -33,9 +32,8 @@ impl fmt::Display for Error {
             Error::Message(e) => e.fmt(fmt),
             Error::Io(e) => write!(fmt, "IO error: {}", e),
             Error::Serenity(e) => e.fmt(fmt),
-            Error::Database(DatabaseError::Connection(e)) => e.fmt(fmt),
-            Error::Database(DatabaseError::Query(e)) => e.fmt(fmt),
-            Error::Database(DatabaseError::Migrations(e)) => e.fmt(fmt),
+            Error::Database(DatabaseErrorInner::Init(e)) => e.fmt(fmt),
+            Error::Database(DatabaseErrorInner::Query(e)) => e.fmt(fmt),
             Error::Modio(e) => e.fmt(fmt),
             Error::Dbl(e) => e.fmt(fmt),
             Error::Env(key, VarError::NotPresent) => {
@@ -84,20 +82,14 @@ impl From<SerenityError> for Error {
     }
 }
 
-impl From<PoolError> for Error {
-    fn from(e: PoolError) -> Error {
-        Error::Database(DatabaseError::Connection(e))
+impl From<DatabaseInitError> for Error {
+    fn from(e: DatabaseInitError) -> Error {
+        Error::Database(DatabaseErrorInner::Init(e))
     }
 }
 
-impl From<QueryError> for Error {
-    fn from(e: QueryError) -> Error {
-        Error::Database(DatabaseError::Query(e))
-    }
-}
-
-impl From<RunMigrationsError> for Error {
-    fn from(e: RunMigrationsError) -> Error {
-        Error::Database(DatabaseError::Migrations(e))
+impl From<DatabaseError> for Error {
+    fn from(e: DatabaseError) -> Error {
+        Error::Database(DatabaseErrorInner::Query(e))
     }
 }
