@@ -23,6 +23,7 @@ extern crate diesel_migrations;
 
 use dotenv::dotenv;
 
+mod auth;
 mod bot;
 mod commands;
 mod config;
@@ -86,11 +87,13 @@ async fn try_main() -> CliResult {
 
     tokio::spawn(tasks::events::task(&client, modio.clone(), metrics));
 
-    if let Some(token) = config.bot.dbl_token {
+    if let Some(token) = &config.bot.dbl_token {
         tracing::info!("Spawning DBL task");
         let cache = client.cache_and_http.cache.clone();
         tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
     }
+
+    tokio::spawn(auth::serve(config, modio, pool));
 
     let sm = client.shard_manager.clone();
     tokio::spawn(async move {
