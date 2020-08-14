@@ -7,6 +7,7 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::prelude::*;
+use url::Url;
 
 use crate::commands::*;
 use crate::config::Config;
@@ -14,6 +15,12 @@ use crate::db::{load_blocked, load_settings};
 use crate::db::{DbPool, Settings, Subscriptions, Users};
 use crate::metrics::Metrics;
 use crate::Result;
+
+pub struct LoginUrl;
+
+impl TypeMapKey for LoginUrl {
+    type Value = Url;
+}
 
 impl TypeMapKey for Settings {
     type Value = Settings;
@@ -159,6 +166,7 @@ pub async fn initialize(
     {
         let mut data = client.data.write().await;
         data.insert::<PoolKey>(pool.clone());
+        data.insert::<LoginUrl>(config.bot.oauth.login_url.clone());
         data.insert::<Settings>(Settings {
             pool: pool.clone(),
             data: Default::default(),

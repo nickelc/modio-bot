@@ -20,7 +20,7 @@ mod users;
 
 pub use settings::{load_settings, Settings};
 pub use subscriptions::{Events, Subscriptions, Tags};
-pub use users::Users;
+pub use users::{NewToken, Users};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;

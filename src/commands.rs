@@ -33,6 +33,7 @@ pub mod prelude {
     pub use crate::util::format_timestamp;
 }
 
+mod auth;
 mod basic;
 mod game;
 pub mod mods;
@@ -41,6 +42,7 @@ mod subs;
 
 use crate::metrics::Metrics;
 
+use auth::*;
 use basic::*;
 use game::*;
 use mods::*;
@@ -60,7 +62,7 @@ struct General;
 struct Basic;
 
 #[group]
-#[commands(mysubs)]
+#[commands(mysubs, login, logout)]
 struct User;
 
 #[group]
