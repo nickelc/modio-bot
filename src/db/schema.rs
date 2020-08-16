@@ -11,6 +11,15 @@ table! {
 }
 
 table! {
+    messages (id) {
+        id -> BigInt,
+        game_id -> Integer,
+        mod_id -> Integer,
+        created_at -> Timestamp,
+    }
+}
+
+table! {
     settings (guild) {
         guild -> BigInt,
         game -> Nullable<Integer>,
@@ -58,6 +67,7 @@ table! {
 allow_tables_to_appear_in_same_query!(
     blocked_guilds,
     blocked_users,
+    messages,
     settings,
     subscriptions,
     subscriptions_exclude_mods,

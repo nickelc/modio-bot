@@ -37,7 +37,7 @@ mod auth;
 mod basic;
 mod game;
 pub mod mods;
-mod mysubs;
+pub mod mysubs;
 mod subs;
 
 use crate::metrics::Metrics;

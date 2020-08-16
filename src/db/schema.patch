@@ -80,3 +80,16 @@ index e352848..89897f0 100644
          access_token -> Text,
          refresh_token -> Text,
          expired_at -> Timestamp,
+diff --git a/src/db/schema.rs b/src/db/schema.rs
+index 9a39756..98acb7f 100644
+--- a/src/db/schema.rs
++++ b/src/db/schema.rs
+@@ -12,7 +12,7 @@ table! {
+ 
+ table! {
+     messages (id) {
+-        id -> Integer,
++        id -> BigInt,
+         game_id -> Integer,
+         mod_id -> Integer,
+         created_at -> Timestamp,

@@ -1,0 +1,7 @@
+CREATE TABLE "messages" (
+	"id"	INTEGER NOT NULL,
+	"game_id"	INTEGER NOT NULL,
+	"mod_id"	INTEGER NOT NULL,
+	"created_at"	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY("id")
+);
