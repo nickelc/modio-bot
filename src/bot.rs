@@ -3,7 +3,7 @@ use serenity::async_trait;
 use serenity::framework::standard::macros::hook;
 use serenity::framework::standard::StandardFramework;
 use serenity::http::Http;
-use serenity::model::channel::Message;
+use serenity::model::channel::{Message, Reaction};
 use serenity::model::gateway::{Activity, Ready};
 use serenity::model::guild::GuildStatus;
 use serenity::prelude::*;
@@ -12,7 +12,7 @@ use url::Url;
 use crate::commands::*;
 use crate::config::Config;
 use crate::db::{load_blocked, load_settings};
-use crate::db::{DbPool, Settings, Subscriptions, Users};
+use crate::db::{DbPool, Messages, Settings, Subscriptions, Users};
 use crate::metrics::Metrics;
 use crate::Result;
 
@@ -20,6 +20,10 @@ pub struct LoginUrl;
 
 impl TypeMapKey for LoginUrl {
     type Value = Url;
+}
+
+impl TypeMapKey for Messages {
+    type Value = Messages;
 }
 
 impl TypeMapKey for Settings {
@@ -82,6 +86,10 @@ impl EventHandler for Handler {
 
         let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
         ctx.set_activity(game).await;
+    }
+
+    async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
+        crate::commands::mysubs::handle_reaction(ctx, reaction).await;
     }
 }
 
@@ -172,6 +180,7 @@ pub async fn initialize(
             data: Default::default(),
         });
         data.insert::<Subscriptions>(Subscriptions { pool: pool.clone() });
+        data.insert::<Messages>(Messages { pool: pool.clone() });
         data.insert::<Users>(Users { pool });
         data.insert::<ModioKey>(modio);
         data.insert::<Metrics>(metrics);

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use modio::filter::prelude::*;
 
 use crate::commands::prelude::*;
-use crate::db::Users;
+use crate::db::{Messages, Users};
 use crate::util::ContentBuilder;
 
 #[command]
@@ -177,6 +177,77 @@ pub async fn mysubs_rm(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
             .await?;
     }
     Ok(())
+}
+
+use serenity::model::channel::{Reaction, ReactionType};
+
+pub async fn handle_reaction(ctx: Context, reaction: Reaction) {
+    let subscribe = match reaction.emoji {
+        ReactionType::Unicode(s) if s == "✅" => true,
+        ReactionType::Unicode(s) if s == "❌" => false,
+        _ => return,
+    };
+
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let users = data.get::<Users>().expect("get users failed");
+    let messages = data.get::<Messages>().expect("get messages failed");
+
+    let (game_filter, mod_filter) = match messages.find(reaction.message_id) {
+        Ok(Some((game_id, mod_id))) => (Id::eq(game_id), Id::eq(mod_id)),
+        Ok(_) | Err(_) => return,
+    };
+
+    let modio = match users.find_token(reaction.user_id.unwrap()) {
+        Ok(Some(token)) => modio.with_token(token),
+        Ok(_) | Err(_) => return,
+    };
+
+    let result = find_game_mod(modio.clone(), game_filter, mod_filter).await;
+    let game_mod = match result {
+        Ok((Some(game), Some(mod_))) => {
+            let ret = if subscribe {
+                modio.mod_(game.id, mod_.id).subscribe().await
+            } else {
+                modio.mod_(game.id, mod_.id).unsubscribe().await
+            };
+            (Some(game), Some(mod_), ret)
+        }
+        Ok((game, mod_)) => (game, mod_, Ok(())),
+        Err(e) => (None, None, Err(e)),
+    };
+
+    let channel = reaction.channel_id;
+    match (game_mod, subscribe) {
+        ((None, _, _), _) => {
+            let _ = channel.say(&ctx, "Game not found").await;
+        }
+        ((_, None, _), _) => {
+            let _ = channel.say(&ctx, "Mod not found").await;
+        }
+        ((_, Some(mod_), Err(e)), true) => {
+            eprintln!("{}", e);
+            let _ = channel
+                .say(&ctx, format!("Failed to subscribe to '{}'", mod_.name))
+                .await;
+        }
+        ((_, Some(mod_), Err(e)), false) => {
+            eprintln!("{}", e);
+            let _ = channel
+                .say(&ctx, format!("Failed to unsubscribe from '{}'", mod_.name))
+                .await;
+        }
+        ((Some(_game), Some(mod_), Ok(_)), true) => {
+            let _ = channel
+                .say(&ctx, format!("Subscribed to '{}'", mod_.name))
+                .await;
+        }
+        ((Some(_game), Some(mod_), Ok(_)), false) => {
+            let _ = channel
+                .say(&ctx, format!("Unsubscribed from '{}'", mod_.name))
+                .await;
+        }
+    }
 }
 
 use modio::filter::Filter;

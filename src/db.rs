@@ -12,18 +12,21 @@ use tokio::task::block_in_place;
 
 embed_migrations!("migrations");
 
+mod messages;
 #[rustfmt::skip]
 mod schema;
 mod settings;
 mod subscriptions;
 mod users;
 
+pub use messages::Messages;
 pub use settings::{load_settings, Settings};
 pub use subscriptions::{Events, Subscriptions, Tags};
 pub use users::{NewToken, Users};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
+pub type ModId = u32;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
