@@ -7,6 +7,7 @@ use modio::mods::filters::Popular as PopularFilter;
 use modio::mods::{Mod, Statistics};
 
 use crate::commands::prelude::*;
+use crate::db::Messages;
 
 #[command("mod")]
 #[description = "Search mods or show the details for a single mod."]
@@ -64,9 +65,12 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                 Some(list) if list.len() == 1 && first => {
                     let game = game.get().await?;
                     let mod_ = &list[0];
-                    channel
+                    let msg = channel
                         .send_message(ctx, |m| mod_.create_message(&game, m))
                         .await?;
+                    let messages = data.get::<Messages>().expect("get messages failed");
+                    let _ = messages.new_messages(Some((msg.id, game.id, mod_.id)));
+
                     break;
                 }
                 Some(list) => {

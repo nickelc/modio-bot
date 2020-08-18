@@ -15,27 +15,41 @@ use tokio::time::Instant;
 use tracing::{debug, error, trace};
 
 use crate::commands::prelude::*;
-use crate::db::Subscriptions;
+use crate::db::{DbPool, GameId, Messages, ModId, Subscriptions};
 use crate::metrics::Metrics;
 use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
-pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Output = ()> {
+pub fn task(
+    client: &Client,
+    modio: Modio,
+    pool: DbPool,
+    metrics: Metrics,
+) -> impl Future<Output = ()> {
     let data = client.data.clone();
     let http = client.cache_and_http.http.clone();
-    let (tx, mut rx) = mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>)>(100);
+    let messages = Messages { pool };
+    let (tx, mut rx) =
+        mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>, GameId, ModId)>(100);
 
     tokio::spawn(async move {
         loop {
-            if let Some((channels, msg)) = rx.recv().await {
+            if let Some((channels, msg, game, mod_)) = rx.recv().await {
                 metrics.notifications.inc_by(channels.len() as u64);
+                let mut msgs = Vec::with_capacity(channels.len());
                 for channel in channels {
                     let mut msg = msg.clone();
-                    if let Err(e) = channel.send_message(&http, |_| &mut msg).await {
-                        error!("{}", e);
+                    match channel.send_message(&http, |_| &mut msg).await {
+                        Ok(msg) => {
+                            msgs.push((msg.id, game, mod_));
+                        }
+                        Err(e) => error!("{}", e),
                     }
+                }
+                if let Err(e) = messages.new_messages(msgs) {
+                    error!("{}", e);
                 }
             }
         }
@@ -188,7 +202,7 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                             "send message {} for {:?} to {:?}",
                             evt, m.name, effected_channels
                         );
-                        if let Err(e) = tx.send((effected_channels, msg)).await {
+                        if let Err(e) = tx.send((effected_channels, msg, game.id, m.id)).await {
                             error!("{}", e);
                         }
                     }
