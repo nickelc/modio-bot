@@ -98,7 +98,9 @@ async fn try_main() -> CliResult {
         tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
     }
 
-    tokio::spawn(auth::serve(config, modio, pool));
+    let (serve, task) = auth::start(config, modio, pool);
+    tokio::spawn(serve);
+    tokio::spawn(task);
 
     let sm = client.shard_manager.clone();
     tokio::spawn(async move {

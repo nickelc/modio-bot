@@ -49,6 +49,16 @@ struct TokenRequest<'a> {
     scope: &'static str,
 }
 
+#[derive(Serialize)]
+struct RefreshTokenRequest<'a> {
+    client_id: &'a str,
+    client_secret: &'a str,
+    grant_type: &'static str,
+    refresh_token: String,
+    redirect_uri: &'a Url,
+    scope: &'static str,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Token {
     pub access_token: String,
@@ -80,6 +90,27 @@ impl Client {
             client_secret: &self.config.client_secret,
             grant_type: "authorization_code",
             code,
+            redirect_uri: &self.config.redirect_uri,
+            scope: self.config.scope,
+        };
+
+        let resp = self.inner.post(url).form(&data).send().await?;
+
+        if resp.status().is_success() {
+            Ok(resp.json().await?)
+        } else {
+            let err = resp.json::<OAuthError>().await?;
+            Err(Error::OAuth(err))
+        }
+    }
+
+    pub async fn refresh_token(&self, refresh_token: String) -> Result<Token, Error> {
+        let url = self.config.token_url.clone();
+        let data = RefreshTokenRequest {
+            client_id: &self.config.client_id,
+            client_secret: &self.config.client_secret,
+            grant_type: "refresh_token",
+            refresh_token,
             redirect_uri: &self.config.redirect_uri,
             scope: self.config.scope,
         };

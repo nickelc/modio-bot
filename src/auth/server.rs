@@ -1,55 +1,23 @@
 use std::convert::{Infallible, TryFrom};
-use std::sync::Arc;
+use std::net::SocketAddr;
 
 use http::Uri;
 use modio::auth::DiscordOptions;
-use modio::Modio;
 use serde::Deserialize;
 use warp::redirect::temporary;
 use warp::Filter;
 
-use crate::config::Config;
-use crate::db::{DbPool, NewToken, Users};
+use crate::db::NewToken;
 
 use super::discord;
-use super::discord::{Client, OAuthConfig};
-
-#[derive(Clone)]
-struct Context {
-    client: Client,
-    config: Arc<OAuthConfig>,
-    modio: Modio,
-    users: Users,
-}
+use super::Context;
 
 #[derive(Deserialize)]
 pub struct AuthCode {
     pub code: String,
 }
 
-pub async fn serve(config: Config, modio: Modio, pool: DbPool) {
-    let (addr, config, location) = {
-        let addr = config.bot.oauth.addr;
-        let location = config.bot.oauth.location_after_login;
-
-        let config = Arc::new(OAuthConfig {
-            client_id: config.bot.oauth.client_id,
-            client_secret: config.bot.oauth.client_secret,
-            auth_url: config.bot.oauth.auth_url,
-            token_url: config.bot.oauth.token_url,
-            redirect_uri: config.bot.oauth.redirect_uri,
-            scope: "identify",
-        });
-        (addr, config, location)
-    };
-
-    let ctx = Context {
-        client: Client::new(Arc::clone(&config)),
-        config,
-        modio,
-        users: Users { pool },
-    };
-
+pub(super) async fn serve(addr: SocketAddr, location: Uri, ctx: Context) {
     let login = warp::get()
         .and(warp::path!("login"))
         .and(with_context(ctx.clone()))
