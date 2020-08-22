@@ -76,4 +76,19 @@ impl Users {
 
         Ok(())
     }
+
+    pub fn tokens_to_refresh(&self) -> Result<Vec<(UserId, String)>> {
+        use schema::users::dsl::*;
+
+        let conn = self.pool.get()?;
+        let result = users
+            .select((id, refresh_token))
+            .filter(expired_at.lt(datetime("now", "+4 hours")))
+            .load(&conn)?
+            .into_iter()
+            .map(|(uid, token): (i64, String)| (UserId::from(uid as u64), token))
+            .collect();
+
+        Ok(result)
+    }
 }
