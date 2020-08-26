@@ -37,10 +37,20 @@ table! {
     }
 }
 
+table! {
+    subscriptions_exclude_users (game, channel, user) {
+        game -> Integer,
+        channel -> BigInt,
+        guild -> Nullable<BigInt>,
+        user -> Text,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     blocked_guilds,
     blocked_users,
     settings,
     subscriptions,
     subscriptions_exclude_mods,
+    subscriptions_exclude_users,
 );

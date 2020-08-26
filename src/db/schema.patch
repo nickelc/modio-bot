@@ -52,3 +52,18 @@
          mod_id -> Integer,
      }
  }
+diff --git a/src/db/schema.rs b/src/db/schema.rs
+index 3d8b460..a28e031 100644
+--- a/src/db/schema.rs
++++ b/src/db/schema.rs
+@@ -40,8 +40,8 @@ table! {
+ table! {
+     subscriptions_exclude_users (game, channel, user) {
+         game -> Integer,
+-        channel -> Integer,
+-        guild -> Nullable<Integer>,
++        channel -> BigInt,
++        guild -> Nullable<BigInt>,
+         user -> Text,
+     }
+ }
