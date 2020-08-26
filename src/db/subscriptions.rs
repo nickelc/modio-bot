@@ -50,9 +50,15 @@ impl Subscriptions {
 
         {
             use schema::subscriptions_exclude_mods::dsl::*;
-            let filter = subscriptions_exclude_mods.filter(guild.ne_all(ids));
+            let filter = subscriptions_exclude_mods.filter(guild.ne_all(&ids));
             let num = diesel::delete(filter).execute(&conn)?;
             log::info!("Deleted {} excluded mods.", num);
+        }
+        {
+            use schema::subscriptions_exclude_users::dsl::*;
+            let filter = subscriptions_exclude_users.filter(guild.ne_all(&ids));
+            let num = diesel::delete(filter).execute(&conn)?;
+            log::info!("Deleted {} excluded users.", num);
         }
         Ok(())
     }
