@@ -162,7 +162,10 @@ impl Subscriptions {
         Ok(records)
     }
 
-    pub fn list_excluded(&self, channel_id: ChannelId) -> Result<HashMap<GameId, ExcludedMods>> {
+    pub fn list_excluded_mods(
+        &self,
+        channel_id: ChannelId,
+    ) -> Result<HashMap<GameId, ExcludedMods>> {
         use schema::subscriptions_exclude_mods::dsl::*;
 
         let conn = self.pool.get()?;
@@ -177,6 +180,29 @@ impl Subscriptions {
                 .into_iter()
                 .fold(HashMap::new(), |mut map, (game_id, mid)| {
                     map.entry(game_id as GameId).or_default().insert(mid as u32);
+                    map
+                });
+        Ok(records)
+    }
+
+    pub fn list_excluded_users(
+        &self,
+        channel_id: ChannelId,
+    ) -> Result<HashMap<GameId, ExcludedUsers>> {
+        use schema::subscriptions_exclude_users::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        let records = subscriptions_exclude_users
+            .select((game, user))
+            .filter(channel.eq(channel_id.0 as i64))
+            .load::<(i32, String)>(&conn)?;
+
+        let records: HashMap<GameId, ExcludedUsers> =
+            records
+                .into_iter()
+                .fold(HashMap::new(), |mut map, (game_id, name)| {
+                    map.entry(game_id as GameId).or_default().insert(name);
                     map
                 });
         Ok(records)
@@ -321,6 +347,42 @@ impl Subscriptions {
             game.eq(game_id as i32)
                 .and(channel.eq(channel_id.0 as i64))
                 .and(mod_id.eq(id as i32)),
+        );
+        diesel::delete(filter).execute(&conn)?;
+        Ok(())
+    }
+
+    pub fn mute_user(
+        &self,
+        game_id: GameId,
+        channel_id: ChannelId,
+        guild_id: Option<GuildId>,
+        name: &str,
+    ) -> Result<()> {
+        use schema::subscriptions_exclude_users::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        diesel::insert_into(subscriptions_exclude_users)
+            .values((
+                game.eq(game_id as i32),
+                channel.eq(channel_id.0 as i64),
+                guild.eq(guild_id.map(|g| g.0 as i64)),
+                user.eq(name),
+            ))
+            .execute(&conn)?;
+        Ok(())
+    }
+
+    pub fn unmute_user(&self, game_id: GameId, channel_id: ChannelId, name: &str) -> Result<()> {
+        use schema::subscriptions_exclude_users::dsl::*;
+
+        let conn = self.pool.get()?;
+
+        let filter = subscriptions_exclude_users.filter(
+            game.eq(game_id as i32)
+                .and(channel.eq(channel_id.0 as i64))
+                .and(user.eq(name)),
         );
         diesel::delete(filter).execute(&conn)?;
         Ok(())

@@ -61,7 +61,10 @@ struct General;
     unsubscribe,
     muted,
     mute,
-    unmute
+    unmute,
+    muted_users,
+    mute_user,
+    unmute_user
 )]
 struct Modio;
 
