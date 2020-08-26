@@ -55,7 +55,12 @@ struct General;
     game,
     list_mods,
     mod_info,
-    popular,
+    popular
+)]
+struct Basic;
+
+#[group]
+#[commands(
     subscriptions,
     subscribe,
     unsubscribe,
@@ -66,7 +71,8 @@ struct General;
     mute_user,
     unmute_user
 )]
-struct Modio;
+#[required_permissions("MANAGE_CHANNELS")]
+struct Subscriptions;
 
 pub mod with_vote {
     use super::*;

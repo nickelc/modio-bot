@@ -110,7 +110,8 @@ pub fn initialize(
             })
             .group(&OWNER_GROUP)
             .group(if crate::tasks::dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
-            .group(&MODIO_GROUP)
+            .group(&BASIC_GROUP)
+            .group(&SUBSCRIPTIONS_GROUP)
             .on_dispatch_error(|ctx, msg, error| match error {
                 DispatchError::NotEnoughArguments { .. } => {
                     let _ = msg.channel_id.say(ctx, "Not enough arguments.");
