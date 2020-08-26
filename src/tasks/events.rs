@@ -143,7 +143,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                         create_message(&game, m, evt, &mut msg);
                         let mut effected_channels = BTreeSet::new();
 
-                        for (channel, tags, _, evts, excluded) in &channels {
+                        for (channel, tags, _, evts, excluded_mods, excluded_users) in &channels {
                             if *evt == &EventType::ModAvailable
                                 && !evts.contains(crate::db::Events::NEW)
                                 || *evt == &EventType::ModfileChanged
@@ -152,7 +152,16 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                                 debug!("event ignored #{}: {} for {:?}", channel, evt, m.name,);
                                 continue;
                             }
-                            if excluded.contains(&m.id) {
+                            if excluded_users.contains(&m.submitted_by.username)
+                                || excluded_users.contains(&m.submitted_by.name_id)
+                            {
+                                debug!(
+                                    "user ignored #{}: {} for {:?}/{:?}",
+                                    channel, evt, m.submitted_by.name_id, m.name,
+                                );
+                                continue;
+                            }
+                            if excluded_mods.contains(&m.id) {
                                 debug!("mod ignored #{}: {} for {:?}", channel, evt, m.name,);
                                 continue;
                             }

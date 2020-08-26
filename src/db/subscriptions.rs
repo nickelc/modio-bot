@@ -8,8 +8,16 @@ use serenity::model::id::GuildId;
 use super::{schema, DbPool, GameId, Result};
 
 pub type ExcludedMods = HashSet<u32>;
+pub type ExcludedUsers = HashSet<String>;
 pub type Tags = HashSet<String>;
-pub type Subscription = (ChannelId, Tags, Option<GuildId>, Events, ExcludedMods);
+pub type Subscription = (
+    ChannelId,
+    Tags,
+    Option<GuildId>,
+    Events,
+    ExcludedMods,
+    ExcludedUsers,
+);
 
 pub struct Subscriptions {
     pub pool: DbPool,
@@ -57,7 +65,8 @@ impl Subscriptions {
         let conn = self.pool.get()?;
         let list = subscriptions.load::<Record>(&conn)?;
 
-        let mut excluded = self.load_excluded_mods()?;
+        let mut excluded_mods = self.load_excluded_mods()?;
+        let mut excluded_users = self.load_excluded_users()?;
 
         Ok(list.into_iter().fold(
             HashMap::new(),
@@ -71,10 +80,20 @@ impl Subscriptions {
                     .collect();
                 let guild_id = guild_id.map(|id| GuildId(id as u64));
                 let evt = Events::from_bits_truncate(evt);
-                let excluded = excluded.remove(&(game_id, channel_id)).unwrap_or_default();
-                map.entry(game_id)
-                    .or_default()
-                    .push((channel_id, _tags, guild_id, evt, excluded));
+                let excluded_mods = excluded_mods
+                    .remove(&(game_id, channel_id))
+                    .unwrap_or_default();
+                let excluded_users = excluded_users
+                    .remove(&(game_id, channel_id))
+                    .unwrap_or_default();
+                map.entry(game_id).or_default().push((
+                    channel_id,
+                    _tags,
+                    guild_id,
+                    evt,
+                    excluded_mods,
+                    excluded_users,
+                ));
                 map
             },
         ))
@@ -92,6 +111,22 @@ impl Subscriptions {
             .fold(HashMap::new(), |mut map, (game_id, channel_id, _, mid)| {
                 let key = (game_id as GameId, ChannelId(channel_id as u64));
                 map.entry(key).or_default().insert(mid as u32);
+                map
+            }))
+    }
+
+    fn load_excluded_users(&self) -> Result<HashMap<(GameId, ChannelId), ExcludedUsers>> {
+        use schema::subscriptions_exclude_users::dsl::*;
+
+        type Record = (i32, i64, Option<i64>, String);
+
+        let conn = self.pool.get()?;
+        let list = subscriptions_exclude_users.load::<Record>(&conn)?;
+        Ok(list
+            .into_iter()
+            .fold(HashMap::new(), |mut map, (game_id, channel_id, _, name)| {
+                let key = (game_id as GameId, ChannelId(channel_id as u64));
+                map.entry(key).or_default().insert(name);
                 map
             }))
     }
