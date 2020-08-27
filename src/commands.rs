@@ -50,13 +50,7 @@ struct Owner;
 struct General;
 
 #[group]
-#[commands(
-    list_games,
-    game,
-    list_mods,
-    mod_info,
-    popular
-)]
+#[commands(list_games, game, list_mods, mod_info, popular)]
 struct Basic;
 
 #[group]
