@@ -13,8 +13,10 @@ pub type EmbedField = (&'static str, String, bool);
 
 pub mod prelude {
     pub use std::fmt::Write;
+    pub use std::future::Future;
 
-    pub use futures::{Future, Stream};
+    pub use futures_core::Stream;
+    pub use futures_util::{future, StreamExt, TryFutureExt, TryStreamExt};
     pub use modio::filter::Operator;
     pub use modio::user::User;
     pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};

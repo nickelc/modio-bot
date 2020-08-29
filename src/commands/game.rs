@@ -1,6 +1,5 @@
 use std::sync::mpsc;
 
-use futures::{future, TryFutureExt, TryStreamExt};
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Statistics};
 

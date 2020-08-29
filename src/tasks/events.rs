@@ -3,7 +3,7 @@ use std::future::Future;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use log::{debug, trace};
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};

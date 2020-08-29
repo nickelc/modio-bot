@@ -16,7 +16,8 @@ chrono = "0.4"
 dbl-rs = "0.2"
 dotenv = "0.15"
 env_logger = "0.7"
-futures = "0.3"
+futures-core = { version = "0.3", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 kuchiki = "0.8"
 log = "0.4"
 serenity = { version = "0.8" }

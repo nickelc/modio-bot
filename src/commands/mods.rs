@@ -1,7 +1,5 @@
 use std::sync::mpsc;
 
-use futures::{future, StreamExt, TryFutureExt, TryStreamExt};
-
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::Popular as PopularFilter;

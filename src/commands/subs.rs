@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-use futures::future;
-use futures::{TryFutureExt, TryStreamExt};
+use futures_util::stream::FuturesUnordered;
 use modio::filter::prelude::*;
 use modio::games::ApiAccessOptions;
 use serenity::prelude::*;
@@ -194,7 +193,7 @@ pub fn muted(ctx: &mut Context, msg: &Message) -> CommandResult {
                         modio.game(game).mods().search(filter).collect(),
                     )
                 })
-                .collect::<futures::stream::FuturesUnordered<_>>()
+                .collect::<FuturesUnordered<_>>()
                 .try_fold(util::ContentBuilder::default(), |mut buf, (game, mods)| {
                     let _ = writeln!(&mut buf, "**{}**", game.name);
                     for m in mods {
@@ -352,7 +351,7 @@ pub fn muted_users(ctx: &mut Context, msg: &Message) -> CommandResult {
                 .map(|(game, users)| {
                     future::try_join(modio.game(game).get(), future::ready(Ok(users)))
                 })
-                .collect::<futures::stream::FuturesUnordered<_>>()
+                .collect::<FuturesUnordered<_>>()
                 .try_fold(util::ContentBuilder::default(), |mut buf, (game, users)| {
                     let _ = writeln!(&mut buf, "**{}**", game.name);
                     for (i, name) in users.iter().enumerate() {
