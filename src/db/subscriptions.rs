@@ -64,15 +64,22 @@ impl Subscriptions {
     }
 
     pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
+        use super::Error;
         use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
         let conn = self.pool.get()?;
-        let list = subscriptions.load::<Record>(&conn)?;
 
-        let mut excluded_mods = self.load_excluded_mods()?;
-        let mut excluded_users = self.load_excluded_users()?;
+        let (list, mut excluded_mods, mut excluded_users) =
+            conn.transaction::<_, Error, _>(|| {
+                let list = subscriptions.load::<Record>(&conn)?;
+
+                let excluded_mods = self.load_excluded_mods()?;
+                let excluded_users = self.load_excluded_users()?;
+
+                Ok((list, excluded_mods, excluded_users))
+            })?;
 
         Ok(list.into_iter().fold(
             HashMap::new(),
@@ -216,6 +223,7 @@ impl Subscriptions {
         guild_id: Option<GuildId>,
         evts: Events,
     ) -> Result<()> {
+        use diesel::result::Error;
         use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
@@ -230,29 +238,33 @@ impl Subscriptions {
         let _tags = _tags.join("\n");
 
         let pk = (game_id, channel_id, _tags.clone());
-        let first = subscriptions.find(pk).first::<Record>(&conn);
 
-        let (game_id, channel_id, _tags, guild_id, evts) = match first {
-            Ok((game_id, channel_id, _tags, guild_id, old_evts)) => {
-                let mut new_evts = Events::from_bits_truncate(old_evts);
-                new_evts |= evts;
-                (game_id, channel_id, _tags, guild_id, new_evts.bits)
-            }
-            Err(_) => {
-                let guild_id = guild_id.map(|g| g.0 as i64);
-                (game_id, channel_id, _tags, guild_id, evts.bits)
-            }
-        };
+        conn.transaction::<_, Error, _>(|| {
+            let first = subscriptions.find(pk).first::<Record>(&conn);
 
-        diesel::replace_into(subscriptions)
-            .values((
+            let (game_id, channel_id, _tags, guild_id, evts) = match first {
+                Ok((game_id, channel_id, _tags, guild_id, old_evts)) => {
+                    let mut new_evts = Events::from_bits_truncate(old_evts);
+                    new_evts |= evts;
+                    (game_id, channel_id, _tags, guild_id, new_evts.bits)
+                }
+                Err(_) => {
+                    let guild_id = guild_id.map(|g| g.0 as i64);
+                    (game_id, channel_id, _tags, guild_id, evts.bits)
+                }
+            };
+
+            let values = (
                 game.eq(game_id),
                 channel.eq(channel_id),
                 tags.eq(_tags),
                 guild.eq(guild_id),
                 events.eq(evts),
-            ))
-            .execute(&conn)?;
+            );
+            diesel::replace_into(subscriptions)
+                .values(values)
+                .execute(&conn)
+        })?;
 
         Ok(())
     }
@@ -264,6 +276,7 @@ impl Subscriptions {
         _tags: Tags,
         evts: Events,
     ) -> Result<()> {
+        use diesel::result::Error;
         use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
@@ -275,43 +288,48 @@ impl Subscriptions {
         let _tags = _tags.join("\n");
 
         let pk = (game_id as i32, channel_id.0 as i64, _tags);
-        let first = subscriptions.find(pk).first::<Record>(&conn);
 
-        if let Ok((game_id, channel_id, _tags, guild_id, old_evts)) = first {
-            let mut new_evts = Events::from_bits_truncate(old_evts);
-            new_evts.remove(evts);
+        conn.transaction::<_, Error, _>(|| {
+            let first = subscriptions.find(pk).first::<Record>(&conn);
 
-            if new_evts.is_empty() {
-                let pred = game
-                    .eq(game_id)
-                    .and(channel.eq(channel_id))
-                    .and(tags.eq(_tags));
-                let filter = subscriptions.filter(pred);
-                diesel::delete(filter).execute(&conn)?;
+            if let Ok((game_id, channel_id, _tags, guild_id, old_evts)) = first {
+                let mut new_evts = Events::from_bits_truncate(old_evts);
+                new_evts.remove(evts);
 
-                let count = subscriptions
-                    .select(diesel::dsl::count_star())
-                    .filter(game.eq(game_id).and(channel.eq(channel_id)))
-                    .first::<i64>(&conn)?;
-
-                if count == 0 {
-                    use schema::subscriptions_exclude_mods::dsl::*;
-                    let pred = game.eq(game_id).and(channel.eq(channel_id));
-                    let filter = subscriptions_exclude_mods.filter(pred);
+                if new_evts.is_empty() {
+                    let pred = game
+                        .eq(game_id)
+                        .and(channel.eq(channel_id))
+                        .and(tags.eq(_tags));
+                    let filter = subscriptions.filter(pred);
                     diesel::delete(filter).execute(&conn)?;
-                }
-            } else {
-                diesel::replace_into(subscriptions)
-                    .values((
+
+                    let count = subscriptions
+                        .select(diesel::dsl::count_star())
+                        .filter(game.eq(game_id).and(channel.eq(channel_id)))
+                        .first::<i64>(&conn)?;
+
+                    if count == 0 {
+                        use schema::subscriptions_exclude_mods::dsl::*;
+                        let pred = game.eq(game_id).and(channel.eq(channel_id));
+                        let filter = subscriptions_exclude_mods.filter(pred);
+                        diesel::delete(filter).execute(&conn)?;
+                    }
+                } else {
+                    let values = (
                         game.eq(game_id),
                         channel.eq(channel_id),
                         tags.eq(_tags),
                         guild.eq(guild_id),
                         events.eq(new_evts.bits),
-                    ))
-                    .execute(&conn)?;
+                    );
+                    diesel::replace_into(subscriptions)
+                        .values(values)
+                        .execute(&conn)?;
+                }
             }
-        }
+            Ok(())
+        })?;
 
         Ok(())
     }

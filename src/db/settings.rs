@@ -28,16 +28,21 @@ pub struct Settings {
 
 impl Settings {
     fn persist(&self, change: ChangeSettings) -> Result<()> {
+        use diesel::result::Error;
         use schema::settings::dsl::*;
 
         let conn = self.pool.get()?;
         let target = settings.filter(guild.eq(change.guild));
-        let query = diesel::update(target).set(&change);
 
-        if query.execute(&conn)? == 0 {
-            let query = diesel::insert_into(settings).values(&change);
-            query.execute(&conn)?;
-        }
+        conn.transaction::<_, Error, _>(|| {
+            let query = diesel::update(target).set(&change);
+
+            if query.execute(&conn)? == 0 {
+                let query = diesel::insert_into(settings).values(&change);
+                query.execute(&conn)?;
+            }
+            Ok(())
+        })?;
         Ok(())
     }
 
