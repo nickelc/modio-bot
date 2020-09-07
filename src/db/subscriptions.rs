@@ -310,10 +310,18 @@ impl Subscriptions {
                         .first::<i64>(&conn)?;
 
                     if count == 0 {
-                        use schema::subscriptions_exclude_mods::dsl::*;
-                        let pred = game.eq(game_id).and(channel.eq(channel_id));
-                        let filter = subscriptions_exclude_mods.filter(pred);
-                        diesel::delete(filter).execute(&conn)?;
+                        {
+                            use schema::subscriptions_exclude_mods::dsl::*;
+                            let pred = game.eq(game_id).and(channel.eq(channel_id));
+                            let filter = subscriptions_exclude_mods.filter(pred);
+                            diesel::delete(filter).execute(&conn)?;
+                        }
+                        {
+                            use schema::subscriptions_exclude_users::dsl::*;
+                            let pred = game.eq(game_id).and(channel.eq(channel_id));
+                            let filter = subscriptions_exclude_users.filter(pred);
+                            diesel::delete(filter).execute(&conn)?;
+                        }
                     }
                 } else {
                     let values = (
