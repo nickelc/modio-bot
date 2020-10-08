@@ -7,7 +7,7 @@
 [![Discord][discord-badge]][discord]
 [![Invite ModBot][bot-invite-badge]][bot-invite-url]
 
-ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
+ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`]. ModBot provides your community with an easy way to search the mod listing. Additionally, if you subscribe to games following the Quick Start introductions below, the ModBot will let you know whenever a mod is added or edited.
 
 ## Example
 
@@ -15,12 +15,13 @@ ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
 ## Setup
 
-You can invite the officially hosted ModBot to join your Discord server using the following URL https://discordbot.mod.io, or you can build and install your own version of ModBot by following the instructions below.
+1. Invite ModBot to your [Discord server](https://discordbot.mod.io)
+2. Set the default game using `~game {GAME NAME or ID}`
+3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe {GAME NAME or ID}`
+4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
+5. All done, the bot will keep you updated and is there to query the mod.io API.
 
- 1. Invite the ModBot https://discordbot.mod.io/
- 2. View the games list `~games` and set the default game `~game ID`
- 3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe ID`
- 4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
+If you followed the steps above, your Discord community will be able to query mods for the default game, and each channel you subscribed to updates in will receive a push notification each time a mod is added or edited. For example in our [#modbot channel](https://discord.mod.io) we subscribe to every game on mod.io so our Discord community continually gets updated.
  
 <img src="https://image.mod.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.59.16_am.png" width="500"/>
 
@@ -46,7 +47,8 @@ Popular commands include:
 
 ## Building
 
-MODBOT is written in Rust, so you'll need to grab a [Rust installation][rust-lang] in order to compile it.
+If you want to build and host your own version of ModBot, these instructions are for you. ModBot is written in Rust, so you'll need to grab a [Rust installation][rust-lang] in order to compile it.
+
 Building is easy:
 
 ```
