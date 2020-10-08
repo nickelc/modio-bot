@@ -15,6 +15,8 @@ ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`]. ModBot
 
 ## Setup
 
+Getting the ModBot up and running takes minutes:
+
 1. Invite ModBot to your [Discord server](https://discordbot.mod.io)
 2. Set the default game using `~game {GAME NAME or ID}`
 3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe {GAME NAME or ID}`
