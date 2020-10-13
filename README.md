@@ -11,7 +11,7 @@ ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`]. ModBot
 
 ## Example
 
-<img src="https://image.mod.io/members/c4ca/1/profileguides/modbot.png" width="500"/>
+<img src="https://image.modcdn.io/members/c4ca/1/profileguides/modbot.png" width="500"/>
 
 ## Setup
 
@@ -25,7 +25,7 @@ Getting the ModBot up and running takes minutes:
 
 If you followed the steps above, your Discord community will be able to query mods for the default game, and each channel you subscribed to updates in will receive a push notification each time a mod is added or edited. For example in our [#modbot channel](https://discord.mod.io) we subscribe to every game on mod.io so our Discord community continually gets updated.
  
-<img src="https://image.mod.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.59.16_am.png" width="500"/>
+<img src="https://image.modcdn.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.59.16_am.png" width="500"/>
 
 ## Commands
 
