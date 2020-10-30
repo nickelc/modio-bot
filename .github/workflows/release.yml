@@ -27,10 +27,7 @@ jobs:
           override: true
 
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target x86_64-unknown-linux-musl --release --features sqlite-bundled
+        run: cargo build --target x86_64-unknown-linux-musl --release --features sqlite-bundled
 
       - name: Package
         id: package
