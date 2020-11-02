@@ -3,9 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dbl::{types::ShardStats, Client};
-use log::error;
 use serenity::cache::Cache;
 use tokio::time::{interval_at, Instant};
+use tracing::{error, info};
 
 use crate::config::{DBL_OVERRIDE_BOT_ID, DBL_TOKEN};
 use crate::error::Error;
@@ -47,7 +47,7 @@ pub fn task(bot: u64, cache: Arc<Cache>, token: &str) -> Result<impl Future<Outp
 
             tokio::spawn(async move {
                 match client.update_stats(bot, stats).await {
-                    Ok(_) => log::info!("Update bot stats [servers={}]", servers),
+                    Ok(_) => info!("Update bot stats [servers={}]", servers),
                     Err(e) => error!("Failed to update bot stats: {:?}", e),
                 }
             });

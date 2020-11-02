@@ -80,7 +80,7 @@ pub mod with_vote {
 
 #[hook]
 pub async fn before(_: &Context, msg: &Message, _: &str) -> bool {
-    log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
+    tracing::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
     true
 }
 

@@ -45,7 +45,7 @@ async fn main() {
 
 async fn try_main() -> CliResult {
     dotenv().ok();
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let config = config::from_env()?;
 
@@ -61,7 +61,7 @@ async fn try_main() -> CliResult {
     tokio::spawn(tasks::events::task(&client, modio.clone()));
 
     if let Ok(token) = util::var(config::DBL_TOKEN) {
-        log::info!("Spawning DBL task");
+        tracing::info!("Spawning DBL task");
         let cache = client.cache_and_http.cache.clone();
         tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
     }

@@ -46,19 +46,19 @@ impl Subscriptions {
         let ids = it.collect::<Vec<_>>();
         let filter = subscriptions.filter(guild.ne_all(&ids));
         let num = diesel::delete(filter).execute(&conn)?;
-        log::info!("Deleted {} subscription(s).", num);
+        tracing::info!("Deleted {} subscription(s).", num);
 
         {
             use schema::subscriptions_exclude_mods::dsl::*;
             let filter = subscriptions_exclude_mods.filter(guild.ne_all(&ids));
             let num = diesel::delete(filter).execute(&conn)?;
-            log::info!("Deleted {} excluded mods.", num);
+            tracing::info!("Deleted {} excluded mods.", num);
         }
         {
             use schema::subscriptions_exclude_users::dsl::*;
             let filter = subscriptions_exclude_users.filter(guild.ne_all(&ids));
             let num = diesel::delete(filter).execute(&conn)?;
-            log::info!("Deleted {} excluded users.", num);
+            tracing::info!("Deleted {} excluded users.", num);
         }
         Ok(())
     }

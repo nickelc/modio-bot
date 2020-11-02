@@ -118,7 +118,7 @@ Logging can be configured via environment variables.
 RUST_LOG=modio=debug,modbot=debug
 ```
 
-See the [env\_logger](https://crates.io/crates/env_logger) crate for more information.
+See [`tracing_subscriber::EnvFilter`] for more information.
 
 ## License
 
@@ -148,4 +148,5 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 [mod.io]: https://mod.io
 [`modio-rs`]: https://github.com/nickelc/modio-rs
 [`serenity`]: https://github.com/serenity-rs/serenity
+[`tracing_subscriber::EnvFilter`]: https://docs.rs/tracing-subscriber/0.2/?search=EnvFilter
 [rust-lang]: https://www.rust-lang.org

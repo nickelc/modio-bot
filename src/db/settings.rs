@@ -82,7 +82,7 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
     let ids = it.collect::<Vec<_>>();
     let filter = settings.filter(guild.ne_all(ids));
     match diesel::delete(filter).execute(&conn) {
-        Ok(num) => log::info!("Deleted {} guild(s).", num),
+        Ok(num) => tracing::info!("Deleted {} guild(s).", num),
         Err(e) => eprintln!("{}", e),
     }
 

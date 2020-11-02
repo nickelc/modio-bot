@@ -3,7 +3,6 @@ use std::future::Future;
 use std::time::Duration;
 
 use futures_util::TryStreamExt;
-use log::{debug, trace};
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::events::EventType as EventTypeFilter;
@@ -13,6 +12,7 @@ use serenity::builder::CreateMessage;
 use serenity::prelude::*;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
+use tracing::{debug, trace};
 
 use crate::commands::prelude::*;
 use crate::db::Subscriptions;

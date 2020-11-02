@@ -46,7 +46,7 @@ impl EventHandler for Handler {
                 .expect("failed to get connection pool");
 
             let guilds = ready.guilds.iter().map(GuildStatus::id).collect::<Vec<_>>();
-            log::info!("Guilds: {:?}", guilds);
+            tracing::info!("Guilds: {:?}", guilds);
 
             let subs = data
                 .get::<Subscriptions>()
