@@ -27,8 +27,7 @@ version = "0.9"
 features = ["collector"]
 
 [dependencies.modio]
-git = "https://github.com/nickelc/modio-rs.git"
-rev = "ab84bd5"
+version = "0.5"
 default-features = false
 features = ["rustls-tls"]
 
