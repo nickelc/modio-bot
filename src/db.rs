@@ -8,6 +8,7 @@ use diesel::sqlite::SqliteConnection;
 use diesel_migrations::RunMigrationsError;
 use serenity::model::id::GuildId;
 use serenity::model::id::UserId;
+use tokio::task::block_in_place;
 
 embed_migrations!("migrations");
 
@@ -44,27 +45,31 @@ pub struct Blocked {
 }
 
 pub fn init_db(database_url: &str) -> Result<DbPool, InitError> {
-    let mgr = ConnectionManager::new(database_url);
-    let pool = Pool::new(mgr)?;
+    block_in_place(|| {
+        let mgr = ConnectionManager::new(database_url);
+        let pool = Pool::new(mgr)?;
 
-    embedded_migrations::run_with_output(&pool.get()?, &mut std::io::stdout())?;
+        embedded_migrations::run_with_output(&pool.get()?, &mut std::io::stdout())?;
 
-    Ok(pool)
+        Ok(pool)
+    })
 }
 
 pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
     use schema::blocked_guilds::dsl::*;
     use schema::blocked_users::dsl::*;
 
-    let conn = pool.get()?;
-    let guilds = blocked_guilds
-        .load::<(i64,)>(&conn)
-        .ok()
-        .unwrap_or_default();
-    let users = blocked_users.load::<(i64,)>(&conn).ok().unwrap_or_default();
-    let guilds = guilds.iter().map(|id| GuildId(id.0 as u64)).collect();
-    let users = users.iter().map(|id| UserId(id.0 as u64)).collect();
-    Ok(Blocked { guilds, users })
+    block_in_place(|| {
+        let conn = pool.get()?;
+        let guilds = blocked_guilds
+            .load::<(i64,)>(&conn)
+            .ok()
+            .unwrap_or_default();
+        let users = blocked_users.load::<(i64,)>(&conn).ok().unwrap_or_default();
+        let guilds = guilds.iter().map(|id| GuildId(id.0 as u64)).collect();
+        let users = users.iter().map(|id| UserId(id.0 as u64)).collect();
+        Ok(Blocked { guilds, users })
+    })
 }
 
 // impl Display & From<*> for (Init)Error {{{
