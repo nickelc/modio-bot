@@ -4,8 +4,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::prelude::*;
 use modio::{Credentials, Modio};
-use serenity::client::Context;
-use serenity::model::id::GuildId;
 
 use crate::config::Config;
 use crate::error::Error;
@@ -24,21 +22,6 @@ pub fn init_modio(config: &Config) -> Result<Modio> {
         .user_agent("modbot")
         .build()?;
     Ok(modio)
-}
-
-pub async fn guild_stats(ctx: &Context) -> (usize, usize) {
-    // ignore Discord Bot List server
-    let dbl = GuildId(264_445_053_596_991_498);
-    let guilds = ctx.cache.guilds().await;
-    let guilds = guilds.into_iter().filter(|&id| dbl != id);
-
-    let (mut servers, mut members) = (0, 0);
-    for id in guilds {
-        let count = ctx.cache.guild_field(id, |g| g.members.len()).await;
-        servers += 1;
-        members += count.unwrap_or_default();
-    }
-    (servers, members)
 }
 
 #[derive(Debug)]

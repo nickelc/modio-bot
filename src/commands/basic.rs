@@ -5,7 +5,6 @@ use serenity::model::channel::Message;
 
 use crate::commands::CommandResult;
 use crate::db::Settings;
-use crate::util::guild_stats;
 
 #[command]
 #[description("Get bot info")]
@@ -22,7 +21,7 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         None
     };
-    let (guilds, users) = guild_stats(ctx).await;
+    let guilds = ctx.cache.guild_count().await;
     msg.channel_id
         .send_message(ctx, move |m| {
             m.embed(|e| {
@@ -33,7 +32,7 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                     a
                 })
-                .footer(|f| f.text(format!("Servers: {} | Users: {}", guilds, users)))
+                .footer(|f| f.text(format!("Servers: {}", guilds)))
                 .field(
                     "Invite to server",
                     "[discordbot.mod.io](https://discordbot.mod.io)",
