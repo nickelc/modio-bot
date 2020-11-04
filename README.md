@@ -109,6 +109,8 @@ A example is provided as [`bot.example.toml`](bot.example.toml).
 #### Running the bot
 ```bash
 ./path/to/modbot
+
+./path/to/modbot --config path/to/bot.toml
 ```
 
 #### Logging

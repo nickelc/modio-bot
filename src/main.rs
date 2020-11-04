@@ -21,6 +21,7 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
+use argh::FromArgs;
 use dotenv::dotenv;
 
 mod bot;
@@ -35,6 +36,14 @@ mod util;
 use db::init_db;
 use util::*;
 
+/// 🤖 modbot. modbot. modbot.
+#[derive(FromArgs)]
+struct Arguments {
+    /// path to config file.
+    #[argh(option, short = 'c')]
+    config: Option<String>,
+}
+
 #[tokio::main]
 async fn main() {
     if let Err(e) = try_main().await {
@@ -47,7 +56,11 @@ async fn try_main() -> CliResult {
     dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let config = config::load_from_file("bot.toml")?;
+    let args: Arguments = argh::from_env();
+
+    let path = args.config.unwrap_or(String::from("bot.toml"));
+    let config = config::load_from_file(&path)
+        .map_err(|e| format!("Failed to load config {:?}: {}", path, e))?;
 
     if tools::tools(&config).await {
         return Ok(());
