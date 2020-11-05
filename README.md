@@ -2,7 +2,6 @@
 
 # ModBot for Discord
 ![Rust version][rust-version]
-![Rust edition][rust-edition]
 ![License][license-badge]
 [![GitHub Action][gha-badge]][gha-url]
 [![Discord][discord-badge]][discord]
@@ -10,9 +9,15 @@
 
 ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
-## Example
-
-<img src="https://image.mod.io/members/c4ca/1/profileguides/modbot.png" width="500"/>
+<p align="center">
+    <a href="#setup">Setup</a> •
+    <a href="#commands">Commands</a> •
+    <a href="#screenshots">Screenshots</a> •
+    <a href="#building">Building</a> •
+    <a href="#installation">Installation</a> •
+    <a href="#usage">Usage</a> •
+    <a href="#license">License</a>
+</p>
 
 ## Setup
 
@@ -22,7 +27,7 @@ You can invite the officially hosted ModBot to join your Discord server using th
  2. View the games list `~games` and set the default game `~game ID`
  3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe ID`
  4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
- 
+
 <img src="https://image.mod.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.59.16_am.png" width="500"/>
 
 ## Commands
@@ -39,7 +44,7 @@ Popular commands include:
  * `~game` return information about the default game
  * `~games` return a list of all games
  * `~mod <ID|Name>` return information about the mod(s) requested
- * `~mods` return a list of all mods belonging to the default game
+ * `~mods [ID|Name]` return a list of all mods belonging to the default game
  * `~popular` return a list of mods ordered by popularity
  * `~subscribe <ID|Name> [Tag..]` subscribe to a game for updates (mods added/edited) \[alias: `sub`\]
    ```
@@ -61,6 +66,14 @@ Popular commands include:
  * `~mute <Game> <Mod>` mute a mod from update notifications
  * `~muted` return a list of all muted mods
  * `~unmute <Game> <Mod>` unmute a mod from update notifications
+
+## Screenshots
+
+### Mod details
+![details](https://user-images.githubusercontent.com/2128532/98248314-0de9e880-1f75-11eb-8598-add24e232cea.png)
+
+### New Mod notification
+![notification](https://user-images.githubusercontent.com/2128532/98248318-0e827f00-1f75-11eb-89d5-a55174d9fed5.png)
 
 ## Building
 
@@ -136,8 +149,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 
-[rust-version]: https://img.shields.io/badge/rust-1.39%2B-blue.svg
-[rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
+[rust-version]: https://img.shields.io/badge/rust-1.43%2B-blue.svg
 [gha-badge]: https://github.com/nickelc/modio-bot/workflows/CI/badge.svg
 [gha-url]: https://github.com/nickelc/modio-bot/actions?query=workflow%3ACI
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
