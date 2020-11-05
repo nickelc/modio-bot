@@ -188,10 +188,10 @@ impl ModExt for Mod {
             Some((
                 "Ratings",
                 format!(
-                    r#"- Rank: {}/{}
-- Downloads: {}
-- Subscribers: {}
-- Votes: +{}/-{}"#,
+                    r#"Rank: {}/{}
+Downloads: {}
+Subscribers: {}
+Votes: +{}/-{}"#,
                     stats.popularity.rank_position,
                     stats.popularity.rank_total,
                     stats.downloads_total,
@@ -207,7 +207,7 @@ impl ModExt for Mod {
             let updated = format_timestamp(m.date_updated as i64);
             Some((
                 "Dates",
-                format!("- Created: {}\n- Updated: {}", added, updated),
+                format!("Created: {}\nUpdated: {}", added, updated),
                 true,
             ))
         }
