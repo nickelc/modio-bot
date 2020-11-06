@@ -6,8 +6,9 @@ readme = "README.md"
 repository = "https://github.com/nickelc/modio-bot"
 license = "MIT/Apache-2.0"
 authors = ["Constantin Nickel <constantin.nickel@gmail.com>"]
-keywords = ["modio", "discord"]
+keywords = ["modio", "discord", "bot"]
 edition = "2018"
+include = ["src/**/*.rs", "LICENSE-*", "README.md", "build.rs", "migrations"]
 
 [dependencies]
 argh = "0.1"
