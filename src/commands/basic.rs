@@ -3,30 +3,17 @@ use serenity::framework::standard::macros::command;
 use serenity::framework::standard::Args;
 use serenity::model::channel::Message;
 
-use crate::bot::EnableDBL;
 use crate::commands::CommandResult;
 use crate::db::Settings;
 
 #[command]
 #[description("Get bot info")]
 pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
-    let (bot, name, avatar) = ctx
+    let (name, avatar) = ctx
         .cache
-        .current_user_field(|u| (*u.id.as_u64(), u.name.clone(), u.avatar_url()))
+        .current_user_field(|u| (u.name.clone(), u.avatar_url()))
         .await;
 
-    let dbl_enabled = {
-        let data = ctx.data.read().await;
-        data.get::<EnableDBL>().copied().unwrap_or(false)
-    };
-
-    let dbl = if dbl_enabled {
-        let profile = crate::tasks::dbl::get_profile(bot);
-        let value = format!("[Profile]({}) | [Vote]({0}/vote)", profile);
-        Some(("top.gg / discordbots.org", value, true))
-    } else {
-        None
-    };
     let guilds = ctx.cache.guild_count().await;
     msg.channel_id
         .send_message(ctx, move |m| {
@@ -44,7 +31,6 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
                     "[discordbot.mod.io](https://discordbot.mod.io)",
                     true,
                 )
-                .field("Website", "[mod.io](https://mod.io)", true)
                 .field(
                     "mod.io Discord",
                     "[discord.mod.io](https://discord.mod.io)",
@@ -53,6 +39,11 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
                 .field(
                     "modbot Discord",
                     "[discord.gg/XNX9665](https://discord.gg/XNX9665)",
+                    true,
+                )
+                .field(
+                    "Website/Blog",
+                    "[ModBot for Discord](https://mod.io/blog/modbot-for-discord)",
                     true,
                 )
                 .field(
@@ -70,7 +61,6 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
                     ),
                     true,
                 )
-                .fields(dbl)
             })
         })
         .await?;

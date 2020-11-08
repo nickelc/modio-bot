@@ -10,7 +10,6 @@ use tracing::{error, info};
 use crate::config::DBL_OVERRIDE_BOT_ID;
 use crate::error::Error;
 
-const DBL_BASE_URL: &str = "https://top.gg/bot";
 const MIN: Duration = Duration::from_secs(60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
 
@@ -19,10 +18,6 @@ fn get_bot_id(bot: u64) -> u64 {
         .ok()
         .and_then(|id| id.parse::<u64>().ok())
         .unwrap_or(bot)
-}
-
-pub fn get_profile(bot: u64) -> String {
-    format!("{}/{}", DBL_BASE_URL, get_bot_id(bot))
 }
 
 pub fn task(bot: u64, cache: Arc<Cache>, token: &str) -> Result<impl Future<Output = ()>, Error> {
