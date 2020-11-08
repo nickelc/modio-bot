@@ -70,14 +70,6 @@ struct Basic;
 #[required_permissions("MANAGE_CHANNELS")]
 struct Subscriptions;
 
-pub mod with_vote {
-    use super::*;
-
-    #[group]
-    #[commands(about, prefix, invite, guide, vote)]
-    struct General;
-}
-
 #[hook]
 pub async fn before(_: &Context, msg: &Message, _: &str) -> bool {
     tracing::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);

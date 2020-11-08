@@ -106,11 +106,7 @@ pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(
         .await
         .before(before)
         .group(&OWNER_GROUP)
-        .group(if config.bot.dbl_token.is_some() {
-            &with_vote::GENERAL_GROUP
-        } else {
-            &GENERAL_GROUP
-        })
+        .group(&GENERAL_GROUP)
         .group(&BASIC_GROUP)
         .group(&SUBSCRIPTIONS_GROUP)
         .on_dispatch_error(dispatch_error)

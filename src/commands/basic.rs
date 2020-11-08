@@ -118,15 +118,6 @@ pub async fn prefix(ctx: &Context, msg: &Message, mut args: Args) -> CommandResu
 }
 
 #[command]
-#[description("Get link to vote for Modbot on Discord Bot List")]
-pub async fn vote(ctx: &Context, msg: &Message) -> CommandResult {
-    let bot = ctx.cache.current_user_field(|u| *u.id.as_u64()).await;
-    let profile = crate::tasks::dbl::get_profile(bot);
-    msg.channel_id.say(ctx, format!("{}/vote", profile)).await?;
-    Ok(())
-}
-
-#[command]
 #[owners_only]
 #[help_available(false)]
 pub async fn servers(ctx: &Context, msg: &Message) -> CommandResult {
