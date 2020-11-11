@@ -1,11 +1,11 @@
 <img src="https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png" width="200" align="right"/>
 
 # ModBot for Discord
+[![Crates.io][crates-badge]][crates-url]
 ![Rust version][rust-version]
 ![License][license-badge]
 [![GitHub Action][gha-badge]][gha-url]
 [![Discord][discord-badge]][discord]
-[![Invite ModBot][bot-invite-badge]][bot-invite-url]
 
 ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
@@ -21,7 +21,9 @@ ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
 ## Setup
 
-You can invite the officially hosted ModBot to join your Discord server using the following URL https://discordbot.mod.io, or you can build and install your own version of ModBot by following the instructions below.
+You can invite the officially hosted ModBot to join your Discord server using the
+following URL https://discordbot.mod.io, or you can build and install your
+own version of ModBot by following the [instructions](#building) below.
 
  1. Invite the ModBot https://discordbot.mod.io/
  2. View the games list `~games` and set the default game `~game ID`
@@ -149,17 +151,17 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 
-[rust-version]: https://img.shields.io/badge/rust-1.43%2B-blue.svg
+[crates-badge]: https://img.shields.io/crates/v/modbot.svg
+[crates-url]: https://crates.io/crates/modbot
+[rust-version]: https://img.shields.io/badge/rust-1.43%2B-lightgrey.svg?logo=rust
 [gha-badge]: https://github.com/nickelc/modio-bot/workflows/CI/badge.svg
 [gha-url]: https://github.com/nickelc/modio-bot/actions?query=workflow%3ACI
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [discord]: https://discord.gg/XNX9665
-[discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
+[discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=support&logo=discord&color=7289DA&labelColor=2C2F33
 [bot-invite-badge]: https://img.shields.io/static/v1.svg?label=%20&logo=discord&message=Invite%20ModBot&color=7289DA&labelColor=2C2F33
 [bot-invite-url]: https://discordbot.mod.io
 [modio-bot-channel]: https://discord.gg/QR7DGD7
-[repo]: https://github.com/nickelc/modio-bot
-[logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
 [mod.io]: https://mod.io
 [`modio-rs`]: https://github.com/nickelc/modio-rs
 [`serenity`]: https://github.com/serenity-rs/serenity
