@@ -77,16 +77,6 @@ pub async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[description("Link to 'Getting Started' blog post.")]
-#[aliases("tutorial", "getting-started")]
-pub async fn guide(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id
-        .say(ctx, "https://apps.mod.io/guides/getting-started")
-        .await?;
-    Ok(())
-}
-
-#[command]
 #[description("Set prefix for the server")]
 #[max_args(1)]
 #[only_in(guilds)]

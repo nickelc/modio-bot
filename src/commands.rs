@@ -48,7 +48,7 @@ use subs::*;
 struct Owner;
 
 #[group]
-#[commands(about, prefix, invite, guide)]
+#[commands(about, prefix, invite)]
 struct General;
 
 #[group]
