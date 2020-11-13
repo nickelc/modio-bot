@@ -30,7 +30,6 @@ mod config;
 mod db;
 mod error;
 mod tasks;
-mod tools;
 mod util;
 
 use db::init_db;
@@ -61,10 +60,6 @@ async fn try_main() -> CliResult {
     let path = args.config.unwrap_or(String::from("bot.toml"));
     let config = config::load_from_file(&path)
         .map_err(|e| format!("Failed to load config {:?}: {}", path, e))?;
-
-    if tools::tools(&config).await {
-        return Ok(());
-    }
 
     let pool = init_db(&config.bot.database_url)?;
     let modio = init_modio(&config)?;
