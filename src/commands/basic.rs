@@ -124,7 +124,7 @@ pub async fn servers(ctx: &Context, msg: &Message) -> CommandResult {
     {
         Ok(_) => {
             if msg.guild_id.is_some() {
-                let _ = msg.react(ctx, '\u{01F44C}'); // :ok_hand:
+                let _ = msg.react(ctx, '\u{01F44C}').await; // :ok_hand:
             }
         }
         Err(e) => {
