@@ -128,7 +128,7 @@ pub async fn servers(ctx: &Context, msg: &Message) -> CommandResult {
             }
         }
         Err(e) => {
-            eprintln!("Error sending server list: {:?}", e);
+            tracing::error!("Error sending server list: {:?}", e);
             let _ = msg
                 .channel_id
                 .say(ctx, "There was a problem sending you the server list.")

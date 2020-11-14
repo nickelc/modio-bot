@@ -12,7 +12,7 @@ use serenity::builder::CreateMessage;
 use serenity::prelude::*;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use crate::commands::prelude::*;
 use crate::db::Subscriptions;
@@ -32,7 +32,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                 for channel in channels {
                     let mut msg = msg.clone();
                     if let Err(e) = channel.send_message(&http, |_| &mut msg).await {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 }
             }
@@ -66,7 +66,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                 .expect("failed to get subscriptions")
                 .load()
                 .unwrap_or_else(|e| {
-                    eprintln!("failed to load subscriptions: {}", e);
+                    error!("failed to load subscriptions: {}", e);
                     Default::default()
                 });
 
@@ -184,7 +184,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
                             evt, m.name, effected_channels
                         );
                         if let Err(e) = tx.send((effected_channels, msg)).await {
-                            eprintln!("{}", e);
+                            error!("{}", e);
                         }
                     }
                     Ok::<_, modio::Error>(())
@@ -192,7 +192,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
 
                 tokio::spawn(async {
                     if let Err(e) = task.await {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 });
             }

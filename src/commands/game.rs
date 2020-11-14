@@ -34,7 +34,7 @@ pub async fn list_games(ctx: &Context, msg: &Message) -> CommandResult {
             .send_message(ctx, |m| m.embed(|e| e.title("Games").description(content)))
             .await;
         if let Err(e) = ret {
-            eprintln!("{:?}", e);
+            tracing::error!("{:?}", e);
         }
     }
     Ok(())
@@ -75,7 +75,7 @@ async fn get_game(ctx: &Context, msg: &Message) -> CommandResult {
             .send_message(ctx, |m| game.create_message(stats, m))
             .await
         {
-            eprintln!("{} {:?}", e, e);
+            tracing::error!("{} {:?}", e, e);
         }
     }
     Ok(())

@@ -228,7 +228,7 @@ pub async fn mute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
         }
         (Some(game), Some(mod_)) => {
             if let Err(e) = subs.mute_mod(game.id, msg.channel_id, msg.guild_id, mod_.id) {
-                eprintln!("{}", e);
+                tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to mute '{}'", mod_.name))
                     .await?;
@@ -273,7 +273,7 @@ pub async fn unmute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResu
         }
         (Some(game), Some(mod_)) => {
             if let Err(e) = subs.unmute_mod(game.id, msg.channel_id, mod_.id) {
-                eprintln!("{}", e);
+                tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to unmute '{}'", mod_.name))
                     .await?;
@@ -366,7 +366,7 @@ pub async fn mute_user(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
         }
         Some(game) => {
             if let Err(e) = subs.mute_user(game.id, msg.channel_id, msg.guild_id, name) {
-                eprintln!("{}", e);
+                tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to mute '{}'", name))
                     .await?;
@@ -408,7 +408,7 @@ pub async fn unmute_user(ctx: &Context, msg: &Message, mut args: Args) -> Comman
         }
         Some(game) => {
             if let Err(e) = subs.unmute_user(game.id, msg.channel_id, name) {
-                eprintln!("{}", e);
+                tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to unmute '{}'", name))
                     .await?;
@@ -481,7 +481,7 @@ async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) 
                     .say(ctx, format!("Subscribed to '{}'", game.name))
                     .await;
             }
-            Err(e) => eprintln!("{}", e),
+            Err(e) => tracing::error!("{}", e),
         }
     }
     Ok(())
@@ -530,7 +530,7 @@ async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events
                     .say(ctx, format!("Unsubscribed from '{}'", game.name))
                     .await;
             }
-            Err(e) => eprintln!("{}", e),
+            Err(e) => tracing::error!("{}", e),
         }
     }
     Ok(())

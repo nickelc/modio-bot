@@ -46,7 +46,7 @@ struct Arguments {
 #[tokio::main]
 async fn main() {
     if let Err(e) = try_main().await {
-        eprintln!("{}", e);
+        tracing::error!("{}", e);
         std::process::exit(1);
     }
 }

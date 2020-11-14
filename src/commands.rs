@@ -91,7 +91,7 @@ pub async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) 
         DispatchError::Ratelimited(_) => {
             let _ = msg.channel_id.say(ctx, "Try again in 1 second.").await;
         }
-        e => eprintln!("Dispatch error: {:?}", e),
+        e => tracing::error!("Dispatch error: {:?}", e),
     }
 }
 

@@ -53,7 +53,7 @@ impl EventHandler for Handler {
                 .expect("failed to get subscriptions");
 
             if let Err(e) = subs.cleanup(&guilds) {
-                eprintln!("{}", e);
+                tracing::error!("{}", e);
             }
 
             load_settings(&pool, &guilds).unwrap_or_default()
