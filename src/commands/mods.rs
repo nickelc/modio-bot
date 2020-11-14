@@ -73,7 +73,7 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                     let footer = match (list.current(), list.page_count()) {
                         (page, count) if page == count => format!("{}/{}", page, count),
                         (page, count) => format!(
-                            "{}/{} - Type `next` within 15s for the next page",
+                            "{}/{} - Type `next` within 30s for the next page",
                             page, count
                         ),
                     };
@@ -100,7 +100,7 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                 .await_reply(ctx)
                 .channel_id(channel)
                 .filter(|m| m.content.to_lowercase() == "next")
-                .timeout(Duration::from_secs(15));
+                .timeout(Duration::from_secs(30));
 
             if collector.await.is_none() {
                 break;
