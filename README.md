@@ -138,6 +138,15 @@ RUST_LOG=modio=debug,modbot=debug
 
 See [`tracing_subscriber::EnvFilter`] for more information.
 
+#### Metrics
+
+By default, the metrics are exposed via Prometheus endpoint listing on `http://127.0.0.1:8080/metrics`.
+
+```toml
+[metrics]
+addr = "127.0.0.1:3000"
+```
+
 ## License
 
 Licensed under either of

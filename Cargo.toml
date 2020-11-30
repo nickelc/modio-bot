@@ -20,7 +20,9 @@ dbl-rs = "0.2"
 dotenv = "0.15"
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+hyper = "0.13"
 kuchiki = "0.8"
+prometheus = { version = "0.11", default-features = false }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "0.2", features = ["stream", "time", "full"] }
 toml = "0.5"

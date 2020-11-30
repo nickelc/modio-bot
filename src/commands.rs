@@ -38,6 +38,8 @@ mod game;
 pub mod mods;
 mod subs;
 
+use crate::metrics::Metrics;
+
 use basic::*;
 use game::*;
 use mods::*;
@@ -74,6 +76,17 @@ struct Subscriptions;
 pub async fn before(_: &Context, msg: &Message, _: &str) -> bool {
     tracing::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
     true
+}
+
+#[hook]
+pub async fn after(ctx: &Context, _: &Message, name: &str, result: CommandResult) {
+    let data = ctx.data.read().await;
+    let metrics = data.get::<Metrics>().expect("get metrics failed");
+    metrics.commands.total.inc();
+    metrics.commands.counts.with_label_values(&[name]).inc();
+    if result.is_err() {
+        metrics.commands.errored.inc();
+    }
 }
 
 #[hook]

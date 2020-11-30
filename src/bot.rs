@@ -12,6 +12,7 @@ use crate::commands::*;
 use crate::config::Config;
 use crate::db::{load_blocked, load_settings};
 use crate::db::{DbPool, Settings, Subscriptions};
+use crate::metrics::Metrics;
 use crate::Result;
 
 impl TypeMapKey for Settings {
@@ -32,6 +33,10 @@ pub struct ModioKey;
 
 impl TypeMapKey for ModioKey {
     type Value = Modio;
+}
+
+impl TypeMapKey for Metrics {
+    type Value = Metrics;
 }
 
 pub struct Handler;
@@ -69,6 +74,27 @@ impl EventHandler for Handler {
     }
 }
 
+use serenity::model::event::Event;
+
+#[serenity::async_trait]
+impl RawEventHandler for Handler {
+    async fn raw_event(&self, ctx: Context, evt: Event) {
+        match evt {
+            Event::GuildCreate(_) => {
+                let data = ctx.data.read().await;
+                let metrics = data.get::<Metrics>().expect("get metrics failed");
+                metrics.guilds.inc();
+            }
+            Event::GuildDelete(_) => {
+                let data = ctx.data.read().await;
+                let metrics = data.get::<Metrics>().expect("get metrics failed");
+                metrics.guilds.dec();
+            }
+            _ => {}
+        }
+    }
+}
+
 #[hook]
 async fn dynamic_prefix(ctx: &Context, msg: &Message) -> Option<String> {
     let data = ctx.data.read().await;
@@ -77,7 +103,12 @@ async fn dynamic_prefix(ctx: &Context, msg: &Message) -> Option<String> {
         .flatten()
 }
 
-pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(Client, u64)> {
+pub async fn initialize(
+    config: &Config,
+    modio: Modio,
+    pool: DbPool,
+    metrics: Metrics,
+) -> Result<(Client, u64)> {
     let blocked = load_blocked(&pool)?;
 
     let http = Http::new_with_token(&config.bot.token);
@@ -99,6 +130,7 @@ pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(
         .bucket("simple", |b| b.delay(1))
         .await
         .before(before)
+        .after(after)
         .group(&OWNER_GROUP)
         .group(&GENERAL_GROUP)
         .group(&BASIC_GROUP)
@@ -108,6 +140,7 @@ pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(
 
     let client = Client::builder(&config.bot.token)
         .event_handler(Handler)
+        .raw_event_handler(Handler)
         .framework(framework)
         .await?;
     {
@@ -119,6 +152,7 @@ pub async fn initialize(config: &Config, modio: Modio, pool: DbPool) -> Result<(
         });
         data.insert::<Subscriptions>(Subscriptions { pool });
         data.insert::<ModioKey>(modio);
+        data.insert::<Metrics>(metrics);
     }
 
     Ok((client, *bot.as_u64()))

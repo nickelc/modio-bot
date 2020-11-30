@@ -16,12 +16,13 @@ use tracing::{debug, error, trace};
 
 use crate::commands::prelude::*;
 use crate::db::Subscriptions;
+use crate::metrics::Metrics;
 use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
-pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
+pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Output = ()> {
     let data = client.data.clone();
     let http = client.cache_and_http.http.clone();
     let (tx, mut rx) = mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>)>(100);
@@ -29,6 +30,7 @@ pub fn task(client: &Client, modio: Modio) -> impl Future<Output = ()> {
     tokio::spawn(async move {
         loop {
             if let Some((channels, msg)) = rx.recv().await {
+                metrics.notifications.inc_by(channels.len() as u64);
                 for channel in channels {
                     let mut msg = msg.clone();
                     if let Err(e) = channel.send_message(&http, |_| &mut msg).await {

@@ -3,6 +3,7 @@ use std::io::Error as IoError;
 
 use dbl::Error as DblError;
 use modio::Error as ModioError;
+use prometheus::Error as PrometheusError;
 use serenity::Error as SerenityError;
 use toml::de::Error as TomlError;
 
@@ -18,6 +19,7 @@ pub enum Error {
     Database(DatabaseErrorInner),
     Serenity(SerenityError),
     Config(TomlError),
+    Metrics(PrometheusError),
 }
 
 #[derive(Debug)]
@@ -37,6 +39,7 @@ impl fmt::Display for Error {
             Error::Modio(e) => e.fmt(fmt),
             Error::Dbl(e) => e.fmt(fmt),
             Error::Config(e) => e.fmt(fmt),
+            Error::Metrics(e) => e.fmt(fmt),
         }
     }
 }
@@ -74,6 +77,12 @@ impl From<ModioError> for Error {
 impl From<DblError> for Error {
     fn from(e: DblError) -> Error {
         Error::Dbl(e)
+    }
+}
+
+impl From<PrometheusError> for Error {
+    fn from(e: PrometheusError) -> Error {
+        Error::Metrics(e)
     }
 }
 

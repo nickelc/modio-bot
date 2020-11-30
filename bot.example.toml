@@ -11,3 +11,6 @@ api_key="your mod.io api key"
 
 # Alternative mod.io host
 # host="https://api.test.mod.io/v1"
+
+[metrics] # Optional
+addr = "127.0.0.1:3000" # defaults to 127.0.0.1:8080

@@ -29,10 +29,12 @@ mod commands;
 mod config;
 mod db;
 mod error;
+mod metrics;
 mod tasks;
 mod util;
 
 use db::init_db;
+use metrics::Metrics;
 use util::*;
 
 /// 🤖 modbot. modbot. modbot.
@@ -61,12 +63,16 @@ async fn try_main() -> CliResult {
     let config = config::load_from_file(&path)
         .map_err(|e| format!("Failed to load config {:?}: {}", path, e))?;
 
+    let metrics = Metrics::new()?;
     let pool = init_db(&config.bot.database_url)?;
     let modio = init_modio(&config)?;
 
-    let (mut client, bot) = bot::initialize(&config, modio.clone(), pool.clone()).await?;
+    tokio::spawn(metrics::serve(&config.metrics, metrics.clone()));
 
-    tokio::spawn(tasks::events::task(&client, modio.clone()));
+    let (mut client, bot) =
+        bot::initialize(&config, modio.clone(), pool.clone(), metrics.clone()).await?;
+
+    tokio::spawn(tasks::events::task(&client, modio.clone(), metrics));
 
     if let Some(token) = config.bot.dbl_token {
         tracing::info!("Spawning DBL task");
