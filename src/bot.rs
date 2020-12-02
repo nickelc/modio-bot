@@ -118,6 +118,13 @@ pub async fn initialize(
         Err(e) => panic!("Couldn't get application info: {}", e),
     };
 
+    let disabled = std::env::var("MODBOT_DISABLED_COMMANDS")
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .map(String::from)
+        .collect();
+
     let framework = StandardFramework::new()
         .configure(|c| {
             c.prefix("~")
@@ -126,6 +133,7 @@ pub async fn initialize(
                 .owners(owners)
                 .blocked_guilds(blocked.guilds)
                 .blocked_users(blocked.users)
+                .disabled_commands(disabled)
         })
         .bucket("simple", |b| b.delay(1))
         .await

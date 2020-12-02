@@ -95,6 +95,12 @@ pub async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) 
         DispatchError::NotEnoughArguments { .. } => {
             let _ = msg.channel_id.say(ctx, "Not enough arguments.").await;
         }
+        DispatchError::CommandDisabled(_) => {
+            let _ = msg
+                .channel_id
+                .say(ctx, "The command is currently disabled.")
+                .await;
+        }
         DispatchError::LackingPermissions(_) => {
             let _ = msg
                 .channel_id
