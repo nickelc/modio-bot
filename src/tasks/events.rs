@@ -80,7 +80,7 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                     "polling events at {} for game={} channels: {:?}",
                     tstamp, game, channels
                 );
-                let mut tx = tx.clone();
+                let tx = tx.clone();
                 let filter = filter.clone();
                 let game = modio.game(game);
                 let mods = game.mods();

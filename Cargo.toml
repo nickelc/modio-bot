@@ -16,25 +16,25 @@ argh = "0.1"
 bitflags = "1"
 bytesize = "1"
 chrono = "0.4"
-dbl-rs = "0.2"
+dbl-rs = "0.3"
 dotenv = "0.15"
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
-hyper = "0.13"
+hyper = { version = "0.14", features = ["server"] }
 kuchiki = "0.8"
 prometheus = { version = "0.11", default-features = false }
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "0.2", features = ["stream", "time", "full"] }
+tokio = { version = "1.0", features = ["time", "full"] }
 toml = "0.5"
 tracing = "0.1"
 tracing-subscriber = "0.2"
 
 [dependencies.serenity]
-version = "0.9"
+version = "0.10"
 features = ["collector"]
 
 [dependencies.modio]
-version = "0.5"
+version = "0.6"
 default-features = false
 features = ["rustls-tls"]
 
