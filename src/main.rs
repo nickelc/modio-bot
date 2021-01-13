@@ -80,6 +80,14 @@ async fn try_main() -> CliResult {
         tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
     }
 
+    let sm = client.shard_manager.clone();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen to ctrlc event.");
+        sm.lock().await.shutdown_all().await;
+    });
+
     client.start().await?;
     Ok(())
 }
