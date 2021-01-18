@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::future::Future;
 use std::time::Duration;
 
@@ -171,8 +171,11 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                                 continue;
                             }
                             if !tags.is_empty() {
-                                let mod_tags = m.tags.iter().map(|t| t.name.clone()).collect();
+                                let mod_tags = m.tags.iter().map(|t| t.name.as_str()).collect();
 
+                                // Hidden tags are saved with a leading `*`
+                                let tags: HashSet<_> =
+                                    tags.iter().map(|t| t.trim_start_matches('*')).collect();
                                 if !tags.is_subset(&mod_tags) {
                                     debug!("mod ignored #{}: {} for {:?}", channel, evt, m.name);
                                     trace!("mod tags: {:?}; sub tags: {:?}", mod_tags, tags);

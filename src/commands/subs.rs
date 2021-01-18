@@ -460,7 +460,11 @@ async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) 
             .flatten()
             .collect::<Tags>();
 
-        let sub_tags = args.iter().quoted().flatten().collect::<Tags>();
+        let (hidden, mut sub_tags) = args
+            .iter()
+            .quoted()
+            .flatten()
+            .partition::<Tags, _>(|e| e.starts_with('*'));
 
         if !sub_tags.is_subset(&game_tags) {
             let mut msg = format!("Failed to subscribe to '{}'.\n", game.name);
@@ -473,6 +477,8 @@ async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) 
             channel_id.say(ctx, msg).await?;
             return Ok(());
         }
+
+        sub_tags.extend(hidden);
 
         let ret = subs.add(game.id, channel_id, sub_tags, guild_id, evts);
         match ret {
@@ -509,7 +515,11 @@ async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events
             .flatten()
             .collect::<Tags>();
 
-        let sub_tags = args.iter().quoted().flatten().collect::<Tags>();
+        let (hidden, mut sub_tags) = args
+            .iter()
+            .quoted()
+            .flatten()
+            .partition::<Tags, _>(|e| e.starts_with('*'));
 
         if !sub_tags.is_subset(&game_tags) {
             let mut msg = format!("Failed to unsubscribe from '{}'.\n", game.name);
@@ -522,6 +532,8 @@ async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events
             channel_id.say(ctx, msg).await?;
             return Ok(());
         }
+
+        sub_tags.extend(hidden);
 
         let ret = subs.remove(game.id, channel_id, sub_tags, evts);
         match ret {
