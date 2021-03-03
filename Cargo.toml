@@ -51,7 +51,7 @@ optional = true
 features = ["min_sqlite_version_3_7_16"]
 
 [build-dependencies]
-vergen = "3"
+git2 = { version = "0.13", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]

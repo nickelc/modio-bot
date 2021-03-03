@@ -18,6 +18,16 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id
         .send_message(ctx, move |m| {
             m.embed(|e| {
+                let version = if env!("GIT_SHA") == "UNKNOWN" {
+                    env!("CARGO_PKG_VERSION").to_string()
+                } else {
+                    format!(
+                        "{} ([{}](https://github.com/nickelc/modio-bot/commit/{}))",
+                        env!("CARGO_PKG_VERSION"),
+                        env!("GIT_SHA_SHORT"),
+                        env!("GIT_SHA"),
+                    )
+                };
                 e.author(|a| {
                     let mut a = a.name(name);
                     if let Some(avatar) = avatar {
@@ -51,16 +61,7 @@ pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
                     "[nickelc/modio-bot](https://github.com/nickelc/modio-bot)",
                     true,
                 )
-                .field(
-                    "Version",
-                    format!(
-                        "{} ([{}](https://github.com/nickelc/modio-bot/commit/{}))",
-                        env!("CARGO_PKG_VERSION"),
-                        env!("VERGEN_SHA_SHORT"),
-                        env!("VERGEN_SHA"),
-                    ),
-                    true,
-                )
+                .field("Version", version, true)
             })
         })
         .await?;
