@@ -184,8 +184,8 @@ pub trait ModExt {
 
 impl ModExt for Mod {
     fn create_fields(&self, is_new: bool, with_ddl: bool) -> Vec<EmbedField> {
-        fn ratings(stats: &Statistics) -> Option<EmbedField> {
-            Some((
+        fn ratings(stats: &Statistics) -> EmbedField {
+            (
                 "Ratings",
                 format!(
                     r#"Rank: {}/{}
@@ -200,16 +200,16 @@ Votes: +{}/-{}"#,
                     stats.ratings.negative,
                 ),
                 true,
-            ))
+            )
         }
-        fn dates(m: &Mod) -> Option<EmbedField> {
+        fn dates(m: &Mod) -> EmbedField {
             let added = format_timestamp(m.date_added as i64);
             let updated = format_timestamp(m.date_updated as i64);
-            Some((
+            (
                 "Dates",
                 format!("Created: {}\nUpdated: {}", added, updated),
                 true,
-            ))
+            )
         }
         fn info(m: &Mod, with_ddl: bool) -> Option<EmbedField> {
             let mut info = if with_ddl {
@@ -252,9 +252,9 @@ Votes: +{}/-{}"#,
             vec![info(self, with_ddl), tags(self)]
         } else {
             vec![
-                ratings(&self.stats),
+                Some(ratings(&self.stats)),
                 info(self, with_ddl),
-                dates(self),
+                Some(dates(self)),
                 tags(self),
             ]
         };
