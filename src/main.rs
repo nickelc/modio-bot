@@ -21,7 +21,6 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-use argh::FromArgs;
 use dotenv::dotenv;
 
 mod bot;
@@ -37,13 +36,19 @@ use db::init_db;
 use metrics::Metrics;
 use util::*;
 
-/// 🤖 modbot. modbot. modbot.
-#[derive(FromArgs)]
-struct Arguments {
-    /// path to config file.
-    #[argh(option, short = 'c')]
-    config: Option<String>,
-}
+const HELP: &str = "\
+🤖 modbot. modbot. modbot.
+
+USAGE:
+  modbot [-c <config>]
+
+OPTIONS:
+  -c <config>       Path to config file
+
+ENV:
+  MODBOT_DISABLED_COMMANDS      Comma separated list of disabled commands
+  MODBOT_DEBUG_TIMESTAMP        Start time as Unix timestamp for polling the mod events
+";
 
 #[tokio::main]
 async fn main() {
@@ -57,9 +62,16 @@ async fn try_main() -> CliResult {
     dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let args: Arguments = argh::from_env();
+    let mut args = pico_args::Arguments::from_env();
+    if args.contains(["-h", "--help"]) {
+        println!("{}", HELP);
+        std::process::exit(0);
+    }
 
-    let path = args.config.unwrap_or_else(|| String::from("bot.toml"));
+    let path = args
+        .opt_value_from_str("-c")?
+        .unwrap_or_else(|| String::from("bot.toml"));
+
     let config = config::load_from_file(&path)
         .map_err(|e| format!("Failed to load config {:?}: {}", path, e))?;
 

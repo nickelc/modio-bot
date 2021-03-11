@@ -12,7 +12,6 @@ edition = "2018"
 include = ["src/**/*.rs", "LICENSE-*", "README.md", "build.rs", "migrations"]
 
 [dependencies]
-argh = "0.1"
 bitflags = "1"
 bytesize = "1"
 chrono = "0.4"
@@ -22,6 +21,7 @@ futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 hyper = { version = "0.14", features = ["server"] }
 kuchiki = "0.8"
+pico-args = "0.4"
 prometheus = { version = "0.11", default-features = false }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.0", features = ["time", "full"] }

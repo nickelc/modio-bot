@@ -3,6 +3,7 @@ use std::io::Error as IoError;
 
 use dbl::Error as DblError;
 use modio::Error as ModioError;
+use pico_args::Error as ArgsError;
 use prometheus::Error as PrometheusError;
 use serenity::Error as SerenityError;
 use toml::de::Error as TomlError;
@@ -12,6 +13,7 @@ use crate::db::InitError as DatabaseInitError;
 
 #[derive(Debug)]
 pub enum Error {
+    Args(ArgsError),
     Message(String),
     Io(IoError),
     Modio(ModioError),
@@ -31,6 +33,7 @@ pub enum DatabaseErrorInner {
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::Args(e) => e.fmt(fmt),
             Error::Message(e) => e.fmt(fmt),
             Error::Io(e) => write!(fmt, "IO error: {}", e),
             Error::Serenity(e) => e.fmt(fmt),
@@ -41,6 +44,12 @@ impl fmt::Display for Error {
             Error::Config(e) => e.fmt(fmt),
             Error::Metrics(e) => e.fmt(fmt),
         }
+    }
+}
+
+impl From<ArgsError> for Error {
+    fn from(e: ArgsError) -> Error {
+        Error::Args(e)
     }
 }
 
