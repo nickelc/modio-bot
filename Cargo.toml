@@ -55,3 +55,6 @@ git2 = { version = "0.13", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
+
+[profile.release]
+lto = true
