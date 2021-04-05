@@ -75,14 +75,14 @@ impl Subscriptions {
         let (list, mut excluded_mods, mut excluded_users) = block_in_place::<_, Result<_>>(|| {
             let conn = self.pool.get()?;
 
-            Ok(conn.transaction::<_, Error, _>(|| {
+            conn.transaction::<_, Error, _>(|| {
                 let list = subscriptions.load::<Record>(&conn)?;
 
                 let excluded_mods = self.load_excluded_mods()?;
                 let excluded_users = self.load_excluded_users()?;
 
                 Ok((list, excluded_mods, excluded_users))
-            })?)
+            })
         })?;
 
         Ok(list.into_iter().fold(
