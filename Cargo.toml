@@ -30,7 +30,7 @@ tracing = "0.1"
 tracing-subscriber = "0.2"
 
 [dependencies.serenity]
-version = "0.10"
+version = "0.10.5"
 features = ["collector"]
 
 [dependencies.modio]
