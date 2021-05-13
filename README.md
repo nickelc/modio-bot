@@ -30,7 +30,7 @@ own version of ModBot by following the [instructions](#building) below.
  3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe ID`
  4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
 
-<img src="https://image.mod.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.59.16_am.png" width="500"/>
+<img src="https://user-images.githubusercontent.com/2128532/118098374-1adc0e80-b3d4-11eb-808a-4024b7e79d9b.png" width="500"/>
 
 ## Commands
 
