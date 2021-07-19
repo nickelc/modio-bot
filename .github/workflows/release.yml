@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install musl tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Install rust
+        uses: hecrj/setup-rust-action@v1
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Build
+        run: cargo build --target x86_64-unknown-linux-musl --release --features sqlite-bundled
+
+      - name: Package
+        id: package
+        run: |
+          name=modbot
+          target=x86_64-unknown-linux-musl
+          tag=$(git describe --tags --abbrev=0)
+          release_name="$name-$tag-$target"
+          release_file="$release_name.tar.gz"
+          mkdir "$release_name"
+
+          cp "target/$target/release/modbot" "$release_name"
+          cp README.md LICENSE-APACHE LICENSE-MIT "$release_name"
+          tar cvzf "$release_file" "$release_name"
+
+          echo "::set-output name=asset_name::$release_file"
+          echo "::set-output name=asset_path::$release_file"
+
+      - name: Upload
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_name: ${{ steps.package.outputs.asset_name }}
+          asset_path: ${{ steps.package.outputs.asset_path }}
+          asset_content_type: application/gzip

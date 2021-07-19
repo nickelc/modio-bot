@@ -1,28 +1,42 @@
 [package]
 name = "modbot"
-version = "0.2.0"
-description = "Discord bot for https://mod.io"
+version = "0.4.3"
+description = """Discord bot for https://mod.io.
+ModBot provides commands to search for mods and notifications about added & edited mods."""
 readme = "README.md"
 repository = "https://github.com/nickelc/modio-bot"
 license = "MIT/Apache-2.0"
 authors = ["Constantin Nickel <constantin.nickel@gmail.com>"]
-keywords = ["modio", "discord"]
+keywords = ["modio", "discord", "bot"]
 edition = "2018"
+include = ["src/**/*.rs", "LICENSE-*", "README.md", "build.rs", "migrations"]
 
 [dependencies]
+bitflags = "1"
 bytesize = "1"
 chrono = "0.4"
-dbl-rs = "0.1"
-dotenv = "0.14"
-env_logger = "0.6"
-futures = "0.1"
-log = "0.4"
-reqwest = "0.9"
-serenity = "0.7"
-tokio = "0.1"
+dbl-rs = "0.3"
+dotenv = "0.15"
+futures-core = { version = "0.3", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+hyper = { version = "0.14", features = ["server"] }
+kuchiki = "0.8"
+pico-args = "0.4"
+prometheus = { version = "0.12", default-features = false }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.0", features = ["time", "full"] }
+toml = "0.5"
+tracing = "0.1"
+tracing-subscriber = "0.2"
+
+[dependencies.serenity]
+version = "0.10.5"
+features = ["collector"]
 
 [dependencies.modio]
-version = "0.4"
+version = "0.6"
+default-features = false
+features = ["rustls-tls"]
 
 [dependencies.diesel]
 version = "1.4"
@@ -32,12 +46,15 @@ features = ["r2d2", "sqlite"]
 version = "1.4"
 
 [dependencies.libsqlite3-sys]
-version = ">=0.8.0, <0.13.0"
+version = ">=0.8.0, <0.21.0"
 optional = true
 features = ["min_sqlite_version_3_7_16"]
 
 [build-dependencies]
-vergen = "3"
+git2 = { version = "0.13", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
+
+[profile.release]
+lto = true

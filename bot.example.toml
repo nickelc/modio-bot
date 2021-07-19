@@ -1,0 +1,16 @@
+[bot]
+token="your discord bot token"
+database_url="/path/to/sqlite.db"
+
+[modio]
+# API key is required
+api_key="your mod.io api key"
+
+# Optional
+# token="your mod.io token"
+
+# Alternative mod.io host
+# host="https://api.test.mod.io/v1"
+
+[metrics] # Optional
+addr = "127.0.0.1:3000" # defaults to 127.0.0.1:8080

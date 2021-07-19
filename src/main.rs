@@ -1,3 +1,19 @@
+//! ![MODBOT logo][logo]
+//!
+//! ![Rust version][rust-version]
+//! ![Rust edition][rust-edition]
+//! ![License][license-badge]
+//!
+//! MODBOT is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
+//!
+//!
+//! [rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
+//! [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
+//! [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
+//! [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
+//! [mod.io]: https://mod.io
+//! [`modio-rs`]: https://github.com/nickelc/modio-rs
+//! [`serenity`]: https://github.com/serenity-rs/serenity
 #![deny(rust_2018_idioms)]
 
 #[macro_use]
@@ -5,144 +21,85 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-use std::collections::HashSet;
-
 use dotenv::dotenv;
-use serenity::client::Context;
-use serenity::framework::standard::macros::{group, help};
-use serenity::framework::standard::{
-    help_commands, Args, CommandGroup, CommandResult, DispatchError, HelpOptions, StandardFramework,
-};
-use serenity::model::prelude::*;
 
+mod bot;
 mod commands;
+mod config;
 mod db;
-mod dbl;
 mod error;
-#[rustfmt::skip]
-mod schema;
-mod tools;
+mod metrics;
+mod tasks;
 mod util;
 
-use commands::basic::*;
-use commands::game::*;
-use commands::mods::*;
-use commands::subs::*;
+use db::init_db;
+use metrics::Metrics;
 use util::*;
 
-const DATABASE_URL: &str = "DATABASE_URL";
-const DISCORD_BOT_TOKEN: &str = "DISCORD_BOT_TOKEN";
-const DBL_TOKEN: &str = "DBL_TOKEN";
-const DBL_OVERRIDE_BOT_ID: &str = "DBL_OVERRIDE_BOT_ID";
-const MODIO_HOST: &str = "MODIO_HOST";
-const MODIO_API_KEY: &str = "MODIO_API_KEY";
-const MODIO_TOKEN: &str = "MODIO_TOKEN";
+const HELP: &str = "\
+🤖 modbot. modbot. modbot.
 
-const DEFAULT_MODIO_HOST: &str = "https://api.mod.io/v1";
+USAGE:
+  modbot [-c <config>]
 
-fn main() {
-    if let Err(e) = try_main() {
-        eprintln!("{}", e);
+OPTIONS:
+  -c <config>       Path to config file
+
+ENV:
+  MODBOT_DISABLED_COMMANDS      Comma separated list of disabled commands
+  MODBOT_DEBUG_TIMESTAMP        Start time as Unix timestamp for polling the mod events
+";
+
+#[tokio::main]
+async fn main() {
+    if let Err(e) = try_main().await {
+        tracing::error!("{}", e);
         std::process::exit(1);
     }
 }
 
-fn try_main() -> CliResult {
+async fn try_main() -> CliResult {
     dotenv().ok();
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
-    if tools::tools() {
-        return Ok(());
+    let mut args = pico_args::Arguments::from_env();
+    if args.contains(["-h", "--help"]) {
+        println!("{}", HELP);
+        std::process::exit(0);
     }
 
-    let (mut client, modio, mut rt) = util::initialize()?;
+    let path = args
+        .opt_value_from_str("-c")?
+        .unwrap_or_else(|| String::from("bot.toml"));
 
-    rt.spawn(task(&client, modio.clone(), rt.executor()));
+    let config = config::load_from_file(&path)
+        .map_err(|e| format!("Failed to load config {:?}: {}", path, e))?;
 
-    let (bot, owners) = match client.cache_and_http.http.get_current_application_info() {
-        Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
-        Err(e) => panic!("Couldn't get application info: {}", e),
-    };
+    let metrics = Metrics::new()?;
+    let pool = init_db(&config.bot.database_url)?;
+    let modio = init_modio(&config)?;
 
-    if let Ok(token) = util::var(DBL_TOKEN) {
-        log::info!("Spawning DBL task");
-        let bot = *bot.as_u64();
+    tokio::spawn(metrics::serve(&config.metrics, metrics.clone()));
+
+    let (mut client, bot) =
+        bot::initialize(&config, modio.clone(), pool.clone(), metrics.clone()).await?;
+
+    tokio::spawn(tasks::events::task(&client, modio.clone(), metrics));
+
+    if let Some(token) = config.bot.dbl_token {
+        tracing::info!("Spawning DBL task");
         let cache = client.cache_and_http.cache.clone();
-        rt.spawn(dbl::task(bot, cache, &token, rt.executor())?);
+        tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
     }
 
-    client.with_framework(
-        StandardFramework::new()
-            .configure(|c| {
-                c.prefix("~")
-                    .dynamic_prefix(util::dynamic_prefix)
-                    .on_mention(Some(bot))
-                    .owners(owners)
-            })
-            .bucket("simple", |b| b.delay(1))
-            .before(|_, msg, _| {
-                log::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
-                true
-            })
-            .group(&OWNER_GROUP)
-            .group(if dbl::is_dbl_enabled() { &with_vote::GENERAL_GROUP } else { &GENERAL_GROUP })
-            .group(&MODIO_GROUP)
-            .on_dispatch_error(|ctx, msg, error| match error {
-                DispatchError::NotEnoughArguments { .. } => {
-                    let _ = msg.channel_id.say(ctx, "Not enough arguments.");
-                }
-                DispatchError::LackingPermissions(_) => {
-                    let _ = msg
-                        .channel_id
-                        .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.");
-                }
-                DispatchError::Ratelimited(_) => {
-                    let _ = msg.channel_id.say(ctx, "Try again in 1 second.");
-                }
-                e => eprintln!("Dispatch error: {:?}", e),
-            })
-            .help(&HELP),
-    );
-    client.start()?;
-    Ok(())
-}
-
-group!({
-    name: "Owner",
-    options: {},
-    commands: [servers],
-});
-
-group!({
-    name: "General",
-    options: {},
-    commands: [about, prefix, invite, guide],
-});
-
-group!({
-    name: "modio",
-    options: {},
-    commands: [list_games, game, list_mods, mod_info, popular, subscriptions, subscribe, unsubscribe],
-});
-
-mod with_vote {
-    use super::*;
-
-    group!({
-        name: "General",
-        options: {},
-        commands: [about, prefix, invite, guide, vote],
+    let sm = client.shard_manager.clone();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen to ctrlc event.");
+        sm.lock().await.shutdown_all().await;
     });
-}
 
-#[help]
-fn help(
-    context: &mut Context,
-    msg: &Message,
-    args: Args,
-    help_options: &'static HelpOptions,
-    groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>,
-) -> CommandResult {
-    help_commands::with_embeds(context, msg, args, help_options, groups, owners)
+    client.start().await?;
+    Ok(())
 }

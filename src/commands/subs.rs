@@ -1,63 +1,60 @@
-use std::sync::mpsc;
-use std::time::Duration;
+use std::collections::HashMap;
 
-use futures::future::{self, Either};
-use futures::{Future, Stream};
-use log::{debug, warn};
+use futures_util::stream::FuturesUnordered;
 use modio::filter::prelude::*;
-use modio::games::Game;
-use modio::mods::filters::events::EventType as EventTypeFilter;
-use modio::mods::{Event, EventType, Mod};
-use modio::Modio;
-use serenity::builder::CreateMessage;
+use modio::games::ApiAccessOptions;
 use serenity::prelude::*;
-use tokio::runtime::TaskExecutor;
-use tokio::timer::Interval;
 
 use crate::commands::prelude::*;
-use crate::db::Subscriptions;
+use crate::db::{Events, Subscriptions, Tags};
 use crate::util;
-
-const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
 #[command]
 #[description = "List subscriptions of the current channel to mod updates of a game"]
 #[aliases("subs")]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let mut ctx2 = ctx.clone();
+pub async fn subscriptions(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
-    let games = Subscriptions::list_games(&mut ctx2, msg.channel_id);
+    let data = ctx.data.read().await;
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let subs = subs.list_for_channel(msg.channel_id)?;
 
-    if !games.is_empty() {
-        let data = ctx.data.read();
+    if !subs.is_empty() {
         let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
 
-        let filter = Id::_in(games);
-        let task = modio
-            .games()
-            .iter(&filter)
-            .fold(util::ContentBuilder::default(), |mut buf, g| {
-                let _ = writeln!(&mut buf, "{}. {}", g.id, g.name);
-                future::ok::<_, modio::error::Error>(buf)
-            })
-            .and_then(move |games| {
-                tx.send(games).unwrap();
-                Ok(())
-            })
-            .map_err(|e| eprintln!("{}", e));
-        exec.spawn(task);
+        let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
+        let list = modio.games().search(filter).collect().await?;
+        let games = list
+            .into_iter()
+            .map(|g| (g.id, g.name))
+            .collect::<HashMap<_, _>>();
+        let mut buf = util::ContentBuilder::default();
+        for (game_id, tags, evts) in subs {
+            let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
+                (true, true) | (false, false) => " (+Δ)",
+                (true, false) => " (+)",
+                (false, true) => " (Δ)",
+            };
+            let tags = if tags.is_empty() {
+                String::new()
+            } else {
+                let mut buf = String::from(" | Tags: ");
+                push_tags(&mut buf, tags.iter());
+                buf
+            };
+            let name = games.get(&game_id).unwrap();
+            let _ = writeln!(&mut buf, "{}. {} {}{}", game_id, name, suffix, tags);
+        }
 
-        let games = rx.recv().unwrap();
-        for content in games {
-            let _ = channel_id.send_message(&ctx, |m| {
-                m.embed(|e| e.title("Subscriptions").description(content))
-            });
+        for content in buf {
+            let _ = channel_id
+                .send_message(ctx, |m| {
+                    m.embed(|e| e.title("Subscriptions").description(content))
+                })
+                .await;
         }
     } else {
-        let _ = channel_id.say(&ctx, "No subscriptions found.");
+        let _ = channel_id.say(ctx, "No subscriptions found.").await;
     }
     Ok(())
 }
@@ -65,282 +62,533 @@ pub fn subscriptions(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[command]
 #[description = "Subscribe the current channel to mod updates of a game"]
 #[aliases("sub")]
+#[sub_commands(subscribe_new, subscribe_update)]
 #[min_args(1)]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn subscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
+pub async fn subscribe(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::all()).await
+}
+
+#[command]
+#[description = "Subscribe the current channel to new mod notifications"]
+#[aliases("new")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
+pub async fn subscribe_new(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::NEW).await
+}
+
+#[command]
+#[description = "Subscribe the current channel to mod update notifications"]
+#[aliases("upd")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
+pub async fn subscribe_update(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _subscribe(ctx, msg, args, Events::UPD).await
+}
+
+#[command]
+#[description = "Unsubscribe the current channel from mod updates of a game"]
+#[aliases("unsub")]
+#[sub_commands(unsubscribe_new, unsubscribe_update)]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
+pub async fn unsubscribe(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::all()).await
+}
+
+#[command]
+#[description = "Unsubscribe the current channel from new mod notifications"]
+#[aliases("new")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
+pub async fn unsubscribe_new(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::NEW).await
+}
+
+#[command]
+#[description = "Unsubscribe the current channel from mod update notification"]
+#[aliases("upd")]
+#[min_args(1)]
+#[required_permissions("MANAGE_CHANNELS")]
+#[usage("<name or id> [tag ..]")]
+#[example("snowrunner")]
+#[example("xcom \"UFO Defense\" Major")]
+pub async fn unsubscribe_update(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    _unsubscribe(ctx, msg, args, Events::UPD).await
+}
+
+#[command]
+#[description = "List muted mods"]
+#[required_permissions("MANAGE_CHANNELS")]
+pub async fn muted(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
-    let guild_id = msg.guild_id;
+    let data = ctx.data.read().await;
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let modio = data.get::<ModioKey>().expect("get modio failed");
 
-    let filter = match args.single::<u32>() {
-        Ok(id) => Id::eq(id),
-        Err(_) => Fulltext::eq(args.rest().to_string()),
+    let excluded = subs.list_excluded_mods(msg.channel_id)?;
+
+    let muted = match excluded.len() {
+        0 => {
+            msg.channel_id.say(ctx, "No mod is muted").await?;
+            return Ok(());
+        }
+        1 => {
+            let (game, mods) = excluded.into_iter().next().unwrap();
+            let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
+            modio
+                .game(game)
+                .mods()
+                .search(filter)
+                .iter()
+                .await?
+                .try_fold(util::ContentBuilder::default(), |mut buf, m| {
+                    let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                    future::ok(buf)
+                })
+                .await?
+        }
+        _ => {
+            excluded
+                .into_iter()
+                .map(|(game, mods)| {
+                    let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
+                    future::try_join(
+                        modio.game(game).get(),
+                        modio.game(game).mods().search(filter).collect(),
+                    )
+                })
+                .collect::<FuturesUnordered<_>>()
+                .try_fold(util::ContentBuilder::default(), |mut buf, (game, mods)| {
+                    let _ = writeln!(&mut buf, "**{}**", game.name);
+                    for m in mods {
+                        let _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                    }
+                    let _ = writeln!(&mut buf);
+                    future::ok(buf)
+                })
+                .await?
+        }
     };
 
-    let game = {
-        let data = ctx.data.read();
-        let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
-
-        let task = modio
-            .games()
-            .list(&filter)
-            .and_then(|mut list| Ok(list.shift()))
-            .and_then(move |game| {
-                tx.send(game).unwrap();
-                Ok(())
+    for content in muted {
+        let _ = channel_id
+            .send_message(ctx, |m| {
+                m.embed(|e| e.title("Muted mods").description(content))
             })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
+            .await;
+    }
+    Ok(())
+}
 
-        exec.spawn(task);
-        rx.recv().unwrap()
+#[command]
+#[description = "Mute update notifications for a mod"]
+#[min_args(2)]
+#[required_permissions("MANAGE_CHANNELS")]
+pub async fn mute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let game_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
     };
-    if let Some(g) = game {
-        let mut ctx2 = ctx.clone();
-        let ret = Subscriptions::add(&mut ctx2, g.id, channel_id, guild_id);
-        match ret {
-            Ok(_) => {
-                let _ = channel_id.say(&ctx, format!("Subscribed to '{}'", g.name));
+    let mod_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+
+    let game_mod = find_game_mod(modio.clone(), game_filter, mod_filter).await?;
+
+    let channel = msg.channel_id;
+
+    match game_mod {
+        (None, _) => {
+            channel.say(ctx, "Game not found").await?;
+        }
+        (_, None) => {
+            channel.say(ctx, "Mod not found").await?;
+        }
+        (Some(game), Some(mod_)) => {
+            if let Err(e) = subs.mute_mod(game.id, msg.channel_id, msg.guild_id, mod_.id) {
+                tracing::error!("{}", e);
+                channel
+                    .say(ctx, format!("Failed to mute '{}'", mod_.name))
+                    .await?;
+            } else {
+                channel
+                    .say(ctx, format!("The mod '{}' is now muted", mod_.name))
+                    .await?;
             }
-            Err(e) => eprintln!("{}", e),
         }
     }
     Ok(())
 }
 
 #[command]
-#[description = "Unsubscribe the current channel from mod updates of a game"]
-#[aliases("unsub")]
-#[min_args(1)]
+#[description = "Unmute update notifications for a mod"]
+#[min_args(2)]
 #[required_permissions("MANAGE_CHANNELS")]
-pub fn unsubscribe(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
-    let channel_id = msg.channel_id;
-    let guild_id = msg.guild_id;
-
-    let game = {
-        let data = ctx.data.read();
-        let modio = data.get::<ModioKey>().expect("get modio failed");
-        let exec = data.get::<ExecutorKey>().expect("get exec failed");
-        let (tx, rx) = mpsc::channel();
-
-        let filter = match args.single::<u32>() {
-            Ok(id) => Id::eq(id),
-            Err(_) => Fulltext::eq(args.rest().to_string()),
-        };
-        let task = modio
-            .games()
-            .list(&filter)
-            .and_then(|mut list| Ok(list.shift()))
-            .and_then(move |game| {
-                tx.send(game).unwrap();
-                Ok(())
-            })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
-
-        exec.spawn(task);
-
-        rx.recv().unwrap()
+pub async fn unmute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let game_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+    let mod_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
     };
 
-    if let Some(g) = game {
-        let mut ctx2 = ctx.clone();
-        let ret = Subscriptions::remove(&mut ctx2, g.id, channel_id, guild_id);
-        match ret {
-            Ok(_) => {
-                let _ = channel_id.say(&ctx, format!("Unsubscribed to '{}'", g.name));
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+
+    let game_mod = find_game_mod(modio.clone(), game_filter, mod_filter).await?;
+
+    let channel = msg.channel_id;
+
+    match game_mod {
+        (None, _) => {
+            channel.say(ctx, "Game not found").await?;
+        }
+        (_, None) => {
+            channel.say(ctx, "Mod not found").await?;
+        }
+        (Some(game), Some(mod_)) => {
+            if let Err(e) = subs.unmute_mod(game.id, msg.channel_id, mod_.id) {
+                tracing::error!("{}", e);
+                channel
+                    .say(ctx, format!("Failed to unmute '{}'", mod_.name))
+                    .await?;
+            } else {
+                channel
+                    .say(ctx, format!("The mod '{}' is now unmuted", mod_.name))
+                    .await?;
             }
-            Err(e) => eprintln!("{}", e),
         }
     }
     Ok(())
 }
 
-struct Notification<'n> {
-    event: &'n Event,
-    mod_: &'n Mod,
-}
+#[command("muted-users")]
+#[description = "List muted users"]
+#[required_permissions("MANAGE_CHANNELS")]
+pub async fn muted_users(ctx: &Context, msg: &Message) -> CommandResult {
+    let channel_id = msg.channel_id;
+    let data = ctx.data.read().await;
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+    let modio = data.get::<ModioKey>().expect("get modio failed");
 
-impl<'n> Notification<'n> {
-    fn new((event, mod_): (&'n Event, &'n Mod)) -> Notification<'n> {
-        Notification { event, mod_ }
-    }
+    let excluded = subs.list_excluded_users(msg.channel_id)?;
 
-    fn is_ignored(&self) -> bool {
-        use EventType::*;
-        match self.event.event_type {
-            UserTeamJoin | UserTeamLeave | UserSubscribe | UserUnsubscribe | ModTeamChanged => true,
-            _ => false,
+    let muted = match excluded.len() {
+        0 => {
+            msg.channel_id.say(ctx, "No user is muted").await?;
+            return Ok(());
         }
-    }
+        1 => {
+            let (_game, users) = excluded.into_iter().next().unwrap();
 
-    fn create_message<'a, 'b>(
-        &self,
-        game: &Game,
-        m: &'b mut CreateMessage<'a>,
-    ) -> &'b mut CreateMessage<'a> {
-        use crate::commands::mods::ModExt;
-
-        let create_embed =
-            |m: &'b mut CreateMessage<'a>, desc: &str, changelog: Option<(&str, String, bool)>| {
-                m.embed(|e| {
-                    e.title(&self.mod_.name)
-                        .url(&self.mod_.profile_url)
-                        .description(desc)
-                        .thumbnail(&self.mod_.logo.thumb_320x180)
-                        .author(|a| {
-                            a.name(&game.name)
-                                .icon_url(&game.icon.thumb_64x64.to_string())
-                                .url(&game.profile_url.to_string())
-                        })
-                        .footer(|f| self.mod_.submitted_by.create_footer(f))
-                        .fields(changelog)
+            let mut muted = util::ContentBuilder::default();
+            for (i, name) in users.iter().enumerate() {
+                let _ = writeln!(&mut muted, "{}. {}", i + 1, name);
+            }
+            muted
+        }
+        _ => {
+            excluded
+                .into_iter()
+                .map(|(game, users)| {
+                    future::try_join(modio.game(game).get(), future::ready(Ok(users)))
                 })
-            };
-
-        match self.event.event_type {
-            EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
-            EventType::ModAvailable => {
-                let m = m.content("A new mod is available. :tada:");
-                self.mod_.create_new_mod_message(game, m)
-            }
-            EventType::ModUnavailable => create_embed(m, "The mod is now unavailable.", None),
-            EventType::ModfileChanged => {
-                let (desc, changelog) = self
-                    .mod_
-                    .modfile
-                    .as_ref()
-                    .map(|f| {
-                        let link = &f.download.binary_url;
-                        let no_version = || format!("[Download]({})", link);
-                        let version = |v| format!("[Version {}]({})", v, link);
-                        let download = f
-                            .version
-                            .as_ref()
-                            .filter(|v| !v.is_empty())
-                            .map_or_else(no_version, version);
-                        let changelog = f
-                            .changelog
-                            .as_ref()
-                            .filter(|c| !c.is_empty())
-                            .map(|c| {
-                                let it = c.char_indices().rev().scan(c.len(), |state, (pos, _)| {
-                                    if *state > 1024 {
-                                        *state = pos;
-                                        Some(pos)
-                                    } else {
-                                        None
-                                    }
-                                });
-                                let pos = it.last().unwrap_or_else(|| c.len());
-                                &c[..pos]
-                            })
-                            .map(|c| ("Changelog", c.to_owned(), true));
-                        let desc = format!("A new version is available. {}", download);
-
-                        (desc, changelog)
-                    })
-                    .unwrap_or_default();
-                create_embed(m, &desc, changelog)
-            }
-            EventType::ModDeleted => create_embed(m, "The mod has been permanently deleted.", None),
-            _ => create_embed(m, "event ignored", None),
+                .collect::<FuturesUnordered<_>>()
+                .try_fold(util::ContentBuilder::default(), |mut buf, (game, users)| {
+                    let _ = writeln!(&mut buf, "**{}**", game.name);
+                    for (i, name) in users.iter().enumerate() {
+                        let _ = writeln!(&mut buf, "{}. {}", i + 1, name);
+                    }
+                    let _ = writeln!(&mut buf);
+                    future::ok(buf)
+                })
+                .await?
         }
+    };
+
+    for content in muted {
+        let _ = channel_id
+            .send_message(&ctx, |m| {
+                m.embed(|e| e.title("Muted users").description(content))
+            })
+            .await;
+    }
+    Ok(())
+}
+
+#[command("mute-user")]
+#[description = "Mute update notifications for mods of a user"]
+#[min_args(2)]
+#[usage("<game> <username>")]
+#[required_permissions("MANAGE_CHANNELS")]
+pub async fn mute_user(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let game_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+    let name = args.rest();
+
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+
+    let game = modio.games().search(game_filter).first().await?;
+
+    let channel = msg.channel_id;
+    match game {
+        None => {
+            channel.say(ctx, "Game not found").await?;
+        }
+        Some(game) => {
+            if let Err(e) = subs.mute_user(game.id, msg.channel_id, msg.guild_id, name) {
+                tracing::error!("{}", e);
+                channel
+                    .say(ctx, format!("Failed to mute '{}'", name))
+                    .await?;
+            } else {
+                channel
+                    .say(
+                        ctx,
+                        format!("The user '{}' is now muted for '{}'", name, game.name),
+                    )
+                    .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[command("unmute-user")]
+#[description = "Unmute update notifications for mods of a user"]
+#[min_args(2)]
+#[usage("<game> <username>")]
+#[required_permissions("MANAGE_CHANNELS")]
+pub async fn unmute_user(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let game_filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.quoted().single::<String>()?),
+    };
+    let name = args.rest();
+
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+    let subs = data.get::<Subscriptions>().expect("get subs failed");
+
+    let game = modio.games().search(game_filter).first().await?;
+
+    let channel = msg.channel_id;
+    match game {
+        None => {
+            channel.say(ctx, "Game not found").await?;
+        }
+        Some(game) => {
+            if let Err(e) = subs.unmute_user(game.id, msg.channel_id, name) {
+                tracing::error!("{}", e);
+                channel
+                    .say(ctx, format!("Failed to unmute '{}'", name))
+                    .await?;
+            } else {
+                channel
+                    .say(
+                        ctx,
+                        format!("The user '{}' is now unmuted for '{}'", name, game.name),
+                    )
+                    .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
+    let channel_id = msg.channel_id;
+    let guild_id = msg.guild_id;
+
+    let filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
+    };
+
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+
+    let game = modio.games().search(filter).first().await?;
+
+    if let Some(game) = game {
+        if !game
+            .api_access_options
+            .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
+        {
+            let msg = format!(
+                ":no_entry: Third party API access is disabled for '{}' but is required for subscriptions.",
+                game.name
+            );
+            let _ = channel_id.say(ctx, msg).await;
+            return Ok(());
+        }
+        let data = ctx.data.read().await;
+        let subs = data.get::<Subscriptions>().expect("get subs failed");
+        let game_tags = game
+            .tag_options
+            .into_iter()
+            .map(|opt| opt.tags)
+            .flatten()
+            .collect::<Tags>();
+
+        let (hidden, mut sub_tags) = args
+            .iter()
+            .quoted()
+            .flatten()
+            .partition::<Tags, _>(|e| e.starts_with('*'));
+
+        if !sub_tags.is_subset(&game_tags) {
+            let mut msg = format!("Failed to subscribe to '{}'.\n", game.name);
+            msg.push_str("Invalid tag(s): ");
+            push_tags(&mut msg, sub_tags.difference(&game_tags));
+
+            msg.push_str("\nAvailable tags: ");
+            push_tags(&mut msg, game_tags.iter());
+
+            channel_id.say(ctx, msg).await?;
+            return Ok(());
+        }
+
+        sub_tags.extend(hidden);
+
+        let ret = subs.add(game.id, channel_id, sub_tags, guild_id, evts);
+        match ret {
+            Ok(_) => {
+                let _ = channel_id
+                    .say(ctx, format!("Subscribed to '{}'", game.name))
+                    .await;
+            }
+            Err(e) => tracing::error!("{}", e),
+        }
+    }
+    Ok(())
+}
+
+async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) -> CommandResult {
+    let channel_id = msg.channel_id;
+
+    let data = ctx.data.read().await;
+    let modio = data.get::<ModioKey>().expect("get modio failed");
+
+    let filter = match args.single::<u32>() {
+        Ok(id) => Id::eq(id),
+        Err(_) => Fulltext::eq(args.single_quoted::<String>()?),
+    };
+    let game = modio.games().search(filter).first().await?;
+
+    if let Some(game) = game {
+        let data = ctx.data.read().await;
+        let subs = data.get::<Subscriptions>().expect("get subs failed");
+        let game_tags = game
+            .tag_options
+            .into_iter()
+            .map(|opt| opt.tags)
+            .flatten()
+            .collect::<Tags>();
+
+        let (hidden, mut sub_tags) = args
+            .iter()
+            .quoted()
+            .flatten()
+            .partition::<Tags, _>(|e| e.starts_with('*'));
+
+        if !sub_tags.is_subset(&game_tags) {
+            let mut msg = format!("Failed to unsubscribe from '{}'.\n", game.name);
+            msg.push_str("Invalid tag(s): ");
+            push_tags(&mut msg, sub_tags.difference(&game_tags));
+
+            msg.push_str("\nAvailable tags: ");
+            push_tags(&mut msg, game_tags.iter());
+
+            channel_id.say(ctx, msg).await?;
+            return Ok(());
+        }
+
+        sub_tags.extend(hidden);
+
+        let ret = subs.remove(game.id, channel_id, sub_tags, evts);
+        match ret {
+            Ok(_) => {
+                let _ = channel_id
+                    .say(ctx, format!("Unsubscribed from '{}'", game.name))
+                    .await;
+            }
+            Err(e) => tracing::error!("{}", e),
+        }
+    }
+    Ok(())
+}
+
+use modio::filter::Filter;
+use modio::games::Game;
+use modio::mods::Mod;
+use modio::{Modio, Result};
+
+async fn find_game_mod(
+    modio: Modio,
+    game_filter: Filter,
+    mod_filter: Filter,
+) -> Result<(Option<Game>, Option<Mod>)> {
+    let game = if let Some(game) = modio.games().search(game_filter).first().await? {
+        game
+    } else {
+        return Ok((None, None));
+    };
+
+    let mod_ = modio
+        .game(game.id)
+        .mods()
+        .search(mod_filter)
+        .first()
+        .await?;
+
+    if let Some(mod_) = mod_ {
+        Ok((Some(game), Some(mod_)))
+    } else {
+        Ok((Some(game), None))
     }
 }
 
-pub fn task(
-    client: &Client,
-    modio: Modio,
-    exec: TaskExecutor,
-) -> impl Future<Item = (), Error = ()> {
-    let data = client.data.clone();
-    let http = client.cache_and_http.http.clone();
-    let (tx, rx) = mpsc::channel::<(ChannelId, CreateMessage<'_>)>();
-
-    std::thread::spawn(move || loop {
-        let (channel, mut msg) = rx.recv().unwrap();
-        let _ = channel.send_message(&http, |_| &mut msg);
-    });
-
-    Interval::new_interval(INTERVAL_DURATION)
-        .fold(util::current_timestamp(), move |tstamp, _| {
-            let filter = DateAdded::gt(tstamp)
-                .and(EventTypeFilter::_in(vec![
-                    EventType::ModfileChanged,
-                    // EventType::ModEdited,
-                    EventType::ModDeleted,
-                    EventType::ModAvailable,
-                    EventType::ModUnavailable,
-                ]))
-                .order_by(Id::asc());
-
-            let data = data.read();
-            let Subscriptions(subs) = data
-                .get::<Subscriptions>()
-                .expect("failed to get subscriptions");
-
-            for (game, channels) in subs.clone() {
-                if channels.is_empty() {
-                    continue;
-                }
-                debug!(
-                    "polling events at {} for game={} channels: {:?}",
-                    tstamp, game, channels
-                );
-                let tx = tx.clone();
-                let game = modio.game(game);
-                let mods = game.mods();
-                let task = mods
-                    .events(&filter)
-                    .collect()
-                    .and_then(move |events| {
-                        if events.is_empty() {
-                            return Either::A(future::ok(()));
-                        }
-                        let mid: Vec<_> = events.iter().map(|e| e.mod_id).collect();
-                        let filter = Id::_in(mid);
-
-                        let game = game.get();
-                        let mods = mods.iter(&filter).collect();
-
-                        Either::B(game.join(mods).and_then(
-                            move |(game, mods)| {
-                                let mods = events
-                                    .iter()
-                                    .map(|e| mods.iter().find(|m| m.id == e.mod_id))
-                                    .flatten();
-                                let it = events
-                                    .iter()
-                                    .zip(mods)
-                                    .map(Notification::new)
-                                    .filter(|n| !n.is_ignored());
-                                for n in it {
-                                    for (channel, _) in &channels {
-                                        debug!(
-                                            "send message to #{}: {} for {:?}",
-                                            channel, n.event.event_type, n.mod_.name,
-                                        );
-                                        let mut msg = CreateMessage::default();
-                                        n.create_message(&game, &mut msg);
-                                        tx.send((*channel, msg)).unwrap();
-                                    }
-                                }
-                                Ok(())
-                            },
-                        ))
-                    })
-                    .map_err(|_| ());
-
-                exec.spawn(task);
-            }
-
-            // current timestamp for the next run
-            Ok(util::current_timestamp())
-        })
-        .map(|_| ())
-        .map_err(|e| warn!("interval errored: {}", e))
+fn push_tags<'a, I>(s: &mut String, iter: I)
+where
+    I: std::iter::Iterator<Item = &'a String>,
+{
+    let mut iter = iter.peekable();
+    while let Some(t) = iter.next() {
+        s.push('`');
+        s.push_str(&t);
+        s.push('`');
+        if iter.peek().is_some() {
+            s.push_str(", ");
+        }
+    }
 }

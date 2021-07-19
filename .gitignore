@@ -1,4 +1,6 @@
 /target
 **/*.rs.bk
 .env
-bot.db
+*.db
+*.db.bk
+bot.toml

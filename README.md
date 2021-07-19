@@ -1,31 +1,36 @@
 <img src="https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png" width="200" align="right"/>
 
 # ModBot for Discord
+[![Crates.io][crates-badge]][crates-url]
 ![Rust version][rust-version]
-![Rust edition][rust-edition]
 ![License][license-badge]
+[![GitHub Action][gha-badge]][gha-url]
 [![Discord][discord-badge]][discord]
-[![Invite ModBot][bot-invite-badge]][bot-invite-url]
 
-ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`]. ModBot provides your community with an easy way to search the mod listing. Additionally, if you subscribe to games following the Quick Start introductions below, the ModBot will let you know whenever a mod is added or edited.
+ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
 
-## Example
-
-<img src="https://image.modcdn.io/members/c4ca/1/profileguides/modbot.png" width="500"/>
+<p align="center">
+    <a href="#setup">Setup</a> •
+    <a href="#commands">Commands</a> •
+    <a href="#screenshots">Screenshots</a> •
+    <a href="#building">Building</a> •
+    <a href="#installation">Installation</a> •
+    <a href="#usage">Usage</a> •
+    <a href="#license">License</a>
+</p>
 
 ## Setup
 
-Getting the ModBot up and running takes minutes:
+You can invite the officially hosted ModBot to join your Discord server using the
+following URL https://discordbot.mod.io, or you can build and install your
+own version of ModBot by following the [instructions](#building) below.
 
-1. Invite ModBot to your [Discord server](https://discordbot.mod.io)
-2. Set the default game using `~game {GAME NAME or ID}`
-3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe {GAME NAME or ID}`
-4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
-5. All done, the bot will keep you updated and is there to query the mod.io API.
+ 1. Invite the ModBot https://discordbot.mod.io/
+ 2. View the games list `~games` and set the default game `~game ID`
+ 3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe ID`
+ 4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
 
-If you followed the steps above, your Discord community will be able to query mods for the default game, and each channel you subscribed to updates in will receive a push notification each time a mod is added or edited. For example in our [#modbot channel](https://discord.mod.io) we subscribe to every game on mod.io so our Discord community continually gets updated.
- 
-<img src="https://image.modcdn.io/mods/3cf1/499/screen_shot_2019-05-17_at_10.59.16_am.png" width="500"/>
+<img src="https://user-images.githubusercontent.com/2128532/118098374-1adc0e80-b3d4-11eb-808a-4024b7e79d9b.png" width="500"/>
 
 ## Commands
 
@@ -37,33 +42,51 @@ Popular commands include:
 
  * `~help` show these commands
  * `~prefix CHARACTER` change the default prefix from `~` to something else
- * `~game ID|Name` set the default game
+ * `~game <ID|Name>` set the default game
  * `~game` return information about the default game
  * `~games` return a list of all games
- * `~mod ID|Name` return information about the mod(s) requested
- * `~mods` return a list of all mods belonging to the default game
+ * `~mod <ID|Name>` return information about the mod(s) requested
+ * `~mods [ID|Name]` return a list of all mods belonging to the default game
  * `~popular` return a list of mods ordered by popularity
- * `~subscribe ID|Name` subscribe to a game for updates (mods added/edited)
- * `~subscriptions` see all games subscribed too
- * `~unsubscribe ID|Name` unsubscribe from a game
+ * `~subscribe <ID|Name> [Tag..]` subscribe to a game for updates (mods added/edited) \[alias: `sub`\]
+   ```
+   ~sub 51
+   ~sub xcom
+   ~sub xcom "UFO Defense" Major
+   ~sub "Skate XL" "Real World Spot"
+   ~sub skate Gear Deck
+   ```
+ * `~subscriptions` see all games subscribed too \[alias: `subs`\]
+ * `~unsubscribe <ID|Name> [Tag..]` unsubscribe from a game \[alias: `unsub`\]
+   ```
+   ~unsub 51
+   ~unsub OpenXcom
+   ~unsub xcom "UFO Defense" Major
+   ~unsub "Skate XL" "Real World Spot"
+   ~unsub skate Gear Deck
+   ```
+ * `~mute <Game> <Mod>` mute a mod from update notifications
+ * `~muted` return a list of all muted mods
+ * `~unmute <Game> <Mod>` unmute a mod from update notifications
+
+## Screenshots
+
+### Mod details
+![details](https://user-images.githubusercontent.com/2128532/98248314-0de9e880-1f75-11eb-8598-add24e232cea.png)
+
+### New Mod notification
+![notification](https://user-images.githubusercontent.com/2128532/98248318-0e827f00-1f75-11eb-89d5-a55174d9fed5.png)
 
 ## Building
 
-If you want to build and host your own version of ModBot, these instructions are for you. ModBot is written in Rust, so you'll need to grab a [Rust installation][rust-lang] in order to compile it.
-
+MODBOT is written in Rust, so you'll need to grab a [Rust installation][rust-lang] in order to compile it.
 Building is easy:
 
 ```
-$ mkdir bot-compile
-$ cd bot-compile
 $ git clone https://github.com/nickelc/modio-bot
 $ cd modio-bot
 $ cargo build --release
-$ cp target/release/modbot /home/modbot/
-$ chown modbot:modbot /home/modbot/modbot
-$ sudo su modbot 
-$ cd ~
-$ ./modbot &
+$ ./target/release/modbot
 ```
 
 ### Building with bundled sqlite3
@@ -85,19 +108,24 @@ $ $HOME/.cargo/bin/modbot
 
 ## Usage
 
-Set up the environment variables with `export` or by creating a `.env` file.
+Create a `bot.toml` config file in the working directory.
 
-- `DISCORD_BOT_TOKEN`
-- `MODIO_API_KEY` or `MODIO_TOKEN`
-- `MODIO_HOST` (optional)
+```toml
+[bot]
+token="your discord bot token"
+database_url="/path/to/sqlite.db"
 
-A `.env` sample is provided as [`.env.sample`](.env.sample).
+[modio]
+api_key="your mod.io api key"
+```
+
+A example is provided as [`bot.example.toml`](bot.example.toml).
 
 #### Running the bot
 ```bash
-DISCORD_BOT_TOKEN="your token" \
-MODIO_API_KEY="your api key" \
 ./path/to/modbot
+
+./path/to/modbot --config path/to/bot.toml
 ```
 
 #### Logging
@@ -108,7 +136,16 @@ Logging can be configured via environment variables.
 RUST_LOG=modio=debug,modbot=debug
 ```
 
-See the [env\_logger](https://crates.io/crates/env_logger) crate for more information.
+See [`tracing_subscriber::EnvFilter`] for more information.
+
+#### Metrics
+
+By default, the metrics are exposed via Prometheus endpoint listing on `http://127.0.0.1:8080/metrics`.
+
+```toml
+[metrics]
+addr = "127.0.0.1:3000"
+```
 
 ## License
 
@@ -123,17 +160,19 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 
-[rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
-[rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
+[crates-badge]: https://img.shields.io/crates/v/modbot.svg
+[crates-url]: https://crates.io/crates/modbot
+[rust-version]: https://img.shields.io/badge/rust-1.43%2B-lightgrey.svg?logo=rust
+[gha-badge]: https://github.com/nickelc/modio-bot/workflows/CI/badge.svg
+[gha-url]: https://github.com/nickelc/modio-bot/actions?query=workflow%3ACI
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [discord]: https://discord.gg/XNX9665
-[discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=Discord&logo=discord&color=7289DA&labelColor=2C2F33
+[discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=support&logo=discord&color=7289DA&labelColor=2C2F33
 [bot-invite-badge]: https://img.shields.io/static/v1.svg?label=%20&logo=discord&message=Invite%20ModBot&color=7289DA&labelColor=2C2F33
 [bot-invite-url]: https://discordbot.mod.io
 [modio-bot-channel]: https://discord.gg/QR7DGD7
-[repo]: https://github.com/nickelc/modio-bot
-[logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
 [mod.io]: https://mod.io
 [`modio-rs`]: https://github.com/nickelc/modio-rs
 [`serenity`]: https://github.com/serenity-rs/serenity
+[`tracing_subscriber::EnvFilter`]: https://docs.rs/tracing-subscriber/0.2/?search=EnvFilter
 [rust-lang]: https://www.rust-lang.org

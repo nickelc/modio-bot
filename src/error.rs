@@ -1,50 +1,55 @@
-use std::env::VarError;
 use std::fmt;
 use std::io::Error as IoError;
 
 use dbl::Error as DblError;
-use diesel::r2d2::PoolError;
-use diesel::result::Error as QueryError;
-use diesel_migrations::RunMigrationsError;
 use modio::Error as ModioError;
+use pico_args::Error as ArgsError;
+use prometheus::Error as PrometheusError;
 use serenity::Error as SerenityError;
+use toml::de::Error as TomlError;
+
+use crate::db::Error as DatabaseError;
+use crate::db::InitError as DatabaseInitError;
 
 #[derive(Debug)]
 pub enum Error {
+    Args(ArgsError),
     Message(String),
     Io(IoError),
     Modio(ModioError),
     Dbl(DblError),
-    Database(DatabaseError),
+    Database(DatabaseErrorInner),
     Serenity(SerenityError),
-    Env(&'static str, VarError),
+    Config(TomlError),
+    Metrics(PrometheusError),
 }
 
 #[derive(Debug)]
-pub enum DatabaseError {
-    Connection(PoolError),
-    Query(QueryError),
-    Migrations(RunMigrationsError),
+pub enum DatabaseErrorInner {
+    Init(DatabaseInitError),
+    Query(DatabaseError),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::Args(e) => e.fmt(fmt),
             Error::Message(e) => e.fmt(fmt),
             Error::Io(e) => write!(fmt, "IO error: {}", e),
             Error::Serenity(e) => e.fmt(fmt),
-            Error::Database(DatabaseError::Connection(e)) => e.fmt(fmt),
-            Error::Database(DatabaseError::Query(e)) => e.fmt(fmt),
-            Error::Database(DatabaseError::Migrations(e)) => e.fmt(fmt),
+            Error::Database(DatabaseErrorInner::Init(e)) => e.fmt(fmt),
+            Error::Database(DatabaseErrorInner::Query(e)) => e.fmt(fmt),
             Error::Modio(e) => e.fmt(fmt),
             Error::Dbl(e) => e.fmt(fmt),
-            Error::Env(key, VarError::NotPresent) => {
-                write!(fmt, "Environment variable '{}' not found", key)
-            }
-            Error::Env(key, VarError::NotUnicode(_)) => {
-                write!(fmt, "Environment variable '{}' was not valid unicode", key)
-            }
+            Error::Config(e) => e.fmt(fmt),
+            Error::Metrics(e) => e.fmt(fmt),
         }
+    }
+}
+
+impl From<ArgsError> for Error {
+    fn from(e: ArgsError) -> Error {
+        Error::Args(e)
     }
 }
 
@@ -66,6 +71,12 @@ impl From<IoError> for Error {
     }
 }
 
+impl From<TomlError> for Error {
+    fn from(e: TomlError) -> Error {
+        Error::Config(e)
+    }
+}
+
 impl From<ModioError> for Error {
     fn from(e: ModioError) -> Error {
         Error::Modio(e)
@@ -78,26 +89,26 @@ impl From<DblError> for Error {
     }
 }
 
+impl From<PrometheusError> for Error {
+    fn from(e: PrometheusError) -> Error {
+        Error::Metrics(e)
+    }
+}
+
 impl From<SerenityError> for Error {
     fn from(e: SerenityError) -> Error {
         Error::Serenity(e)
     }
 }
 
-impl From<PoolError> for Error {
-    fn from(e: PoolError) -> Error {
-        Error::Database(DatabaseError::Connection(e))
+impl From<DatabaseInitError> for Error {
+    fn from(e: DatabaseInitError) -> Error {
+        Error::Database(DatabaseErrorInner::Init(e))
     }
 }
 
-impl From<QueryError> for Error {
-    fn from(e: QueryError) -> Error {
-        Error::Database(DatabaseError::Query(e))
-    }
-}
-
-impl From<RunMigrationsError> for Error {
-    fn from(e: RunMigrationsError) -> Error {
-        Error::Database(DatabaseError::Migrations(e))
+impl From<DatabaseError> for Error {
+    fn from(e: DatabaseError) -> Error {
+        Error::Database(DatabaseErrorInner::Query(e))
     }
 }

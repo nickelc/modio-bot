@@ -1,47 +1,40 @@
-use std::sync::mpsc;
-
-use futures::future;
 use modio::filter::prelude::*;
+use modio::games::{ApiAccessOptions, Statistics};
 
 use crate::commands::prelude::*;
 use crate::util::ContentBuilder;
 
-type Stats = (usize, u32, u32);
+enum Identifier {
+    Id(u32),
+    Search(String),
+}
 
 #[command("games")]
 #[description = "List all games on <https://mod.io>"]
 #[bucket = "simple"]
 #[max_args(0)]
-pub fn list_games(ctx: &mut Context, msg: &Message) -> CommandResult {
+pub async fn list_games(ctx: &Context, msg: &Message) -> CommandResult {
     let channel = msg.channel_id;
-    let data = ctx.data.read();
+    let data = ctx.data.read().await;
     let modio = data.get::<ModioKey>().expect("get modio failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
 
-    let (tx, rx) = mpsc::channel();
-
-    let task = modio
+    let games = modio
         .games()
-        .iter(&Default::default())
-        .fold(ContentBuilder::default(), |mut buf, game| {
+        .search(Default::default())
+        .iter()
+        .await?
+        .try_fold(ContentBuilder::default(), |mut buf, game| {
             let _ = writeln!(&mut buf, "{}. {}", game.id, game.name);
-            future::ok::<_, modio::Error>(buf)
+            future::ok(buf)
         })
-        .and_then(move |games| {
-            tx.send(games).unwrap();
-            Ok(())
-        })
-        .map_err(|e| {
-            eprintln!("{}", e);
-        });
-    exec.spawn(task);
+        .await?;
 
-    let games = rx.recv().unwrap();
     for content in games {
-        let ret =
-            channel.send_message(&ctx, |m| m.embed(|e| e.title("Games").description(content)));
+        let ret = channel
+            .send_message(ctx, |m| m.embed(|e| e.title("Games").description(content)))
+            .await;
         if let Err(e) = ret {
-            eprintln!("{:?}", e);
+            tracing::error!("{:?}", e);
         }
     }
     Ok(())
@@ -53,117 +46,94 @@ pub fn list_games(ctx: &mut Context, msg: &Message) -> CommandResult {
 #[bucket = "simple"]
 #[min_args(0)]
 #[only_in(guilds)]
-pub fn game(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn game(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let id = match args.single::<u32>() {
         Ok(id) => Some(Identifier::Id(id)),
         Err(ArgError::Parse(_)) => Some(Identifier::Search(args.rest().into())),
         Err(_) => None,
     };
     match id {
-        Some(id) => set_game(ctx, msg, id),
-        None => get_game(ctx, msg),
+        Some(id) => set_game(ctx, msg, id).await,
+        None => get_game(ctx, msg).await,
     }?;
     Ok(())
 }
 
-fn get_game(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let channel = msg.channel_id;
-    let game_id = msg.guild_id.and_then(|id| Settings::game(ctx, id));
-
-    let data = ctx.data.read();
+async fn get_game(ctx: &Context, msg: &Message) -> CommandResult {
+    let data = ctx.data.read().await;
+    let settings = data.get::<Settings>().expect("get settings failed");
     let modio = data.get::<ModioKey>().expect("get modio failed");
-    let exec = data.get::<ExecutorKey>().expect("get exec failed");
+
+    let channel = msg.channel_id;
+    let game_id = msg.guild_id.and_then(|id| settings.game(id));
 
     if let Some(id) = game_id {
-        let (tx, rx) = mpsc::channel();
-        let stats = modio
-            .game(id)
-            .mods()
-            .statistics(&Default::default())
-            .collect()
-            .and_then(|list| {
-                let total = list.len();
-                Ok(list
-                    .into_iter()
-                    .fold((total, 0, 0), |(total, mut dl, mut sub), s| {
-                        dl += s.downloads_total;
-                        sub += s.subscribers_total;
-                        (total, dl, sub)
-                    }))
-            });
-        let task = modio
-            .game(id)
-            .get()
-            .join(stats)
-            .and_then(move |(game, stats)| {
-                tx.send((game, stats)).unwrap();
-                Ok(())
-            })
-            .map_err(|e| {
-                eprintln!("{}", e);
-            });
-        exec.spawn(task);
+        let stats = modio.game(id).statistics();
+        let (game, stats) = future::try_join(modio.game(id).get(), stats).await?;
 
-        let (game, stats) = rx.recv().unwrap();
-        if let Err(e) = channel.send_message(&ctx, |m| game.create_message(stats, m)) {
-            eprintln!("{} {:?}", e, e);
+        if let Err(e) = channel
+            .send_message(ctx, |m| game.create_message(stats, m))
+            .await
+        {
+            tracing::error!("{} {:?}", e, e);
         }
     }
     Ok(())
 }
 
-fn set_game(ctx: &mut Context, msg: &Message, id: Identifier) -> CommandResult {
+async fn set_game(ctx: &Context, msg: &Message, id: Identifier) -> CommandResult {
     let channel = msg.channel_id;
 
     if let Some(guild_id) = msg.guild_id {
         let game = {
-            let data = ctx.data.read();
+            let data = ctx.data.read().await;
             let modio = data.get::<ModioKey>().expect("get modio failed");
-            let exec = data.get::<ExecutorKey>().expect("get exec failed");
-            let (tx, rx) = mpsc::channel();
             let filter = match id {
                 Identifier::Id(id) => Id::eq(id),
                 Identifier::Search(id) => Fulltext::eq(id),
             };
-            let task = modio
-                .games()
-                .list(&filter)
-                .and_then(|mut list| Ok(list.shift()))
-                .and_then(move |game| {
-                    tx.send(game).unwrap();
-                    Ok(())
-                })
-                .map_err(|e| {
-                    eprintln!("{}", e);
-                });
-            exec.spawn(task);
-
-            rx.recv().unwrap()
+            modio.games().search(filter).first().await?
         };
 
         if let Some(game) = game {
-            let mut ctx2 = ctx.clone();
-            Settings::set_game(&mut ctx2, guild_id, game.id);
-            let _ = channel.say(&ctx, format!("Game is set to '{}'", game.name));
+            if !game
+                .api_access_options
+                .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
+            {
+                let msg = format!(
+                    ":no_entry: Third party API access is disabled for '{}' but is required for the commands.",
+                    game.name
+                );
+                let _ = channel.say(ctx, msg).await;
+                return Ok(());
+            }
+            {
+                let mut data = ctx.data.write().await;
+                let settings = data.get_mut::<Settings>().expect("get settings failed");
+                settings.set_game(guild_id, game.id)?;
+            }
+            let _ = channel
+                .say(ctx, format!("Game is set to '{}'", game.name))
+                .await;
         } else {
-            let _ = channel.say(&ctx, "Game not found");
+            let _ = channel.say(ctx, "Game not found").await;
         }
     }
     Ok(())
 }
 
 trait GameExt {
-    fn create_fields(&self, _: Stats) -> Vec<EmbedField>;
+    fn create_fields(&self, _: Statistics) -> Vec<EmbedField>;
 
     fn create_message<'a, 'b>(
         &self,
-        _: Stats,
+        _: Statistics,
         m: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a>;
 }
 
 impl GameExt for modio::games::Game {
-    fn create_fields(&self, s: Stats) -> Vec<EmbedField> {
+    fn create_fields(&self, s: Statistics) -> Vec<EmbedField> {
         fn info(g: &modio::games::Game) -> EmbedField {
             (
                 "Info",
@@ -178,8 +148,10 @@ impl GameExt for modio::games::Game {
                 true,
             )
         }
-        fn stats(stats: Stats) -> EmbedField {
-            let (total, downloads, subs) = stats;
+        fn stats(stats: Statistics) -> EmbedField {
+            let total = stats.mods_total;
+            let subs = stats.subscribers_total;
+            let downloads = stats.downloads.total;
             (
                 "Stats",
                 format!(
@@ -196,7 +168,7 @@ impl GameExt for modio::games::Game {
 
     fn create_message<'a, 'b>(
         &self,
-        stats: Stats,
+        stats: Statistics,
         m: &'b mut CreateMessage<'a>,
     ) -> &'b mut CreateMessage<'a> {
         m.embed(|e| {

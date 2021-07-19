@@ -1,128 +1,27 @@
-use std::collections::HashMap;
-use std::env;
-use std::env::VarError;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::prelude::*;
-use log::info;
-use modio::auth::Credentials;
-use modio::Modio;
-use serenity::model::channel::Message;
-use serenity::model::gateway::{Activity, Ready};
-use serenity::model::guild::GuildStatus;
-use serenity::model::id::GuildId;
-use serenity::prelude::*;
-use tokio::runtime::Runtime;
-use tokio::runtime::TaskExecutor;
+use modio::{Credentials, Modio};
 
-use crate::db::{init_db, load_settings, load_subscriptions, DbPool, Settings, Subscriptions};
+use crate::config::Config;
 use crate::error::Error;
-use crate::{DATABASE_URL, DISCORD_BOT_TOKEN, MODIO_API_KEY, MODIO_TOKEN};
-use crate::{DEFAULT_MODIO_HOST, MODIO_HOST};
 
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl TypeMapKey for Settings {
-    type Value = HashMap<GuildId, Settings>;
+pub fn init_modio(config: &Config) -> Result<Modio> {
+    let credentials = match (&config.modio.api_key, &config.modio.token) {
+        (key, None) => Credentials::new(key),
+        (key, Some(token)) => Credentials::with_token(key, token),
+    };
+
+    let modio = Modio::builder(credentials)
+        .host(&config.modio.host)
+        .user_agent("modbot")
+        .build()?;
+    Ok(modio)
 }
-
-impl TypeMapKey for Subscriptions {
-    type Value = Subscriptions;
-}
-
-pub struct PoolKey;
-
-impl TypeMapKey for PoolKey {
-    type Value = DbPool;
-}
-
-pub struct ModioKey;
-
-impl TypeMapKey for ModioKey {
-    type Value = Modio;
-}
-
-pub struct ExecutorKey;
-
-impl TypeMapKey for ExecutorKey {
-    type Value = TaskExecutor;
-}
-
-pub struct Handler;
-
-impl EventHandler for Handler {
-    fn ready(&self, ctx: Context, ready: Ready) {
-        let (settings, subs) = {
-            let data = ctx.data.read();
-            let pool = data
-                .get::<PoolKey>()
-                .expect("failed to get connection pool");
-
-            let guilds = ready.guilds.iter().map(GuildStatus::id).collect::<Vec<_>>();
-            info!("Guilds: {:?}", guilds);
-
-            let settings = load_settings(&pool, &guilds).unwrap_or_default();
-            let subs = load_subscriptions(&pool, &guilds).unwrap_or_default();
-            info!("Subscriptions: {}", subs);
-
-            (settings, subs)
-        };
-        let mut data = ctx.data.write();
-        data.insert::<Settings>(settings);
-        data.insert::<Subscriptions>(subs);
-
-        let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
-        ctx.set_activity(game);
-    }
-}
-
-pub fn guild_stats(ctx: &mut Context) -> (usize, usize) {
-    // ignore Discord Bot List server
-    let dbl = GuildId(264_445_053_596_991_498);
-    ctx.cache
-        .read()
-        .guilds
-        .iter()
-        .filter(|&(&id, _)| dbl != id)
-        .fold((0, 0), |(count, sum), (_, guild)| {
-            let guild = guild.read();
-            (count + 1, sum + guild.members.len())
-        })
-}
-
-pub fn dynamic_prefix(ctx: &mut Context, msg: &Message) -> Option<String> {
-    Settings::prefix(ctx, msg)
-}
-
-#[derive(Debug, Clone)]
-pub enum Identifier {
-    Id(u32),
-    Search(String),
-}
-
-// impl FromStr & Display for Identifier {{{
-impl std::str::FromStr for Identifier {
-    type Err = std::string::ParseError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.parse::<u32>() {
-            Ok(id) => Ok(Identifier::Id(id)),
-            Err(_) => Ok(Identifier::Search(String::from(s))),
-        }
-    }
-}
-
-impl fmt::Display for Identifier {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Identifier::Id(id) => id.fmt(fmt),
-            Identifier::Search(id) => id.fmt(fmt),
-        }
-    }
-}
-// }}}
 
 #[derive(Debug)]
 pub struct ContentBuilder {
@@ -197,65 +96,13 @@ pub fn format_timestamp(seconds: i64) -> impl fmt::Display {
     NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M")
 }
 
-pub fn var(key: &'static str) -> Result<String> {
-    env::var(key).map_err(|e| Error::Env(key, e))
-}
+pub fn strip_html_tags<S>(input: S) -> String
+where
+    S: AsRef<str>,
+{
+    use kuchiki::traits::*;
 
-pub fn var_or<S: Into<String>>(key: &'static str, default: S) -> Result<String> {
-    match env::var(key) {
-        Ok(v) => Ok(v),
-        Err(VarError::NotPresent) => Ok(default.into()),
-        Err(e) => Err(Error::Env(key, e)),
-    }
-}
-
-fn credentials() -> Result<Credentials> {
-    use VarError::*;
-
-    let api_key = env::var(MODIO_API_KEY);
-    let token = env::var(MODIO_TOKEN);
-
-    match (api_key, token) {
-        (Ok(key), _) => Ok(Credentials::ApiKey(key)),
-        (_, Ok(token)) => Ok(Credentials::Token(token)),
-        (Err(NotUnicode(_)), Err(_)) => {
-            Err("Environment variable 'MODIO_API_KEY' is not valid unicode".into())
-        }
-        (Err(_), Err(NotUnicode(_))) => {
-            Err("Environment variable 'MODIO_TOKEN' is not valid unicode".into())
-        }
-        (Err(NotPresent), Err(NotPresent)) => {
-            Err("Environment variable 'MODIO_API_KEY' or 'MODIO_TOKEN' not found".into())
-        }
-    }
-}
-
-pub fn initialize() -> Result<(Client, Modio, Runtime)> {
-    let token = var(DISCORD_BOT_TOKEN)?;
-    let database_url = var(DATABASE_URL)?;
-
-    let rt = Runtime::new()?;
-    let pool = init_db(database_url)?;
-
-    let modio = {
-        let host = var_or(MODIO_HOST, DEFAULT_MODIO_HOST)?;
-
-        Modio::builder(credentials()?)
-            .host(host)
-            .agent("modbot")
-            .build()
-            .map_err(Error::from)?
-    };
-
-    let client = Client::new(&token, Handler)?;
-    {
-        let mut data = client.data.write();
-        data.insert::<PoolKey>(pool);
-        data.insert::<ModioKey>(modio.clone());
-        data.insert::<ExecutorKey>(rt.executor());
-    }
-
-    Ok((client, modio, rt))
+    kuchiki::parse_html().one(input.as_ref()).text_contents()
 }
 
 #[cfg(test)]
