@@ -162,7 +162,7 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 
 [crates-badge]: https://img.shields.io/crates/v/modbot.svg
 [crates-url]: https://crates.io/crates/modbot
-[rust-version]: https://img.shields.io/badge/rust-1.43%2B-lightgrey.svg?logo=rust
+[rust-version]: https://img.shields.io/badge/rust-1.46%2B-lightgrey.svg?logo=rust
 [gha-badge]: https://github.com/nickelc/modio-bot/workflows/CI/badge.svg
 [gha-url]: https://github.com/nickelc/modio-bot/actions?query=workflow%3ACI
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
