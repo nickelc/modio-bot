@@ -456,8 +456,7 @@ async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) 
         let game_tags = game
             .tag_options
             .into_iter()
-            .map(|opt| opt.tags)
-            .flatten()
+            .flat_map(|opt| opt.tags)
             .collect::<Tags>();
 
         let (hidden, mut sub_tags) = args
@@ -511,8 +510,7 @@ async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events
         let game_tags = game
             .tag_options
             .into_iter()
-            .map(|opt| opt.tags)
-            .flatten()
+            .flat_map(|opt| opt.tags)
             .collect::<Tags>();
 
         let (hidden, mut sub_tags) = args
@@ -585,7 +583,7 @@ where
     let mut iter = iter.peekable();
     while let Some(t) = iter.next() {
         s.push('`');
-        s.push_str(&t);
+        s.push_str(t);
         s.push('`');
         if iter.peek().is_some() {
             s.push_str(", ");
