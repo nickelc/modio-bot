@@ -24,7 +24,7 @@ kuchiki = "0.8"
 pico-args = "0.4"
 prometheus = { version = "0.12", default-features = false }
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1.0", features = ["time", "full"] }
+tokio = { version = "1.11", features = ["time", "full"] }
 toml = "0.5"
 tracing = "0.1"
 tracing-subscriber = "0.2"
@@ -50,11 +50,16 @@ version = ">=0.8.0, <0.23.0"
 optional = true
 features = ["min_sqlite_version_3_7_16"]
 
+[dependencies.console-subscriber]
+git = "https://github.com/tokio-rs/console"
+optional = true
+
 [build-dependencies]
 git2 = { version = "0.13", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
+console = ["console-subscriber"]
 
 [profile.release]
 lto = true

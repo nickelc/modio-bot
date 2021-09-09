@@ -60,7 +60,10 @@ async fn main() {
 
 async fn try_main() -> CliResult {
     dotenv().ok();
+    #[cfg(not(feature = "console"))]
     tracing_subscriber::fmt::init();
+    #[cfg(feature = "console")]
+    console_subscriber::init();
 
     let mut args = pico_args::Arguments::from_env();
     if args.contains(["-h", "--help"]) {
