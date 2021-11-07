@@ -1,7 +1,6 @@
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chrono::prelude::*;
 use modio::{Credentials, Modio};
 
 use crate::config::Config;
@@ -92,8 +91,19 @@ pub fn current_timestamp() -> u64 {
         .as_secs()
 }
 
-pub fn format_timestamp(seconds: i64) -> impl fmt::Display {
-    NaiveDateTime::from_timestamp(seconds, 0).format("%Y-%m-%d %H:%M")
+pub fn format_timestamp(seconds: i64) -> String {
+    use time::format_description::FormatItem;
+    use time::macros::format_description;
+    use time::OffsetDateTime;
+
+    const FMT: &[FormatItem<'_>] = format_description!("[year]-[month]-[day] [hour]:[minute]");
+
+    if let Ok(v) = OffsetDateTime::from_unix_timestamp(seconds) {
+        if let Ok(s) = v.format(&FMT) {
+            return s;
+        }
+    }
+    String::new()
 }
 
 pub fn strip_html_tags<S>(input: S) -> String

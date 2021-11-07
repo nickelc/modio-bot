@@ -132,7 +132,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
- "time",
+ "time 0.1.44",
  "winapi",
 ]
 
@@ -840,7 +840,6 @@ version = "0.4.4"
 dependencies = [
  "bitflags",
  "bytesize",
- "chrono",
  "dbl-rs",
  "diesel",
  "diesel_migrations",
@@ -856,6 +855,7 @@ dependencies = [
  "prometheus",
  "serde",
  "serenity",
+ "time 0.3.4",
  "tokio",
  "toml",
  "tracing",
@@ -1630,6 +1630,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99beeb0daeac2bd1e86ac2c21caddecb244b39a093594da1a661ec2060c7aedd"
+dependencies = [
+ "itoa",
+ "libc",
+ "time-macros",
+]
+
+[[package]]
+name = "time-macros"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25eb0ca3468fc0acc11828786797f6ef9aa1555e4a211a60d64cc8e4d1be47d6"
+
+[[package]]
 name = "tinyvec"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1772,6 +1789,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "time 0.3.4",
  "tracing",
  "tracing-core",
  "tracing-log",
