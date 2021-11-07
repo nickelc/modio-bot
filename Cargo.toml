@@ -22,12 +22,12 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 hyper = { version = "0.14", features = ["server"] }
 kuchiki = "0.8"
 pico-args = "0.4"
-prometheus = { version = "0.12", default-features = false }
+prometheus = { version = "0.13", default-features = false }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.0", features = ["time", "full"] }
 toml = "0.5"
 tracing = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dependencies.serenity]
 version = "0.10.5"
