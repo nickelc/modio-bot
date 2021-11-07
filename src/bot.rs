@@ -61,7 +61,7 @@ impl EventHandler for Handler {
                 tracing::error!("{}", e);
             }
 
-            load_settings(&pool, &guilds).unwrap_or_default()
+            load_settings(pool, &guilds).unwrap_or_default()
         };
         let mut data = ctx.data.write().await;
         data.get_mut::<Settings>()
@@ -98,9 +98,7 @@ impl RawEventHandler for Handler {
 #[hook]
 async fn dynamic_prefix(ctx: &Context, msg: &Message) -> Option<String> {
     let data = ctx.data.read().await;
-    data.get::<Settings>()
-        .map(|s| s.prefix(msg.guild_id))
-        .flatten()
+    data.get::<Settings>().and_then(|s| s.prefix(msg.guild_id))
 }
 
 pub async fn initialize(

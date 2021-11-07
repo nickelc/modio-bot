@@ -15,7 +15,7 @@ fn main() -> Result<(), Error> {
     let commit = head.peel_to_commit()?;
     let short_id = repo.revparse_single("HEAD")?.short_id()?;
 
-    println!("cargo:rustc-env=GIT_SHA={}", commit.id().to_string());
+    println!("cargo:rustc-env=GIT_SHA={}", commit.id());
     println!(
         "cargo:rustc-env=GIT_SHA_SHORT={}",
         short_id.as_str().unwrap_or_default()

@@ -141,9 +141,7 @@ impl GameExt for modio::games::Game {
                     r#"**Id:** {}
 **Name-Id:** {}
 **Profile:** {}"#,
-                    g.id,
-                    g.name_id,
-                    g.profile_url.to_string(),
+                    g.id, g.name_id, g.profile_url,
                 ),
                 true,
             )
