@@ -84,8 +84,9 @@ pub async fn after(ctx: &Context, _: &Message, name: &str, result: CommandResult
     let metrics = data.get::<Metrics>().expect("get metrics failed");
     metrics.commands.total.inc();
     metrics.commands.counts.with_label_values(&[name]).inc();
-    if result.is_err() {
+    if let Err(e) = result {
         metrics.commands.errored.inc();
+        tracing::error!(error = e, r#"command "{}" failed."#, name);
     }
 }
 
