@@ -34,7 +34,7 @@ version = "0.10.5"
 features = ["collector"]
 
 [dependencies.modio]
-version = "0.6"
+version = "0.7"
 default-features = false
 features = ["rustls-tls"]
 

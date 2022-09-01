@@ -172,7 +172,6 @@ impl GameExt for modio::games::Game {
         m.embed(|e| {
             e.title(self.name.to_string())
                 .url(self.profile_url.to_string())
-                .author(|a| self.submitted_by.create_author(a))
                 .description(self.summary.to_string())
                 .image(self.logo.thumb_640x360.to_string())
                 .fields(self.create_fields(stats))
