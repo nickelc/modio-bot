@@ -2,11 +2,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use diesel::prelude::*;
-use serenity::model::id::ChannelId;
-use serenity::model::id::GuildId;
 use tokio::task::block_in_place;
 
-use super::{schema, DbPool, GameId, Result};
+use super::{schema, ChannelId, DbPool, GameId, GuildId, Result};
 
 pub type ExcludedMods = HashSet<u32>;
 pub type ExcludedUsers = HashSet<String>;
@@ -44,7 +42,7 @@ impl Subscriptions {
 
         block_in_place(|| {
             let conn = self.pool.get()?;
-            let it = guilds.iter().map(|g| g.0 as i64);
+            let it = guilds.iter().map(|id| *id as i64);
             let ids = it.collect::<Vec<_>>();
             let filter = subscriptions.filter(guild.ne_all(&ids));
             let num = diesel::delete(filter).execute(&conn)?;
@@ -89,13 +87,13 @@ impl Subscriptions {
             HashMap::new(),
             |mut map, (game_id, channel_id, _tags, guild_id, evt)| {
                 let game_id = game_id as GameId;
-                let channel_id = ChannelId(channel_id as u64);
+                let channel_id = channel_id as ChannelId;
                 let _tags = _tags
                     .split('\n')
                     .filter(|t| !t.is_empty())
                     .map(ToOwned::to_owned)
                     .collect();
-                let guild_id = guild_id.map(|id| GuildId(id as u64));
+                let guild_id = guild_id.map(|id| id as GuildId);
                 let evt = Events::from_bits_truncate(evt);
                 let excluded_mods = excluded_mods
                     .remove(&(game_id, channel_id))
@@ -129,7 +127,7 @@ impl Subscriptions {
         Ok(list
             .into_iter()
             .fold(HashMap::new(), |mut map, (game_id, channel_id, _, mid)| {
-                let key = (game_id as GameId, ChannelId(channel_id as u64));
+                let key = (game_id as GameId, channel_id as ChannelId);
                 map.entry(key).or_default().insert(mid as u32);
                 map
             }))
@@ -148,7 +146,7 @@ impl Subscriptions {
         Ok(list
             .into_iter()
             .fold(HashMap::new(), |mut map, (game_id, channel_id, _, name)| {
-                let key = (game_id as GameId, ChannelId(channel_id as u64));
+                let key = (game_id as GameId, channel_id as ChannelId);
                 map.entry(key).or_default().insert(name);
                 map
             }))
@@ -162,7 +160,7 @@ impl Subscriptions {
 
             let records = subscriptions
                 .select((game, tags, events))
-                .filter(channel.eq(channel_id.0 as i64))
+                .filter(channel.eq(channel_id as i64))
                 .load::<(i32, String, i32)>(&conn)?;
             Ok(records)
         })?;
@@ -193,7 +191,7 @@ impl Subscriptions {
 
             let records = subscriptions_exclude_mods
                 .select((game, mod_id))
-                .filter(channel.eq(channel_id.0 as i64))
+                .filter(channel.eq(channel_id as i64))
                 .load::<(i32, i32)>(&conn)?;
             Ok(records)
         })?;
@@ -219,7 +217,7 @@ impl Subscriptions {
 
             let records = subscriptions_exclude_users
                 .select((game, user))
-                .filter(channel.eq(channel_id.0 as i64))
+                .filter(channel.eq(channel_id as i64))
                 .load::<(i32, String)>(&conn)?;
             Ok(records)
         })?;
@@ -248,7 +246,7 @@ impl Subscriptions {
         type Record = (i32, i64, String, Option<i64>, i32);
 
         let game_id = game_id as i32;
-        let channel_id = channel_id.0 as i64;
+        let channel_id = channel_id as i64;
 
         let mut _tags = _tags.into_iter().collect::<Vec<_>>();
         _tags.sort();
@@ -269,7 +267,7 @@ impl Subscriptions {
                         (game_id, channel_id, _tags, guild_id, new_evts.bits)
                     }
                     Err(_) => {
-                        let guild_id = guild_id.map(|g| g.0 as i64);
+                        let guild_id = guild_id.map(|g| g as i64);
                         (game_id, channel_id, _tags, guild_id, evts.bits)
                     }
                 };
@@ -306,7 +304,7 @@ impl Subscriptions {
         _tags.sort();
         let _tags = _tags.join("\n");
 
-        let pk = (game_id as i32, channel_id.0 as i64, _tags);
+        let pk = (game_id as i32, channel_id as i64, _tags);
 
         block_in_place(|| {
             let conn = self.pool.get()?;
@@ -379,8 +377,8 @@ impl Subscriptions {
             diesel::insert_into(subscriptions_exclude_mods)
                 .values((
                     game.eq(game_id as i32),
-                    channel.eq(channel_id.0 as i64),
-                    guild.eq(guild_id.map(|g| g.0 as i64)),
+                    channel.eq(channel_id as i64),
+                    guild.eq(guild_id.map(|g| g as i64)),
                     mod_id.eq(id as i32),
                 ))
                 .execute(&conn)?;
@@ -396,7 +394,7 @@ impl Subscriptions {
 
             let filter = subscriptions_exclude_mods.filter(
                 game.eq(game_id as i32)
-                    .and(channel.eq(channel_id.0 as i64))
+                    .and(channel.eq(channel_id as i64))
                     .and(mod_id.eq(id as i32)),
             );
             diesel::delete(filter).execute(&conn)?;
@@ -419,8 +417,8 @@ impl Subscriptions {
             diesel::insert_into(subscriptions_exclude_users)
                 .values((
                     game.eq(game_id as i32),
-                    channel.eq(channel_id.0 as i64),
-                    guild.eq(guild_id.map(|g| g.0 as i64)),
+                    channel.eq(channel_id as i64),
+                    guild.eq(guild_id.map(|g| g as i64)),
                     user.eq(name),
                 ))
                 .execute(&conn)?;
@@ -436,7 +434,7 @@ impl Subscriptions {
 
             let filter = subscriptions_exclude_users.filter(
                 game.eq(game_id as i32)
-                    .and(channel.eq(channel_id.0 as i64))
+                    .and(channel.eq(channel_id as i64))
                     .and(user.eq(name)),
             );
             diesel::delete(filter).execute(&conn)?;

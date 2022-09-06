@@ -5,7 +5,7 @@ use serenity::framework::standard::StandardFramework;
 use serenity::http::Http;
 use serenity::model::channel::Message;
 use serenity::model::gateway::{Activity, Ready};
-use serenity::model::guild::GuildStatus;
+use serenity::model::id::{GuildId, UserId};
 use serenity::prelude::*;
 
 use crate::commands::*;
@@ -50,7 +50,7 @@ impl EventHandler for Handler {
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
 
-            let guilds = ready.guilds.iter().map(GuildStatus::id).collect::<Vec<_>>();
+            let guilds = ready.guilds.iter().map(|g| g.id().0).collect::<Vec<_>>();
             tracing::info!("Guilds: {:?}", guilds);
 
             let subs = data
@@ -98,7 +98,8 @@ impl RawEventHandler for Handler {
 #[hook]
 async fn dynamic_prefix(ctx: &Context, msg: &Message) -> Option<String> {
     let data = ctx.data.read().await;
-    data.get::<Settings>().and_then(|s| s.prefix(msg.guild_id))
+    data.get::<Settings>()
+        .and_then(|s| s.prefix(msg.guild_id.map(|id| id.0)))
 }
 
 pub async fn initialize(
@@ -129,8 +130,8 @@ pub async fn initialize(
                 .dynamic_prefix(dynamic_prefix)
                 .on_mention(Some(bot))
                 .owners(owners)
-                .blocked_guilds(blocked.guilds)
-                .blocked_users(blocked.users)
+                .blocked_guilds(blocked.guilds.into_iter().map(GuildId).collect())
+                .blocked_users(blocked.users.into_iter().map(UserId).collect())
                 .disabled_commands(disabled)
         })
         .bucket("simple", |b| b.delay(1))

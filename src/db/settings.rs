@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use diesel::prelude::*;
-use serenity::model::id::GuildId;
 use tokio::task::block_in_place;
 
-use super::{schema, DbPool, GameId, Result};
+use super::{schema, DbPool, GameId, GuildId, Result};
 use schema::settings;
 
 #[derive(Default)]
@@ -82,7 +81,7 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
     let list = block_in_place::<_, Result<_>>(|| {
         let conn = pool.get()?;
 
-        let it = guilds.iter().map(|g| g.0 as i64);
+        let it = guilds.iter().map(|g| *g as i64);
         let ids = it.collect::<Vec<_>>();
         let filter = settings.filter(guild.ne_all(ids));
         match diesel::delete(filter).execute(&conn) {
@@ -96,7 +95,7 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
     let mut map = HashMap::new();
     for r in list {
         map.insert(
-            GuildId(r.0 as u64),
+            r.0 as u64,
             GuildSettings {
                 game: r.1.map(|id| id as u32),
                 prefix: r.2,
@@ -109,7 +108,7 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
 impl From<(GuildId, GameId)> for ChangeSettings {
     fn from(c: (GuildId, GameId)) -> Self {
         Self {
-            guild: (c.0).0 as i64,
+            guild: c.0 as i64,
             game: Some(Some(c.1 as i32)),
             prefix: None,
         }
@@ -119,7 +118,7 @@ impl From<(GuildId, GameId)> for ChangeSettings {
 impl From<(GuildId, Option<String>)> for ChangeSettings {
     fn from(c: (GuildId, Option<String>)) -> Self {
         Self {
-            guild: (c.0).0 as i64,
+            guild: c.0 as i64,
             game: None,
             prefix: Some(c.1),
         }

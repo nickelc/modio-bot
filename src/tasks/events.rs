@@ -182,7 +182,7 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                                     continue;
                                 }
                             }
-                            effected_channels.insert(*channel);
+                            effected_channels.insert(ChannelId(*channel));
                         }
                         debug!(
                             "send message {} for {:?} to {:?}",

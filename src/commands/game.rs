@@ -65,7 +65,7 @@ async fn get_game(ctx: &Context, msg: &Message) -> CommandResult {
     let modio = data.get::<ModioKey>().expect("get modio failed");
 
     let channel = msg.channel_id;
-    let game_id = msg.guild_id.and_then(|id| settings.game(id));
+    let game_id = msg.guild_id.and_then(|id| settings.game(id.0));
 
     if let Some(id) = game_id {
         let stats = modio.game(id).statistics();
@@ -110,7 +110,7 @@ async fn set_game(ctx: &Context, msg: &Message, id: Identifier) -> CommandResult
             {
                 let mut data = ctx.data.write().await;
                 let settings = data.get_mut::<Settings>().expect("get settings failed");
-                settings.set_game(guild_id, game.id)?;
+                settings.set_game(guild_id.0, game.id)?;
             }
             let _ = channel
                 .say(ctx, format!("Game is set to '{}'", game.name))

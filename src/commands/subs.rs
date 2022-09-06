@@ -17,7 +17,7 @@ pub async fn subscriptions(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = msg.channel_id;
     let data = ctx.data.read().await;
     let subs = data.get::<Subscriptions>().expect("get subs failed");
-    let subs = subs.list_for_channel(msg.channel_id)?;
+    let subs = subs.list_for_channel(msg.channel_id.0)?;
 
     if !subs.is_empty() {
         let modio = data.get::<ModioKey>().expect("get modio failed");
@@ -142,7 +142,7 @@ pub async fn muted(ctx: &Context, msg: &Message) -> CommandResult {
     let subs = data.get::<Subscriptions>().expect("get subs failed");
     let modio = data.get::<ModioKey>().expect("get modio failed");
 
-    let excluded = subs.list_excluded_mods(msg.channel_id)?;
+    let excluded = subs.list_excluded_mods(msg.channel_id.0)?;
 
     let muted = match excluded.len() {
         0 => {
@@ -227,7 +227,8 @@ pub async fn mute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
             channel.say(ctx, "Mod not found").await?;
         }
         (Some(game), Some(mod_)) => {
-            if let Err(e) = subs.mute_mod(game.id, msg.channel_id, msg.guild_id, mod_.id) {
+            let guild_id = msg.guild_id.map(|id| id.0);
+            if let Err(e) = subs.mute_mod(game.id, msg.channel_id.0, guild_id, mod_.id) {
                 tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to mute '{}'", mod_.name))
@@ -272,7 +273,7 @@ pub async fn unmute(ctx: &Context, msg: &Message, mut args: Args) -> CommandResu
             channel.say(ctx, "Mod not found").await?;
         }
         (Some(game), Some(mod_)) => {
-            if let Err(e) = subs.unmute_mod(game.id, msg.channel_id, mod_.id) {
+            if let Err(e) = subs.unmute_mod(game.id, msg.channel_id.0, mod_.id) {
                 tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to unmute '{}'", mod_.name))
@@ -296,7 +297,7 @@ pub async fn muted_users(ctx: &Context, msg: &Message) -> CommandResult {
     let subs = data.get::<Subscriptions>().expect("get subs failed");
     let modio = data.get::<ModioKey>().expect("get modio failed");
 
-    let excluded = subs.list_excluded_users(msg.channel_id)?;
+    let excluded = subs.list_excluded_users(msg.channel_id.0)?;
 
     let muted = match excluded.len() {
         0 => {
@@ -365,7 +366,8 @@ pub async fn mute_user(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
             channel.say(ctx, "Game not found").await?;
         }
         Some(game) => {
-            if let Err(e) = subs.mute_user(game.id, msg.channel_id, msg.guild_id, name) {
+            let guild_id = msg.guild_id.map(|id| id.0);
+            if let Err(e) = subs.mute_user(game.id, msg.channel_id.0, guild_id, name) {
                 tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to mute '{}'", name))
@@ -407,7 +409,7 @@ pub async fn unmute_user(ctx: &Context, msg: &Message, mut args: Args) -> Comman
             channel.say(ctx, "Game not found").await?;
         }
         Some(game) => {
-            if let Err(e) = subs.unmute_user(game.id, msg.channel_id, name) {
+            if let Err(e) = subs.unmute_user(game.id, msg.channel_id.0, name) {
                 tracing::error!("{}", e);
                 channel
                     .say(ctx, format!("Failed to unmute '{}'", name))
@@ -479,7 +481,8 @@ async fn _subscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events) 
 
         sub_tags.extend(hidden);
 
-        let ret = subs.add(game.id, channel_id, sub_tags, guild_id, evts);
+        let guild_id = guild_id.map(|id| id.0);
+        let ret = subs.add(game.id, channel_id.0, sub_tags, guild_id, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id
@@ -533,7 +536,7 @@ async fn _unsubscribe(ctx: &Context, msg: &Message, mut args: Args, evts: Events
 
         sub_tags.extend(hidden);
 
-        let ret = subs.remove(game.id, channel_id, sub_tags, evts);
+        let ret = subs.remove(game.id, channel_id.0, sub_tags, evts);
         match ret {
             Ok(_) => {
                 let _ = channel_id

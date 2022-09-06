@@ -28,7 +28,7 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
     let game_id = {
         let data = ctx.data.read().await;
         let settings = data.get::<Settings>().expect("get settings failed");
-        msg.guild_id.and_then(|id| settings.game(id))
+        msg.guild_id.and_then(|id| settings.game(id.0))
     };
 
     if let Some(id) = game_id {
@@ -120,7 +120,7 @@ pub async fn popular(ctx: &Context, msg: &Message) -> CommandResult {
     let game_id = {
         let data = ctx.data.read().await;
         let settings = data.get::<Settings>().expect("get settings failed");
-        msg.guild_id.and_then(|id| settings.game(id))
+        msg.guild_id.and_then(|id| settings.game(id.0))
     };
 
     if let Some(id) = game_id {

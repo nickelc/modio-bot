@@ -6,8 +6,6 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 use diesel::result::Error as QueryError;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::RunMigrationsError;
-use serenity::model::id::GuildId;
-use serenity::model::id::UserId;
 use tokio::task::block_in_place;
 
 embed_migrations!("migrations");
@@ -22,6 +20,9 @@ pub use subscriptions::{Events, Subscriptions, Tags};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type GameId = u32;
+pub type ChannelId = u64;
+pub type GuildId = u64;
+pub type UserId = u64;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
@@ -66,8 +67,8 @@ pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
             .ok()
             .unwrap_or_default();
         let users = blocked_users.load::<(i64,)>(&conn).ok().unwrap_or_default();
-        let guilds = guilds.iter().map(|id| GuildId(id.0 as u64)).collect();
-        let users = users.iter().map(|id| UserId(id.0 as u64)).collect();
+        let guilds = guilds.iter().map(|id| id.0 as GuildId).collect();
+        let users = users.iter().map(|id| id.0 as UserId).collect();
         Ok(Blocked { guilds, users })
     })
 }
