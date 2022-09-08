@@ -106,21 +106,21 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
 }
 
 impl From<(GuildId, GameId)> for ChangeSettings {
-    fn from(c: (GuildId, GameId)) -> Self {
+    fn from((guild, game): (GuildId, GameId)) -> Self {
         Self {
-            guild: c.0 as i64,
-            game: Some(Some(c.1 as i32)),
+            guild: guild as i64,
+            game: Some(Some(game as i32)),
             prefix: None,
         }
     }
 }
 
 impl From<(GuildId, Option<String>)> for ChangeSettings {
-    fn from(c: (GuildId, Option<String>)) -> Self {
+    fn from((guild, prefix): (GuildId, Option<String>)) -> Self {
         Self {
-            guild: c.0 as i64,
+            guild: guild as i64,
             game: None,
-            prefix: Some(c.1),
+            prefix: Some(prefix),
         }
     }
 }
