@@ -280,7 +280,7 @@ fn create_message<'a, 'b>(
                                     None
                                 }
                             });
-                            let pos = it.last().unwrap_or_else(|| c.len());
+                            let pos = it.last().unwrap_or(c.len());
                             ("Changelog", c[..pos].to_owned(), true)
                         });
                     let desc = format!("A new version is available. {}", download);
