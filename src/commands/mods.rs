@@ -78,10 +78,10 @@ pub async fn list_mods(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                         ),
                     };
 
-                    let content = list.iter().try_fold(String::new(), |mut buf, mod_| {
-                        writeln!(&mut buf, "{}. {}", mod_.id, mod_.name)?;
-                        Ok::<_, std::fmt::Error>(buf)
-                    })?;
+                    let mut content = String::new();
+                    for mod_ in list {
+                        let _ = writeln!(&mut content, "{}. {}", mod_.id, mod_.name);
+                    }
                     channel
                         .send_message(ctx, |m| {
                             m.embed(|e| {
@@ -133,9 +133,10 @@ pub async fn popular(ctx: &Context, msg: &Message) -> CommandResult {
         let game = game.get().await?;
 
         if !mods.is_empty() {
-            let content = mods.iter().try_fold(String::new(), |mut buf, mod_| {
-                writeln!(
-                    &mut buf,
+            let mut content = String::new();
+            for mod_ in mods {
+                let _ = writeln!(
+                    content,
                     "{:02}. [{}]({}) ({}) +{}/-{}",
                     mod_.stats.popularity.rank_position,
                     mod_.name,
@@ -143,9 +144,8 @@ pub async fn popular(ctx: &Context, msg: &Message) -> CommandResult {
                     mod_.id,
                     mod_.stats.ratings.positive,
                     mod_.stats.ratings.negative,
-                )?;
-                Ok::<_, std::fmt::Error>(buf)
-            })?;
+                );
+            }
             channel
                 .send_message(ctx, |m| {
                     m.embed(|e| {
