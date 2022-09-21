@@ -5,10 +5,12 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 use diesel::result::Error as QueryError;
 use diesel::sqlite::SqliteConnection;
-use diesel_migrations::RunMigrationsError;
+use diesel_migrations::{
+    embed_migrations, EmbeddedMigrations, HarnessWithOutput, MigrationHarness,
+};
 use tokio::task::block_in_place;
 
-embed_migrations!("migrations");
+const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[rustfmt::skip]
 mod schema;
@@ -28,7 +30,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug)]
 pub enum InitError {
     Connection(PoolError),
-    Migrations(RunMigrationsError),
+    Migrations(Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[derive(Debug)]
@@ -50,7 +52,10 @@ pub fn init_db(database_url: &str) -> Result<DbPool, InitError> {
         let mgr = ConnectionManager::new(database_url);
         let pool = Pool::new(mgr)?;
 
-        embedded_migrations::run_with_output(&pool.get()?, &mut std::io::stdout())?;
+        let mut conn = pool.get()?;
+        HarnessWithOutput::write_to_stdout(&mut conn)
+            .run_pending_migrations(MIGRATIONS)
+            .map_err(InitError::Migrations)?;
 
         Ok(pool)
     })
@@ -61,12 +66,9 @@ pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
     use schema::blocked_users::dsl::*;
 
     block_in_place(|| {
-        let conn = pool.get()?;
-        let guilds = blocked_guilds
-            .load::<(i64,)>(&conn)
-            .ok()
-            .unwrap_or_default();
-        let users = blocked_users.load::<(i64,)>(&conn).ok().unwrap_or_default();
+        let conn = &mut pool.get()?;
+        let guilds = blocked_guilds.load::<(i64,)>(conn).ok().unwrap_or_default();
+        let users = blocked_users.load::<(i64,)>(conn).ok().unwrap_or_default();
         let guilds = guilds.iter().map(|id| id.0 as GuildId).collect();
         let users = users.iter().map(|id| id.0 as UserId).collect();
         Ok(Blocked { guilds, users })
@@ -95,12 +97,6 @@ impl fmt::Display for Error {
 impl From<PoolError> for InitError {
     fn from(e: PoolError) -> InitError {
         InitError::Connection(e)
-    }
-}
-
-impl From<RunMigrationsError> for InitError {
-    fn from(e: RunMigrationsError) -> InitError {
-        InitError::Migrations(e)
     }
 }
 

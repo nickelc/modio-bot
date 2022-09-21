@@ -16,11 +16,6 @@
 //! [`serenity`]: https://github.com/serenity-rs/serenity
 #![deny(rust_2018_idioms)]
 
-#[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate diesel_migrations;
-
 use dotenv::dotenv;
 
 mod bot;
