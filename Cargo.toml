@@ -14,6 +14,7 @@ include = ["src/**/*.rs", "LICENSE-*", "README.md", "build.rs", "migrations"]
 [dependencies]
 bitflags = "1"
 bytesize = "1"
+csv = "1.1"
 dbl-rs = "0.3"
 dotenv = "0.15"
 futures-core = { version = "0.3", default-features = false }
@@ -23,15 +24,20 @@ kuchiki = "0.8"
 pico-args = "0.5"
 prometheus = { version = "0.13", default-features = false }
 serde = { version = "1", features = ["derive"] }
+serde_urlencoded = "0.7"
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio = { version = "1.0", features = ["time", "full"] }
 toml = "0.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 
-[dependencies.serenity]
-version = "0.11.5"
-features = ["collector", "unstable_discord_api"]
+# twilight
+twilight-gateway = "0.13"
+twilight-http = "0.13"
+twilight-model= "0.13"
+twilight-cache-inmemory = "0.13"
+twilight-util = { version = "0.13", features = ["builder"] }
+twilight-validate = "0.13"
 
 [dependencies.modio]
 version = "0.7"

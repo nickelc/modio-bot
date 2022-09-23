@@ -6,7 +6,7 @@ use tokio::task::block_in_place;
 use super::{schema, DbPool, GameId, GuildId, Result};
 use schema::settings;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct GuildSettings {
     game: Option<GameId>,
     prefix: Option<String>,

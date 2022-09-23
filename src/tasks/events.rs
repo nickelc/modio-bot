@@ -2,39 +2,61 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::future::Future;
 use std::time::Duration;
 
-use futures_util::TryStreamExt;
+use futures_util::stream::FuturesUnordered;
+use futures_util::{StreamExt, TryStreamExt};
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{EventType, Mod};
-use modio::Modio;
-use serenity::builder::CreateMessage;
-use serenity::prelude::*;
 use tokio::sync::mpsc;
-use tokio::time::Instant;
+use tokio::time::{self, Instant};
 use tracing::{debug, error, trace};
+use twilight_model::channel::embed::Embed;
+use twilight_model::id::Id as ChannelId;
+use twilight_util::builder::embed::{
+    EmbedAuthorBuilder, EmbedBuilder, EmbedFieldBuilder, EmbedFooterBuilder, ImageSource,
+};
 
-use crate::commands::prelude::*;
-use crate::db::Subscriptions;
-use crate::metrics::Metrics;
+use crate::bot::Context;
+use crate::commands::mods::create_fields;
 use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
-pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Output = ()> {
-    let data = client.data.clone();
-    let http = client.cache_and_http.http.clone();
-    let (tx, mut rx) = mpsc::channel::<(BTreeSet<ChannelId>, CreateMessage<'_>)>(100);
+pub fn task(ctx: Context) -> impl Future<Output = ()> {
+    let (sender, mut receiver) = mpsc::channel::<(BTreeSet<u64>, Option<String>, Embed)>(100);
+
+    let Context {
+        client,
+        modio,
+        subscriptions,
+        metrics,
+        ..
+    } = ctx;
 
     tokio::spawn(async move {
         loop {
-            if let Some((channels, msg)) = rx.recv().await {
+            if let Some((channels, content, embed)) = receiver.recv().await {
                 metrics.notifications.inc_by(channels.len() as u64);
-                let map = serenity::json::hashmap_to_json_map(msg.0);
-                let value = serenity::json::Value::from(map);
-                for channel in channels {
-                    if let Err(e) = http.send_message(channel.0, &value).await {
+
+                let embeds = [embed];
+                let mut cc = channels
+                    .into_iter()
+                    .map(|id| {
+                        let mut msg = client
+                            .create_message(ChannelId::new(id))
+                            .embeds(&embeds)
+                            .unwrap();
+                        if let Some(content) = &content {
+                            msg = msg.content(content).unwrap();
+                        }
+                        msg.exec()
+                    })
+                    .collect::<FuturesUnordered<_>>();
+
+                while let Some(ret) = cc.next().await {
+                    if let Err(e) = ret {
                         error!("{}", e);
                     }
                 }
@@ -47,7 +69,7 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
         .and_then(|v| v.parse::<u64>().ok());
 
     async move {
-        let mut interval = tokio::time::interval_at(Instant::now() + MIN, INTERVAL_DURATION);
+        let mut interval = time::interval_at(Instant::now() + MIN, INTERVAL_DURATION);
 
         loop {
             let tstamp = tstamp.take().unwrap_or_else(util::current_timestamp);
@@ -56,22 +78,16 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
                     EventType::ModfileChanged,
-                    // EventType::ModEdited,
                     EventType::ModDeleted,
                     EventType::ModAvailable,
                     EventType::ModUnavailable,
                 ]))
                 .order_by(Id::asc());
 
-            let data = data.read().await;
-            let subs = data
-                .get::<Subscriptions>()
-                .expect("failed to get subscriptions")
-                .load()
-                .unwrap_or_else(|e| {
-                    error!("failed to load subscriptions: {}", e);
-                    Default::default()
-                });
+            let subs = subscriptions.load().unwrap_or_else(|e| {
+                error!("failed to load subscriptions: {}", e);
+                Default::default()
+            });
 
             for (game, channels) in subs {
                 if channels.is_empty() {
@@ -81,7 +97,7 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                     "polling events at {} for game={} channels: {:?}",
                     tstamp, game, channels
                 );
-                let tx = tx.clone();
+                let sender = sender.clone();
                 let filter = filter.clone();
                 let game = modio.game(game);
                 let mods = game.mods();
@@ -112,7 +128,7 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
 
                     // Filter `MODFILE_CHANGED` events for new mods
                     for (_, evt) in events.iter_mut() {
-                        use EventType::*;
+                        use EventType::{ModAvailable, ModfileChanged};
                         if evt.iter().any(|(_, t)| t == &ModAvailable) {
                             let pos = evt.iter().position(|(_, t)| t == &ModfileChanged);
                             if let Some(pos) = pos {
@@ -136,14 +152,14 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                     // Ungroup the events ordered by event id
                     let mut updates = BTreeMap::new();
                     for (m, evt) in &events {
-                        for (eid, t) in *evt {
-                            updates.insert(eid, (m, t));
+                        for (event_id, event_type) in *evt {
+                            updates.insert(event_id, (m, event_type));
                         }
                     }
 
                     let game = game.get().await?;
 
-                    for (_, (m, evt)) in updates.into_iter() {
+                    for (_, (m, evt)) in updates {
                         let mut effected_channels = BTreeSet::new();
 
                         for (channel, tags, _, evts, excluded_mods, excluded_users) in &channels {
@@ -175,12 +191,15 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                                 let tags: HashSet<_> =
                                     tags.iter().map(|t| t.trim_start_matches('*')).collect();
                                 if !tags.is_subset(&mod_tags) {
-                                    debug!("mod ignored #{}: {} for {:?}", channel, evt, m.name);
+                                    debug!(
+                                        "mod ignored based on tags #{}: {} for {:?}",
+                                        channel, evt, m.name
+                                    );
                                     trace!("mod tags: {:?}; sub tags: {:?}", mod_tags, tags);
                                     continue;
                                 }
                             }
-                            effected_channels.insert(ChannelId(*channel));
+                            effected_channels.insert(*channel);
                         }
                         if effected_channels.is_empty() {
                             debug!("no channels left to send to");
@@ -191,9 +210,8 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                             "send message {} for {:?} to {:?}",
                             evt, m.name, effected_channels
                         );
-                        let mut msg = CreateMessage::default();
-                        create_message(&game, m, evt, &mut msg);
-                        if let Err(e) = tx.send((effected_channels, msg)).await {
+                        let (content, embed) = create_mod_message(&game, m, evt);
+                        if let Err(e) = sender.send((effected_channels, content, embed)).await {
                             error!("{}", e);
                         }
                     }
@@ -210,44 +228,22 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
     }
 }
 
-fn create_message<'a, 'b>(
-    game: &Game,
-    mod_: &Mod,
-    event: &EventType,
-    m: &'b mut CreateMessage<'a>,
-) -> &'b mut CreateMessage<'a> {
-    use crate::commands::mods::ModExt;
-
-    let create_embed =
-        |m: &'b mut CreateMessage<'a>, desc: &str, changelog: Option<(&str, String, bool)>| {
-            m.embed(|e| {
-                e.title(&mod_.name)
-                    .url(&mod_.profile_url)
-                    .description(desc)
-                    .thumbnail(&mod_.logo.thumb_320x180)
-                    .author(|a| {
-                        a.name(&game.name)
-                            .icon_url(&game.icon.thumb_64x64.to_string())
-                            .url(&game.profile_url.to_string())
-                    })
-                    .footer(|f| mod_.submitted_by.create_footer(f))
-                    .fields(changelog)
-            })
-        };
-
+fn create_mod_message(game: &Game, mod_: &Mod, event_type: &EventType) -> (Option<String>, Embed) {
     let with_ddl = game
         .api_access_options
         .contains(ApiAccessOptions::ALLOW_DIRECT_DOWNLOAD);
 
-    match event {
-        EventType::ModEdited => create_embed(m, "The mod has been edited.", None),
+    let embed = match event_type {
+        EventType::ModEdited => create_embed(game, mod_, "The mod has been edited.", false),
         EventType::ModAvailable => {
-            let m = m.content("A new mod is available. :tada:");
-            mod_.create_new_mod_message(game, m)
+            let content = "A new mod is available. :tada:".to_owned();
+            let embed = create_embed(game, mod_, &mod_.summary, true);
+            let embed = create_fields(embed, mod_, true, with_ddl).build();
+            return (Some(content), embed);
         }
-        EventType::ModUnavailable => create_embed(m, "The mod is now unavailable.", None),
+        EventType::ModUnavailable => create_embed(game, mod_, "The mod is now unavailable.", false),
         EventType::ModfileChanged => {
-            let (desc, changelog) = mod_
+            let (download, changelog) = mod_
                 .modfile
                 .as_ref()
                 .map(|f| {
@@ -286,16 +282,48 @@ fn create_message<'a, 'b>(
                                 }
                             });
                             let pos = it.last().unwrap_or(c.len());
-                            ("Changelog", c[..pos].to_owned(), true)
+                            EmbedFieldBuilder::new("Changelog", c[..pos].to_owned()).inline()
                         });
-                    let desc = format!("A new version is available. {}", download);
-
-                    (desc, changelog)
+                    (download, changelog)
                 })
                 .unwrap_or_default();
-            create_embed(m, &desc, changelog)
+
+            let desc = format!("A new version is available. {}", download);
+            let mut embed = create_embed(game, mod_, &desc, false);
+            if let Some(changelog) = changelog {
+                embed = embed.field(changelog);
+            }
+            embed
         }
-        EventType::ModDeleted => create_embed(m, "The mod has been permanently deleted.", None),
-        _ => create_embed(m, "event ignored", None),
+        EventType::ModDeleted => {
+            create_embed(game, mod_, "The mod has been permanently deleted.", false)
+        }
+        _ => create_embed(game, mod_, "event ignored", false),
+    };
+
+    (None, embed.build())
+}
+
+fn create_embed(game: &Game, mod_: &Mod, desc: &str, big_thumbnail: bool) -> EmbedBuilder {
+    let mut footer = EmbedFooterBuilder::new(mod_.submitted_by.username.to_owned());
+    if let Some(avatar) = &mod_.submitted_by.avatar {
+        footer = footer.icon_url(ImageSource::url(avatar.thumb_50x50.to_string()).unwrap());
+    }
+
+    let embed = EmbedBuilder::new()
+        .title(mod_.name.to_owned())
+        .url(mod_.profile_url.to_string())
+        .description(desc)
+        .author(
+            EmbedAuthorBuilder::new(game.name.to_owned())
+                .url(game.profile_url.to_string())
+                .icon_url(ImageSource::url(game.icon.thumb_64x64.to_string()).unwrap()),
+        )
+        .footer(footer);
+
+    if big_thumbnail {
+        embed.image(ImageSource::url(mod_.logo.thumb_640x360.to_string()).unwrap())
+    } else {
+        embed.thumbnail(ImageSource::url(mod_.logo.thumb_320x180.to_string()).unwrap())
     }
 }

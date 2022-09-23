@@ -1,154 +1,157 @@
-use std::collections::HashSet;
-
-use modio::user::User;
-use serenity::builder::{CreateEmbedAuthor, CreateEmbedFooter};
-use serenity::client::Context;
-use serenity::framework::standard::macros::{group, help, hook};
-use serenity::framework::standard::{
-    help_commands, Args, CommandGroup, CommandResult, DispatchError, HelpOptions,
+use modio::filter::prelude::{Fulltext, Id as ModioId, *};
+use modio::games::Game;
+use twilight_http::client::InteractionClient;
+use twilight_model::application::command::Command;
+use twilight_model::application::interaction::application_command::CommandData;
+use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
+use twilight_model::application::interaction::Interaction;
+use twilight_model::channel::message::MessageFlags;
+use twilight_model::http::interaction::{
+    InteractionResponse, InteractionResponseData, InteractionResponseType,
 };
-use serenity::model::prelude::*;
+use twilight_util::builder::embed::EmbedBuilder;
+use twilight_util::builder::InteractionResponseDataBuilder;
 
-pub type EmbedField = (&'static str, String, bool);
-
-pub mod prelude {
-    pub use std::fmt::Write;
-    pub use std::future::Future;
-
-    pub use futures_core::Stream;
-    pub use futures_util::{future, StreamExt, TryFutureExt, TryStreamExt};
-    pub use modio::filter::Operator;
-    pub use modio::user::User;
-    pub use serenity::builder::{CreateEmbedAuthor, CreateMessage};
-    pub use serenity::client::Context;
-    pub use serenity::framework::standard::macros::command;
-    pub use serenity::framework::standard::{ArgError, Args, CommandResult};
-    pub use serenity::model::channel::Message;
-    pub use serenity::model::id::ChannelId;
-
-    pub use super::{EmbedField, UserExt};
-    pub use crate::bot::ModioKey;
-    pub use crate::db::Settings;
-    pub use crate::error::Error;
-    pub use crate::util::format_timestamp;
-}
+use crate::bot::Context;
+use crate::error::Error;
 
 mod basic;
 mod game;
 pub mod mods;
 mod subs;
 
-use crate::metrics::Metrics;
-
-use basic::*;
-use game::*;
-use mods::*;
-use subs::*;
-
-#[group]
-#[commands(servers)]
-struct Owner;
-
-#[group]
-#[commands(about, prefix, invite)]
-struct General;
-
-#[group]
-#[commands(list_games, game, list_mods, mod_info, popular)]
-struct Basic;
-
-#[group]
-#[commands(
-    subscriptions,
-    subscribe,
-    unsubscribe,
-    muted,
-    mute,
-    unmute,
-    muted_users,
-    mute_user,
-    unmute_user
-)]
-#[required_permissions("MANAGE_CHANNELS")]
-struct Subscriptions;
-
-#[hook]
-pub async fn before(_: &Context, msg: &Message, _: &str) -> bool {
-    tracing::debug!("cmd: {:?}: {:?}: {}", msg.guild_id, msg.author, msg.content);
-    true
+fn commands() -> Vec<Command> {
+    let mut cmds = Vec::new();
+    cmds.extend(basic::commands());
+    cmds.extend(game::commands());
+    cmds.extend(mods::commands());
+    cmds.extend(subs::commands());
+    cmds
 }
 
-#[hook]
-pub async fn after(ctx: &Context, _: &Message, name: &str, result: CommandResult) {
-    let data = ctx.data.read().await;
-    let metrics = data.get::<Metrics>().expect("get metrics failed");
-    metrics.commands.total.inc();
-    metrics.commands.counts.with_label_values(&[name]).inc();
-    if let Err(e) = result {
-        metrics.commands.errored.inc();
-        tracing::error!(error = e, r#"command "{}" failed."#, name);
-    }
-}
-
-#[hook]
-pub async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _: &str) -> () {
-    match error {
-        DispatchError::NotEnoughArguments { .. } => {
-            let _ = msg.channel_id.say(ctx, "Not enough arguments.").await;
-        }
-        DispatchError::CommandDisabled => {
-            let _ = msg
-                .channel_id
-                .say(ctx, "The command is currently disabled.")
-                .await;
-        }
-        DispatchError::LackingPermissions(_) => {
-            let _ = msg
-                .channel_id
-                .say(ctx, "You have insufficient rights for this command, you need the `MANAGE_CHANNELS` permission.")
-                .await;
-        }
-        DispatchError::Ratelimited(_) => {
-            let _ = msg.channel_id.say(ctx, "Try again in 1 second.").await;
-        }
-        e => tracing::error!("Dispatch error: {:?}", e),
-    }
-}
-
-#[help]
-async fn help(
-    context: &Context,
-    msg: &Message,
-    args: Args,
-    help_options: &'static HelpOptions,
-    groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>,
-) -> CommandResult {
-    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+pub async fn register(client: &InteractionClient<'_>) -> Result<(), Error> {
+    client.set_global_commands(&commands()).exec().await?;
     Ok(())
 }
 
-pub trait UserExt {
-    fn create_author<'a>(&self, _: &'a mut CreateEmbedAuthor) -> &'a mut CreateEmbedAuthor;
-
-    fn create_footer<'a>(&self, _: &'a mut CreateEmbedFooter) -> &'a mut CreateEmbedFooter;
+pub async fn handle_command(ctx: &Context, interaction: &Interaction, command: &CommandData) {
+    let res = match command.name.as_str() {
+        "about" => basic::about(ctx, interaction).await,
+        "settings" => basic::settings(ctx, interaction, command).await,
+        "games" => game::games(ctx, interaction, command).await,
+        "game" => game::game(ctx, interaction).await,
+        "mods" => mods::list(ctx, interaction, command).await,
+        "popular" => mods::popular(ctx, interaction, command).await,
+        "subs" => subs::handle_command(ctx, interaction, command).await,
+        _ => Ok(()),
+    };
+    if let Err(e) = res {
+        tracing::error!("{}", e);
+    }
 }
 
-impl UserExt for User {
-    fn create_author<'a>(&self, mut a: &'a mut CreateEmbedAuthor) -> &'a mut CreateEmbedAuthor {
-        a = a.name(&self.username).url(&self.profile_url.to_string());
-        if let Some(avatar) = &self.avatar {
-            let icon = avatar.original.to_string();
-            a = a.icon_url(&icon);
-        }
-        a
+pub async fn handle_component(
+    ctx: &Context,
+    interaction: &Interaction,
+    component: &MessageComponentInteractionData,
+) {
+    let res = match interaction
+        .message
+        .as_ref()
+        .and_then(|m| m.interaction.as_ref())
+    {
+        Some(msg) if msg.name == "mods" => mods::list_component(ctx, interaction, component).await,
+        _ => Ok(()),
+    };
+    if let Err(e) = res {
+        tracing::error!("{}", e);
     }
+}
 
-    fn create_footer<'a>(&self, mut f: &'a mut CreateEmbedFooter) -> &'a mut CreateEmbedFooter {
-        f = f.text(&self.username);
-        if let Some(avatar) = &self.avatar {
-            f = f.icon_url(&avatar.thumb_50x50.to_string());
-        }
-        f
+trait EphemeralMessage {
+    fn into_ephemeral(self) -> InteractionResponseData;
+}
+
+impl EphemeralMessage for &str {
+    fn into_ephemeral(self) -> InteractionResponseData {
+        InteractionResponseDataBuilder::new()
+            .ephemeral(self)
+            .build()
     }
+}
+
+impl EphemeralMessage for String {
+    fn into_ephemeral(self) -> InteractionResponseData {
+        InteractionResponseDataBuilder::new()
+            .ephemeral(self)
+            .build()
+    }
+}
+
+trait InteractionResponseBuilderExt {
+    fn ephemeral(self, content: impl Into<String>) -> InteractionResponseDataBuilder;
+}
+
+impl InteractionResponseBuilderExt for InteractionResponseDataBuilder {
+    fn ephemeral(self, content: impl Into<String>) -> InteractionResponseDataBuilder {
+        self.content(content).flags(MessageFlags::EPHEMERAL)
+    }
+}
+
+async fn create_response(
+    ctx: &Context,
+    interaction: &Interaction,
+    data: InteractionResponseData,
+) -> Result<(), Error> {
+    let response = InteractionResponse {
+        kind: InteractionResponseType::ChannelMessageWithSource,
+        data: Some(data),
+    };
+    ctx.interaction()
+        .create_response(interaction.id, &interaction.token, &response)
+        .exec()
+        .await?;
+    Ok(())
+}
+
+async fn create_responses_from_content(
+    ctx: &Context,
+    interaction: &Interaction,
+    title: &str,
+    contents: &[String],
+) -> Result<(), Error> {
+    let mut contents = contents.iter();
+    if let Some(content) = contents.next() {
+        let embed = EmbedBuilder::new()
+            .title(title)
+            .description(content)
+            .build();
+
+        let data = InteractionResponseDataBuilder::new().embeds([embed]);
+
+        create_response(ctx, interaction, data.build()).await?;
+
+        for content in contents {
+            let embed = EmbedBuilder::new()
+                .title(title)
+                .description(content)
+                .build();
+
+            ctx.interaction()
+                .create_followup(&interaction.token)
+                .embeds(&[embed])?
+                .exec()
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error> {
+    let filter = match search.parse::<u32>() {
+        Ok(id) => ModioId::eq(id),
+        Err(_) => Fulltext::eq(search),
+    };
+    let game = ctx.modio.games().search(filter).first().await?;
+    Ok(game)
 }

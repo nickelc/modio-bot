@@ -1,22 +1,8 @@
-//! ![MODBOT logo][logo]
-//!
-//! ![Rust version][rust-version]
-//! ![Rust edition][rust-edition]
-//! ![License][license-badge]
-//!
-//! MODBOT is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
-//!
-//!
-//! [rust-version]: https://img.shields.io/badge/rust-1.31%2B-blue.svg
-//! [rust-edition]: https://img.shields.io/badge/edition-2018-red.svg
-//! [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
-//! [logo]: https://raw.githubusercontent.com/nickelc/modio-bot/master/logo.png
-//! [mod.io]: https://mod.io
-//! [`modio-rs`]: https://github.com/nickelc/modio-rs
-//! [`serenity`]: https://github.com/serenity-rs/serenity
 #![deny(rust_2018_idioms)]
+#![allow(dead_code)]
 
 use dotenv::dotenv;
+use futures_util::StreamExt;
 
 mod bot;
 mod commands;
@@ -41,7 +27,6 @@ OPTIONS:
   -c <config>       Path to config file
 
 ENV:
-  MODBOT_DISABLED_COMMANDS      Comma separated list of disabled commands
   MODBOT_DEBUG_TIMESTAMP        Start time as Unix timestamp for polling the mod events
 ";
 
@@ -76,24 +61,31 @@ async fn try_main() -> CliResult {
 
     tokio::spawn(metrics::serve(&config.metrics, metrics.clone()));
 
-    let (mut client, bot) =
-        bot::initialize(&config, modio.clone(), pool.clone(), metrics.clone()).await?;
+    let (cluster, mut events, context) = bot::initialize(&config, modio, pool, metrics).await?;
 
-    tokio::spawn(tasks::events::task(&client, modio.clone(), metrics.clone()));
+    tokio::spawn(tasks::events::task(context.clone()));
 
     if let Some(token) = config.bot.dbl_token {
         tracing::info!("Spawning DBL task");
+        let bot = context.application.id.get();
+        let metrics = context.metrics.clone();
         tokio::spawn(tasks::dbl::task(bot, metrics, &token)?);
     }
 
-    let sm = client.shard_manager.clone();
+    cluster.up().await;
+
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen to ctrlc event.");
-        sm.lock().await.shutdown_all().await;
+        tracing::info!("Shutting down cluster");
+        cluster.down();
     });
 
-    client.start().await?;
+    while let Some((_, event)) = events.next().await {
+        let context = context.clone();
+        tokio::spawn(bot::handle_event(event, context));
+    }
+
     Ok(())
 }

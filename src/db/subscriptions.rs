@@ -18,6 +18,7 @@ pub type Subscription = (
     ExcludedUsers,
 );
 
+#[derive(Clone)]
 pub struct Subscriptions {
     pub pool: DbPool,
 }

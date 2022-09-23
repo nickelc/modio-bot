@@ -5,7 +5,6 @@ use dbl::Error as DblError;
 use modio::Error as ModioError;
 use pico_args::Error as ArgsError;
 use prometheus::Error as PrometheusError;
-use serenity::Error as SerenityError;
 use toml::de::Error as TomlError;
 
 use crate::db::Error as DatabaseError;
@@ -19,7 +18,7 @@ pub enum Error {
     Modio(ModioError),
     Dbl(DblError),
     Database(DatabaseErrorInner),
-    Serenity(SerenityError),
+    Twilight(TwilightError),
     Config(TomlError),
     Metrics(PrometheusError),
 }
@@ -30,13 +29,31 @@ pub enum DatabaseErrorInner {
     Query(DatabaseError),
 }
 
+#[derive(Debug)]
+pub enum TwilightError {
+    ClusterStart(twilight_gateway::cluster::ClusterStartError),
+    Http(twilight_http::Error),
+    Validation(TwilightValidation),
+    Deserialization(twilight_http::response::DeserializeBodyError),
+}
+
+#[derive(Debug)]
+pub enum TwilightValidation {
+    Message(twilight_validate::message::MessageValidationError),
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Args(e) => e.fmt(fmt),
             Error::Message(e) => e.fmt(fmt),
             Error::Io(e) => write!(fmt, "IO error: {}", e),
-            Error::Serenity(e) => e.fmt(fmt),
+            Error::Twilight(TwilightError::ClusterStart(e)) => e.fmt(fmt),
+            Error::Twilight(TwilightError::Http(e)) => e.fmt(fmt),
+            Error::Twilight(TwilightError::Validation(TwilightValidation::Message(e))) => {
+                e.fmt(fmt)
+            }
+            Error::Twilight(TwilightError::Deserialization(e)) => e.fmt(fmt),
             Error::Database(DatabaseErrorInner::Init(e)) => e.fmt(fmt),
             Error::Database(DatabaseErrorInner::Query(e)) => e.fmt(fmt),
             Error::Modio(e) => e.fmt(fmt),
@@ -95,9 +112,27 @@ impl From<PrometheusError> for Error {
     }
 }
 
-impl From<SerenityError> for Error {
-    fn from(e: SerenityError) -> Error {
-        Error::Serenity(e)
+impl From<twilight_gateway::cluster::ClusterStartError> for Error {
+    fn from(e: twilight_gateway::cluster::ClusterStartError) -> Self {
+        Error::Twilight(TwilightError::ClusterStart(e))
+    }
+}
+
+impl From<twilight_http::Error> for Error {
+    fn from(e: twilight_http::Error) -> Self {
+        Error::Twilight(TwilightError::Http(e))
+    }
+}
+
+impl From<twilight_http::response::DeserializeBodyError> for Error {
+    fn from(e: twilight_http::response::DeserializeBodyError) -> Self {
+        Error::Twilight(TwilightError::Deserialization(e))
+    }
+}
+
+impl From<twilight_validate::message::MessageValidationError> for Error {
+    fn from(e: twilight_validate::message::MessageValidationError) -> Self {
+        Error::Twilight(TwilightError::Validation(TwilightValidation::Message(e)))
     }
 }
 
