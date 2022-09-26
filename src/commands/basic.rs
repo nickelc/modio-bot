@@ -11,10 +11,9 @@ use crate::db::Settings;
 pub async fn about(ctx: &Context, msg: &Message) -> CommandResult {
     let (name, avatar) = ctx
         .cache
-        .current_user_field(|u| (u.name.clone(), u.avatar_url()))
-        .await;
+        .current_user_field(|u| (u.name.clone(), u.avatar_url()));
 
-    let guilds = ctx.cache.guild_count().await;
+    let guilds = ctx.cache.guild_count();
     msg.channel_id
         .send_message(ctx, move |m| {
             m.embed(|e| {
@@ -105,13 +104,12 @@ pub async fn servers(ctx: &Context, msg: &Message) -> CommandResult {
     use std::fmt::Write;
 
     let buf = {
-        let guilds = ctx.cache.guilds().await;
+        let guilds = ctx.cache.guilds();
         let mut buf = String::new();
         for id in guilds {
             let info = ctx
                 .cache
-                .guild_field(id, |g| (g.name.clone(), g.members.len()))
-                .await;
+                .guild_field(id, |g| (g.name.clone(), g.members.len()));
             if let Some((name, members)) = info {
                 let _ = writeln!(&mut buf, "- {} (id: {}, members: {})", name, id, members);
             }

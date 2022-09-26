@@ -91,12 +91,12 @@ pub async fn after(ctx: &Context, _: &Message, name: &str, result: CommandResult
 }
 
 #[hook]
-pub async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) -> () {
+pub async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _: &str) -> () {
     match error {
         DispatchError::NotEnoughArguments { .. } => {
             let _ = msg.channel_id.say(ctx, "Not enough arguments.").await;
         }
-        DispatchError::CommandDisabled(_) => {
+        DispatchError::CommandDisabled => {
             let _ = msg
                 .channel_id
                 .say(ctx, "The command is currently disabled.")

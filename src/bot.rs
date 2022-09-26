@@ -50,7 +50,7 @@ impl EventHandler for Handler {
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
 
-            let guilds = ready.guilds.iter().map(|g| g.id().0).collect::<Vec<_>>();
+            let guilds = ready.guilds.iter().map(|g| g.id.0).collect::<Vec<_>>();
             tracing::info!("Guilds: {:?}", guilds);
 
             let subs = data
@@ -110,11 +110,15 @@ pub async fn initialize(
 ) -> Result<(Client, u64)> {
     let blocked = load_blocked(&pool)?;
 
-    let http = Http::new_with_token(&config.bot.token);
+    let http = Http::new(&config.bot.token);
 
-    let (bot, owners) = match http.get_current_application_info().await {
-        Ok(info) => (info.id, vec![info.owner.id].into_iter().collect()),
+    let owners = match http.get_current_application_info().await {
+        Ok(info) => vec![info.owner.id].into_iter().collect(),
         Err(e) => panic!("Couldn't get application info: {}", e),
+    };
+    let bot = match http.get_current_user().await {
+        Ok(user) => user.id,
+        Err(e) => panic!("Couldn't get current user: {}", e),
     };
 
     let disabled = std::env::var("MODBOT_DISABLED_COMMANDS")
@@ -145,7 +149,7 @@ pub async fn initialize(
         .on_dispatch_error(dispatch_error)
         .help(&HELP);
 
-    let client = Client::builder(&config.bot.token)
+    let client = Client::builder(&config.bot.token, GatewayIntents::non_privileged())
         .event_handler(Handler)
         .raw_event_handler(Handler)
         .framework(framework)

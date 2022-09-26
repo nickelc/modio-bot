@@ -29,7 +29,7 @@ pub fn task(bot: u64, cache: Arc<Cache>, token: &str) -> Result<impl Future<Outp
         loop {
             interval.tick().await;
             let client = Arc::clone(&client);
-            let servers = cache.guild_count().await;
+            let servers = cache.guild_count();
             let stats = ShardStats::Cumulative {
                 server_count: servers as u64,
                 shard_count: None,
