@@ -31,9 +31,10 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
         loop {
             if let Some((channels, msg)) = rx.recv().await {
                 metrics.notifications.inc_by(channels.len() as u64);
+                let map = serenity::json::hashmap_to_json_map(msg.0);
+                let value = serenity::json::Value::from(map);
                 for channel in channels {
-                    let mut msg = msg.clone();
-                    if let Err(e) = channel.send_message(&http, |_| &mut msg).await {
+                    if let Err(e) = http.send_message(channel.0, &value).await {
                         error!("{}", e);
                     }
                 }
