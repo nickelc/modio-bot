@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::future::Future;
 use std::time::Duration;
 
@@ -87,7 +87,6 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                 let mods = game.mods();
 
                 let task = async move {
-                    use std::collections::BTreeMap;
                     type Events = BTreeMap<u32, Vec<(u32, EventType)>>;
 
                     // - Group the events by mod
