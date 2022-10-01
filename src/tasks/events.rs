@@ -182,6 +182,11 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                             }
                             effected_channels.insert(ChannelId(*channel));
                         }
+                        if effected_channels.is_empty() {
+                            debug!("no channels left to send to");
+                            continue;
+                        }
+
                         debug!(
                             "send message {} for {:?} to {:?}",
                             evt, m.name, effected_channels
