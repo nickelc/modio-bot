@@ -144,8 +144,6 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                     let game = game.get().await?;
 
                     for (_, (m, evt)) in updates.into_iter() {
-                        let mut msg = CreateMessage::default();
-                        create_message(&game, m, evt, &mut msg);
                         let mut effected_channels = BTreeSet::new();
 
                         for (channel, tags, _, evts, excluded_mods, excluded_users) in &channels {
@@ -188,6 +186,8 @@ pub fn task(client: &Client, modio: Modio, metrics: Metrics) -> impl Future<Outp
                             "send message {} for {:?} to {:?}",
                             evt, m.name, effected_channels
                         );
+                        let mut msg = CreateMessage::default();
+                        create_message(&game, m, evt, &mut msg);
                         if let Err(e) = tx.send((effected_channels, msg)).await {
                             error!("{}", e);
                         }
