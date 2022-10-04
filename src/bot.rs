@@ -5,6 +5,7 @@ use serenity::framework::standard::StandardFramework;
 use serenity::http::Http;
 use serenity::model::channel::Message;
 use serenity::model::gateway::{Activity, Ready};
+use serenity::model::guild::{Guild, UnavailableGuild};
 use serenity::model::id::{GuildId, UserId};
 use serenity::prelude::*;
 
@@ -46,6 +47,10 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         let settings = {
             let data = ctx.data.read().await;
+
+            let metrics = data.get::<Metrics>().expect("get metrics failed");
+            metrics.guilds.set(ready.guilds.len() as i64);
+
             let pool = data
                 .get::<PoolKey>()
                 .expect("failed to get connection pool");
@@ -72,25 +77,21 @@ impl EventHandler for Handler {
         let game = Activity::playing(&format!("~help| @{} help", ready.user.name));
         ctx.set_activity(game).await;
     }
-}
 
-use serenity::model::event::Event;
+    async fn guild_create(&self, ctx: Context, _: Guild, is_new: bool) {
+        if is_new {
+            let data = ctx.data.read().await;
+            let metrics = data.get::<Metrics>().expect("get metrics failed");
+            metrics.guilds.inc();
+        }
+    }
 
-#[serenity::async_trait]
-impl RawEventHandler for Handler {
-    async fn raw_event(&self, ctx: Context, evt: Event) {
-        match evt {
-            Event::GuildCreate(_) => {
-                let data = ctx.data.read().await;
-                let metrics = data.get::<Metrics>().expect("get metrics failed");
-                metrics.guilds.inc();
-            }
-            Event::GuildDelete(_) => {
-                let data = ctx.data.read().await;
-                let metrics = data.get::<Metrics>().expect("get metrics failed");
-                metrics.guilds.dec();
-            }
-            _ => {}
+    async fn guild_delete(&self, ctx: Context, guild: UnavailableGuild, _: Option<Guild>) {
+        // if `unavailable` is false then the bot was removed from the guild.
+        if !guild.unavailable {
+            let data = ctx.data.read().await;
+            let metrics = data.get::<Metrics>().expect("get metrics failed");
+            metrics.guilds.dec();
         }
     }
 }
@@ -151,7 +152,6 @@ pub async fn initialize(
 
     let client = Client::builder(&config.bot.token, GatewayIntents::non_privileged())
         .event_handler(Handler)
-        .raw_event_handler(Handler)
         .framework(framework)
         .await?;
     {
