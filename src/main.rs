@@ -79,12 +79,11 @@ async fn try_main() -> CliResult {
     let (mut client, bot) =
         bot::initialize(&config, modio.clone(), pool.clone(), metrics.clone()).await?;
 
-    tokio::spawn(tasks::events::task(&client, modio.clone(), metrics));
+    tokio::spawn(tasks::events::task(&client, modio.clone(), metrics.clone()));
 
     if let Some(token) = config.bot.dbl_token {
         tracing::info!("Spawning DBL task");
-        let cache = client.cache_and_http.cache.clone();
-        tokio::spawn(tasks::dbl::task(bot, cache, &token)?);
+        tokio::spawn(tasks::dbl::task(bot, metrics, &token)?);
     }
 
     let sm = client.shard_manager.clone();

@@ -3,12 +3,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dbl::{types::ShardStats, Client};
-use serenity::cache::Cache;
 use tokio::time::{interval_at, Instant};
 use tracing::{error, info};
 
 use crate::config::DBL_OVERRIDE_BOT_ID;
 use crate::error::Error;
+use crate::metrics::Metrics;
 
 const MIN: Duration = Duration::from_secs(60);
 const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
@@ -20,7 +20,7 @@ fn get_bot_id(bot: u64) -> u64 {
         .unwrap_or(bot)
 }
 
-pub fn task(bot: u64, cache: Arc<Cache>, token: &str) -> Result<impl Future<Output = ()>, Error> {
+pub fn task(bot: u64, metrics: Metrics, token: &str) -> Result<impl Future<Output = ()>, Error> {
     let bot = get_bot_id(bot);
     let client = Arc::new(Client::new(token.to_owned()).map_err(Error::Dbl)?);
 
@@ -29,7 +29,7 @@ pub fn task(bot: u64, cache: Arc<Cache>, token: &str) -> Result<impl Future<Outp
         loop {
             interval.tick().await;
             let client = Arc::clone(&client);
-            let servers = cache.guild_count();
+            let servers = metrics.guilds.get();
             let stats = ShardStats::Cumulative {
                 server_count: servers as u64,
                 shard_count: None,
