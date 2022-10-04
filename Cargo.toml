@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 
 [dependencies.serenity]
 version = "0.11.5"
-features = ["collector"]
+features = ["collector", "unstable_discord_api"]
 
 [dependencies.modio]
 version = "0.7"
