@@ -20,7 +20,7 @@ futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 hyper = { version = "0.14", features = ["server"] }
 kuchiki = "0.8"
-pico-args = "0.4"
+pico-args = "0.5"
 prometheus = { version = "0.13", default-features = false }
 serde = { version = "1", features = ["derive"] }
 time = { version = "0.3", features = ["formatting", "macros"] }
@@ -50,7 +50,7 @@ version = ">=0.17.2, <0.26.0"
 optional = true
 
 [build-dependencies]
-git2 = { version = "0.13", default-features = false }
+git2 = { version = "0.15", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
