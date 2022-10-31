@@ -7,7 +7,7 @@
 [![GitHub Action][gha-badge]][gha-url]
 [![Discord][discord-badge]][discord]
 
-ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`serenity`].
+ModBot is a Discord bot for [mod.io] using [`modio-rs`] and [`twilight`].
 
 <p align="center">
     <a href="#setup">Setup</a> •
@@ -25,62 +25,70 @@ You can invite the officially hosted ModBot to join your Discord server using th
 following URL https://discordbot.mod.io, or you can build and install your
 own version of ModBot by following the [instructions](#building) below.
 
- 1. Invite the ModBot https://discordbot.mod.io/
- 2. View the games list `~games` and set the default game `~game ID`
- 3. In the channel(s) you want the bot to post updates (mod added / edited), run the command `~subscribe ID`
- 4. Ensure the bot has `Read Messages`, `Send Messages` and `Embed Links` permissions in the channel(s) it is in to be able to function correctly
+ 1. Invite the ModBot <https://discordbot.mod.io/>.
+ 2. View the games list `/games` and set the default game `/settings default-game ID`.
+ 3. In the channel(s) you want the bot to post updates (mod added / edited),
+    run the command `/subs add <GameID>`.
+ 4. Ensure the bot has `Send Messages` and `Embed Links` permissions in the
+    channel(s) it is in to be able to function correctly.
 
 <img src="https://user-images.githubusercontent.com/2128532/118098374-1adc0e80-b3d4-11eb-808a-4024b7e79d9b.png" width="500"/>
 
 ## Commands
 
-By default `~` is the prefix used to issue commands to ModBot. Once you have invited ModBot to your server, you can set the default game using the command `~game ID`. Now when a user issues the command `~mods`, all of the mods for the game you specified will be returned. You can change the default game at any time.
+Once you have invited ModBot to your server, you can set the default game using
+the command `/settings default-game ID`. Now when a user issues the command
+`/mods`, all of the mods for the game you specified will be returned. You can
+change the default game at any time.
 
-We recommend you also `~subscribe ID` to games you are interested in receiving push notifications from. For example in our [#bot channel][modio-bot-channel], we have subscribed to a bunch of games and whenever a mod is updated, the channel is notified.
+We recommend you also `/subs add <GameID>` to games you are interested in
+receiving push notifications from. For example in our [#bot channel], we have
+subscribed to a bunch of games and whenever a mod is updated, the channel is
+notified.
 
 Popular commands include:
 
- * `~help` show these commands
- * `~prefix CHARACTER` change the default prefix from `~` to something else
- * `~game <ID|Name>` set the default game
- * `~game` return information about the default game
- * `~games` return a list of all games
- * `~mod <ID|Name>` return information about the mod(s) requested
- * `~mods [ID|Name]` return a list of all mods belonging to the default game
- * `~popular` return a list of mods ordered by popularity
- * `~subscribe <ID|Name> [Tag..]` subscribe to a game for updates (mods added/edited) \[alias: `sub`\]
+ * `/game` return information about the default game
+ * `/games [search]` return a list of all games
+ * `/mods [ID|Name]` return a list of all mods belonging to the default game
+ * `/popular` return a list of mods ordered by popularity
+ * `/settings default-game <ID|Name>` set the default game
+ * `/subs add <ID|Name> [Tag..] [Type]` subscribe to a game for updates (mods added/edited)
    ```
-   ~sub 51
-   ~sub xcom
-   ~sub xcom "UFO Defense" Major
-   ~sub "Skate XL" "Real World Spot"
-   ~sub skate Gear Deck
+   /sub add 51
+   /sub add OpenXcom
+   /sub add OpenXcom tags:"UFO Defense",Major
+   /sub add "Skate XL" tags:"Real World Spot"
+   /sub add Skate* tags:Gear,Deck
    ```
- * `~subscriptions` see all games subscribed too \[alias: `subs`\]
- * `~unsubscribe <ID|Name> [Tag..]` unsubscribe from a game \[alias: `unsub`\]
+
+ * `/subs list` see all games subscribed too
+ * `/subs rm <ID|Name> [Tag..] [Type]` unsubscribe from a game
    ```
-   ~unsub 51
-   ~unsub OpenXcom
-   ~unsub xcom "UFO Defense" Major
-   ~unsub "Skate XL" "Real World Spot"
-   ~unsub skate Gear Deck
+   /subs rm 51
+   /subs rm OpenXcom
+   /subs rm OpenXcom tags:"UFO Defense",Major
+   /subs rm "Skate XL" tags:"Real World Spot"
+   /subs rm skate tags:Gear,Deck
    ```
- * `~mute <Game> <Mod>` mute a mod from update notifications
- * `~muted` return a list of all muted mods
- * `~unmute <Game> <Mod>` unmute a mod from update notifications
+
+ * `/subs mods mute <Game> <Mod>` mute a mod from update notifications
+ * `/subs mods muted` return a list of all muted mods
+ * `/subs mods unmute <Game> <Mod>` unmute a mod from update notifications
 
 ## Screenshots
 
 ### Mod details
-![details](https://user-images.githubusercontent.com/2128532/98248314-0de9e880-1f75-11eb-8598-add24e232cea.png)
+![command](https://user-images.githubusercontent.com/2128532/199087924-87e56fcd-a049-42d5-be92-c776799bbb21.png)
+![details](https://user-images.githubusercontent.com/2128532/199013232-dc2468f0-0c79-4645-bc69-403cb65648c3.png)
 
 ### New Mod notification
 ![notification](https://user-images.githubusercontent.com/2128532/98248318-0e827f00-1f75-11eb-89d5-a55174d9fed5.png)
 
 ## Building
 
-MODBOT is written in Rust, so you'll need to grab a [Rust installation][rust-lang] in order to compile it.
-Building is easy:
+ModBot is written in Rust, so you'll need to grab a [Rust installation] in
+order to compile it. Building is easy:
 
 ```
 $ git clone https://github.com/nickelc/modio-bot
@@ -100,6 +108,15 @@ $ cargo build --features sqlite-bundled
 ## Installation
 
 ### Cargo
+
+Install latest version from <https://crates.io>.
+
+```
+$ cargo install modbot
+$ $HOME/.cargo/bin/modbot
+```
+
+Install modbot from the `master` branch.
 
 ```
 $ cargo install --git https://github.com/nickelc/modio-bot
@@ -170,9 +187,9 @@ as defined in the Apache-2.0 license, shall be dual licensed as above, without a
 [discord-badge]: https://img.shields.io/discord/541627648112066581.svg?label=support&logo=discord&color=7289DA&labelColor=2C2F33
 [bot-invite-badge]: https://img.shields.io/static/v1.svg?label=%20&logo=discord&message=Invite%20ModBot&color=7289DA&labelColor=2C2F33
 [bot-invite-url]: https://discordbot.mod.io
-[modio-bot-channel]: https://discord.gg/QR7DGD7
+[#bot channel]: https://discord.gg/QR7DGD7
 [mod.io]: https://mod.io
 [`modio-rs`]: https://github.com/nickelc/modio-rs
-[`serenity`]: https://github.com/serenity-rs/serenity
+[`twilight`]: https://github.com/twilight-rs/twilight
 [`tracing_subscriber::EnvFilter`]: https://docs.rs/tracing-subscriber/0.2/?search=EnvFilter
-[rust-lang]: https://www.rust-lang.org
+[Rust Installation]: https://www.rust-lang.org/tools/install
