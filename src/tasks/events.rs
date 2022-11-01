@@ -27,24 +27,17 @@ const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 pub fn task(ctx: Context) -> impl Future<Output = ()> {
     let (sender, mut receiver) = mpsc::channel::<(BTreeSet<u64>, Option<String>, Embed)>(100);
 
-    let Context {
-        client,
-        modio,
-        subscriptions,
-        metrics,
-        ..
-    } = ctx;
-
     tokio::spawn(async move {
         loop {
             if let Some((channels, content, embed)) = receiver.recv().await {
-                metrics.notifications.inc_by(channels.len() as u64);
+                ctx.metrics.notifications.inc_by(channels.len() as u64);
 
                 let embeds = [embed];
                 let mut cc = channels
                     .into_iter()
                     .map(|id| {
-                        let mut msg = client
+                        let mut msg = ctx
+                            .client
                             .create_message(ChannelId::new(id))
                             .embeds(&embeds)
                             .unwrap();
@@ -84,7 +77,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 ]))
                 .order_by(Id::asc());
 
-            let subs = subscriptions.load().unwrap_or_else(|e| {
+            let subs = ctx.subscriptions.load().unwrap_or_else(|e| {
                 error!("failed to load subscriptions: {}", e);
                 Default::default()
             });
@@ -99,7 +92,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 );
                 let sender = sender.clone();
                 let filter = filter.clone();
-                let game = modio.game(game);
+                let game = ctx.modio.game(game);
                 let mods = game.mods();
 
                 let task = async move {
