@@ -113,7 +113,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         .events(filter)
                         .iter()
                         .await?
-                        .try_fold(Events::new(), |mut events, e| async {
+                        .try_fold(Events::new(), |mut events, e| async move {
                             events
                                 .entry(e.mod_id)
                                 .or_default()
