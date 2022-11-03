@@ -130,9 +130,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
 
         let mut content = String::new();
         for (game_id, tags, evts) in subs {
-            let name = if let Some(name) = games.get(&game_id) {
-                name
-            } else {
+            let Some(name) = games.get(&game_id) else {
                 continue;
             };
             let _ = write!(&mut content, "{}. {}", game_id, name);
@@ -696,9 +694,7 @@ async fn find_game_mod(
     game_filter: Filter,
     mod_filter: Filter,
 ) -> Result<(Option<Game>, Option<Mod>), Error> {
-    let game = if let Some(game) = modio.games().search(game_filter).first().await? {
-        game
-    } else {
+    let Some(game) = modio.games().search(game_filter).first().await? else {
         return Ok((None, None));
     };
 

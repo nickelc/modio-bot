@@ -1,13 +1,10 @@
 use git2::{Error, Repository};
 
 fn main() -> Result<(), Error> {
-    let repo = match Repository::discover(".") {
-        Ok(repo) => repo,
-        Err(_) => {
-            println!("cargo:rustc-env=GIT_SHA=UNKNOWN");
-            println!("cargo:rustc-env=GIT_SHA_SHORT=UNKNOWN");
-            return Ok(());
-        }
+    let Ok(repo) = Repository::discover(".") else {
+        println!("cargo:rustc-env=GIT_SHA=UNKNOWN");
+        println!("cargo:rustc-env=GIT_SHA_SHORT=UNKNOWN");
+        return Ok(());
     };
     let repo_path = repo.path();
 
