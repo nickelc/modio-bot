@@ -709,11 +709,7 @@ async fn find_game_mod(
         .first()
         .await?;
 
-    if let Some(mod_) = mod_ {
-        Ok((Some(game), Some(mod_)))
-    } else {
-        Ok((Some(game), None))
-    }
+    Ok((Some(game), mod_))
 }
 
 fn string_to_tags(s: &str) -> Option<HashSet<String>> {
