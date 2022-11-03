@@ -9,7 +9,7 @@ license = "MIT/Apache-2.0"
 authors = ["Constantin Nickel <constantin.nickel@gmail.com>"]
 keywords = ["modio", "discord", "bot"]
 edition = "2021"
-rust-version = "1.60.0"
+rust-version = "1.65.0"
 include = ["src/**/*.rs", "LICENSE-*", "README.md", "build.rs", "migrations"]
 
 [dependencies]
