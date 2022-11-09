@@ -63,6 +63,7 @@ pub fn init_db(database_url: &str) -> Result<DbPool, InitError> {
     })
 }
 
+#[allow(dead_code)]
 pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
     use schema::blocked_guilds::dsl::*;
     use schema::blocked_users::dsl::*;

@@ -60,10 +60,12 @@ impl Settings {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn prefix(&self, guild: Option<GuildId>) -> Option<String> {
         self.data.get(&guild?).and_then(|s| s.prefix.clone())
     }
 
+    #[allow(dead_code)]
     pub fn set_prefix(&mut self, guild: GuildId, prefix: Option<String>) -> Result<()> {
         let change = (guild, prefix.clone());
         self.persist(change.into())?;
