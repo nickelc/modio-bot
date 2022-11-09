@@ -31,7 +31,7 @@ pub fn task(bot: u64, metrics: Metrics, token: &str) -> Result<impl Future<Outpu
             let client = Arc::clone(&client);
             let servers = metrics.guilds.get();
             let stats = ShardStats::Cumulative {
-                server_count: servers as u64,
+                server_count: servers,
                 shard_count: None,
             };
 

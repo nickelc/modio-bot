@@ -91,7 +91,7 @@ pub async fn handle_event(event: Event, context: Context) {
         Event::Ready(ready) => {
             let guilds = ready.guilds.iter().map(|g| g.id.get()).collect::<Vec<_>>();
             tracing::info!("Guilds: {:?}", guilds);
-            context.metrics.guilds.set(ready.guilds.len() as i64);
+            context.metrics.guilds.set(ready.guilds.len() as u64);
 
             if let Err(e) = context.subscriptions.cleanup(&guilds) {
                 tracing::error!("{}", e);

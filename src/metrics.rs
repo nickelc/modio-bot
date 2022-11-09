@@ -1,11 +1,12 @@
-use prometheus::{IntCounter, IntCounterVec, IntGauge, Opts, Registry};
+use prometheus::core::{AtomicU64, GenericGauge};
+use prometheus::{IntCounter, IntCounterVec, Opts, Registry};
 
 use crate::Result;
 
 #[derive(Clone)]
 pub struct Metrics {
     pub registry: Registry,
-    pub guilds: IntGauge,
+    pub guilds: GenericGauge<AtomicU64>,
     pub notifications: IntCounter,
     pub commands: Commands,
 }
@@ -19,7 +20,7 @@ pub struct Commands {
 
 impl Metrics {
     pub fn new() -> Result<Self> {
-        let guilds = IntGauge::new("guilds", "Current guilds")?;
+        let guilds = GenericGauge::<AtomicU64>::new("guilds", "Current guilds")?;
         let notifications = IntCounter::new("notifications", "Notifications")?;
         let commands = Commands {
             total: IntCounter::with_opts(
