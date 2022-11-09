@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
+
 use std::collections::HashSet;
 use std::fmt;
 

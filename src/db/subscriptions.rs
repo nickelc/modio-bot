@@ -86,10 +86,10 @@ impl Subscriptions {
 
         Ok(list.into_iter().fold(
             HashMap::new(),
-            |mut map, (game_id, channel_id, _tags, guild_id, evt)| {
+            |mut map, (game_id, channel_id, sub_tags, guild_id, evt)| {
                 let game_id = game_id as GameId;
                 let channel_id = channel_id as ChannelId;
-                let _tags = _tags
+                let sub_tags = sub_tags
                     .split('\n')
                     .filter(|t| !t.is_empty())
                     .map(ToOwned::to_owned)
@@ -104,7 +104,7 @@ impl Subscriptions {
                     .unwrap_or_default();
                 map.entry(game_id).or_default().push((
                     channel_id,
-                    _tags,
+                    sub_tags,
                     guild_id,
                     evt,
                     excluded_mods,
@@ -168,13 +168,13 @@ impl Subscriptions {
 
         let records = records
             .into_iter()
-            .map(|(game_id, _tags, evts)| {
-                let _tags = _tags
+            .map(|(game_id, sub_tags, evts)| {
+                let sub_tags = sub_tags
                     .split('\n')
                     .filter(|s| !s.is_empty())
                     .map(ToOwned::to_owned)
                     .collect();
-                (game_id as u32, _tags, Events::from_bits_truncate(evts))
+                (game_id as u32, sub_tags, Events::from_bits_truncate(evts))
             })
             .collect();
 
@@ -237,7 +237,7 @@ impl Subscriptions {
         &self,
         game_id: GameId,
         channel_id: ChannelId,
-        _tags: Tags,
+        sub_tags: Tags,
         guild_id: Option<GuildId>,
         evts: Events,
     ) -> Result<()> {
@@ -249,11 +249,11 @@ impl Subscriptions {
         let game_id = game_id as i32;
         let channel_id = channel_id as i64;
 
-        let mut _tags = _tags.into_iter().collect::<Vec<_>>();
-        _tags.sort();
-        let _tags = _tags.join("\n");
+        let mut sub_tags = sub_tags.into_iter().collect::<Vec<_>>();
+        sub_tags.sort();
+        let sub_tags = sub_tags.join("\n");
 
-        let pk = (game_id, channel_id, _tags.clone());
+        let pk = (game_id, channel_id, sub_tags.clone());
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
@@ -261,22 +261,20 @@ impl Subscriptions {
             conn.transaction::<_, Error, _>(|conn| {
                 let first = subscriptions.find(pk).first::<Record>(conn);
 
-                let (game_id, channel_id, _tags, guild_id, evts) = match first {
-                    Ok((game_id, channel_id, _tags, guild_id, old_evts)) => {
+                let (game_id, channel_id, sub_tags, guild_id, evts) =
+                    if let Ok((game_id, channel_id, sub_tags, guild_id, old_evts)) = first {
                         let mut new_evts = Events::from_bits_truncate(old_evts);
                         new_evts |= evts;
-                        (game_id, channel_id, _tags, guild_id, new_evts.bits)
-                    }
-                    Err(_) => {
+                        (game_id, channel_id, sub_tags, guild_id, new_evts.bits)
+                    } else {
                         let guild_id = guild_id.map(|g| g as i64);
-                        (game_id, channel_id, _tags, guild_id, evts.bits)
-                    }
-                };
+                        (game_id, channel_id, sub_tags, guild_id, evts.bits)
+                    };
 
                 let values = (
                     game.eq(game_id),
                     channel.eq(channel_id),
-                    tags.eq(_tags),
+                    tags.eq(sub_tags),
                     guild.eq(guild_id),
                     events.eq(evts),
                 );
@@ -293,7 +291,7 @@ impl Subscriptions {
         &self,
         game_id: GameId,
         channel_id: ChannelId,
-        _tags: Tags,
+        sub_tags: Tags,
         evts: Events,
     ) -> Result<()> {
         use diesel::result::Error;
@@ -301,11 +299,11 @@ impl Subscriptions {
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
-        let mut _tags = _tags.into_iter().collect::<Vec<_>>();
-        _tags.sort();
-        let _tags = _tags.join("\n");
+        let mut sub_tags = sub_tags.into_iter().collect::<Vec<_>>();
+        sub_tags.sort();
+        let sub_tags = sub_tags.join("\n");
 
-        let pk = (game_id as i32, channel_id as i64, _tags);
+        let pk = (game_id as i32, channel_id as i64, sub_tags);
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
@@ -313,7 +311,7 @@ impl Subscriptions {
             conn.transaction::<_, Error, _>(|conn| {
                 let first = subscriptions.find(pk).first::<Record>(conn);
 
-                if let Ok((game_id, channel_id, _tags, guild_id, old_evts)) = first {
+                if let Ok((game_id, channel_id, sub_tags, guild_id, old_evts)) = first {
                     let mut new_evts = Events::from_bits_truncate(old_evts);
                     new_evts.remove(evts);
 
@@ -321,7 +319,7 @@ impl Subscriptions {
                         let pred = game
                             .eq(game_id)
                             .and(channel.eq(channel_id))
-                            .and(tags.eq(_tags));
+                            .and(tags.eq(sub_tags));
                         let filter = subscriptions.filter(pred);
                         diesel::delete(filter).execute(conn)?;
 
@@ -348,7 +346,7 @@ impl Subscriptions {
                         let values = (
                             game.eq(game_id),
                             channel.eq(channel_id),
-                            tags.eq(_tags),
+                            tags.eq(sub_tags),
                             guild.eq(guild_id),
                             events.eq(new_evts.bits),
                         );

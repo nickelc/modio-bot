@@ -39,7 +39,7 @@ impl Settings {
                 let query = diesel::update(target).set(&change);
 
                 if query.execute(conn)? == 0 {
-                    let query = diesel::insert_into(settings).values(&change);
+                    let query = diesel::insert_into(settings).values(change);
                     query.execute(conn)?;
                 }
                 Ok(())

@@ -68,7 +68,7 @@ pub async fn list(
                     let data = "Game not found.".into_ephemeral();
                     return create_response(ctx, interaction, data).await;
                 }
-                game_id = game.map(|g| g.id)
+                game_id = game.map(|g| g.id);
             }
             _ => {}
         }
@@ -241,7 +241,9 @@ pub async fn popular(
         let mods = game.mods().search(filter).first_page().await?;
         let game = game.get().await?;
 
-        if !mods.is_empty() {
+        if mods.is_empty() {
+            builder = builder.ephemeral("no mods founds.");
+        } else {
             let mut content = String::new();
             for mod_ in mods {
                 let _ = writeln!(
@@ -267,8 +269,6 @@ pub async fn popular(
                 .build();
 
             builder = builder.embeds([embed]);
-        } else {
-            builder = builder.ephemeral("no mods founds.");
         }
     } else {
         builder = builder.ephemeral("default game is not set.");
@@ -393,6 +393,7 @@ Votes: +{}/-{}"#,
             inline: true,
         }
     }
+    #[allow(clippy::cast_possible_wrap)]
     fn dates(m: &Mod) -> EmbedField {
         let added = format_timestamp(m.date_added as i64);
         let updated = format_timestamp(m.date_updated as i64);

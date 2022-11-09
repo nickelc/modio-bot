@@ -13,6 +13,7 @@ use twilight_model::application::interaction::application_command::{
 };
 use twilight_model::application::interaction::Interaction;
 use twilight_model::guild::Permissions;
+use twilight_model::id::Id as DiscordId;
 use twilight_util::builder::command::{
     CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder, SubCommandGroupBuilder,
 };
@@ -120,7 +121,9 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     let subs = ctx.subscriptions.list_for_channel(channel_id.get())?;
 
     let mut builder = InteractionResponseDataBuilder::new();
-    if !subs.is_empty() {
+    if subs.is_empty() {
+        builder = builder.ephemeral("No subscriptions found.");
+    } else {
         let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
         let list = ctx.modio.games().search(filter).collect().await?;
         let games = list
@@ -153,8 +156,6 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
             .title("Subscriptions")
             .description(content);
         builder = builder.embeds([embed.build()]);
-    } else {
-        builder = builder.ephemeral("No subscriptions found.");
     }
 
     create_response(ctx, interaction, builder.build()).await
@@ -183,6 +184,7 @@ async fn subscribe(
             }
             CommandOptionValue::Integer(v) if opt.name == "type" => {
                 evts = if (1..=3).contains(v) {
+                    #[allow(clippy::cast_possible_truncation)]
                     Events::from_bits_truncate(*v as i32)
                 } else {
                     Events::ALL
@@ -206,7 +208,7 @@ async fn subscribe(
     }
 
     let channel_id = interaction.channel_id.unwrap().get();
-    let guild_id = interaction.guild_id.map(|id| id.get());
+    let guild_id = interaction.guild_id.map(DiscordId::get);
 
     let game_tags = game
         .tag_options
@@ -272,6 +274,7 @@ async fn unsubscribe(
             }
             CommandOptionValue::Integer(v) if opt.name == "type" => {
                 evts = if (1..=3).contains(v) {
+                    #[allow(clippy::cast_possible_truncation)]
                     Events::from_bits_truncate(*v as i32)
                 } else {
                     Events::ALL
@@ -439,7 +442,7 @@ async fn mods_mute(
         }
         (Some(game), Some(mod_)) => {
             let channel_id = interaction.channel_id.unwrap().get();
-            let guild_id = interaction.guild_id.map(|id| id.get());
+            let guild_id = interaction.guild_id.map(DiscordId::get);
 
             let ret = ctx
                 .subscriptions
@@ -612,7 +615,7 @@ async fn users_mute(
     let mut builder = InteractionResponseDataBuilder::new();
     match game {
         Some(game) => {
-            let guild_id = interaction.guild_id.map(|id| id.get());
+            let guild_id = interaction.guild_id.map(DiscordId::get);
             let channel_id = interaction.channel_id.unwrap().get();
 
             let ret = ctx

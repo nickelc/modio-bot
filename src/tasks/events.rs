@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::time::Duration;
 
@@ -24,6 +24,7 @@ use crate::util;
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
 
+#[allow(clippy::too_many_lines)]
 pub fn task(ctx: Context) -> impl Future<Output = ()> {
     let (sender, mut receiver) = mpsc::channel::<(BTreeSet<u64>, Option<String>, Embed)>(100);
 
@@ -79,7 +80,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
             let subs = ctx.subscriptions.load().unwrap_or_else(|e| {
                 error!("failed to load subscriptions: {}", e);
-                Default::default()
+                HashMap::default()
             });
 
             for (game, channels) in subs {
@@ -120,7 +121,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     }
 
                     // Filter `MODFILE_CHANGED` events for new mods
-                    for (_, evt) in events.iter_mut() {
+                    for evt in &mut events.values_mut() {
                         use EventType::{ModAvailable, ModfileChanged};
                         if evt.iter().any(|(_, t)| t == &ModAvailable) {
                             let pos = evt.iter().position(|(_, t)| t == &ModfileChanged);
@@ -298,17 +299,17 @@ fn create_mod_message(game: &Game, mod_: &Mod, event_type: &EventType) -> (Optio
 }
 
 fn create_embed(game: &Game, mod_: &Mod, desc: &str, big_thumbnail: bool) -> EmbedBuilder {
-    let mut footer = EmbedFooterBuilder::new(mod_.submitted_by.username.to_owned());
+    let mut footer = EmbedFooterBuilder::new(mod_.submitted_by.username.clone());
     if let Some(avatar) = &mod_.submitted_by.avatar {
         footer = footer.icon_url(ImageSource::url(avatar.thumb_50x50.to_string()).unwrap());
     }
 
     let embed = EmbedBuilder::new()
-        .title(mod_.name.to_owned())
+        .title(mod_.name.clone())
         .url(mod_.profile_url.to_string())
         .description(desc)
         .author(
-            EmbedAuthorBuilder::new(game.name.to_owned())
+            EmbedAuthorBuilder::new(game.name.clone())
                 .url(game.profile_url.to_string())
                 .icon_url(ImageSource::url(game.icon.thumb_64x64.to_string()).unwrap()),
         )

@@ -122,19 +122,19 @@ pub async fn settings(
 
     let mut builder = InteractionResponseDataBuilder::new();
     if let Some(game) = game {
-        if !game
+        if game
             .api_access_options
             .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
         {
+            let mut settings = ctx.settings.lock().unwrap();
+            settings.set_game(guild_id.get(), game.id)?;
+            builder = builder.content(format!("Game is set to '{}'.", game.name));
+        } else {
             let msg = format!(
                     ":no_entry: Third party API access is disabled for '{}' but is required for the commands.",
                     game.name
                 );
             builder = builder.ephemeral(msg);
-        } else {
-            let mut settings = ctx.settings.lock().unwrap();
-            settings.set_game(guild_id.get(), game.id)?;
-            builder = builder.content(format!("Game is set to '{}'.", game.name));
         }
     } else {
         builder = builder.ephemeral("Game not found.");

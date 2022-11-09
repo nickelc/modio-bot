@@ -1,5 +1,11 @@
 #![deny(rust_2018_idioms)]
 #![allow(dead_code)]
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::wildcard_imports
+)]
 
 use dotenv::dotenv;
 use futures_util::StreamExt;

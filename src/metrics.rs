@@ -71,8 +71,8 @@ mod server {
             let metrics = metrics.clone();
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
-                    let response = match (req.method(), req.uri().path()) {
-                        (&Method::GET, "/metrics") => {
+                    let response =
+                        if let (&Method::GET, "/metrics") = (req.method(), req.uri().path()) {
                             let mut buffer = vec![];
                             let encoder = TextEncoder::new();
                             let metric_families = metrics.registry.gather();
@@ -82,13 +82,11 @@ mod server {
                                 .header(CONTENT_TYPE, encoder.format_type())
                                 .body(Body::from(buffer))
                                 .unwrap()
-                        }
-                        _ => {
+                        } else {
                             let mut not_found = Response::default();
                             *not_found.status_mut() = StatusCode::NOT_FOUND;
                             not_found
-                        }
-                    };
+                        };
                     async move { Ok::<_, Infallible>(response) }
                 }))
             }
