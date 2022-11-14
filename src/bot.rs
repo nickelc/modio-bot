@@ -9,6 +9,8 @@ use twilight_http::client::InteractionClient;
 use twilight_http::Client;
 use twilight_model::application::interaction::InteractionData;
 use twilight_model::gateway::event::Event;
+use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
+use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status};
 use twilight_model::oauth::Application;
 
 use crate::commands;
@@ -52,6 +54,19 @@ pub async fn initialize(
     let interaction = client.interaction(application.id);
     commands::register(&interaction).await?;
 
+    let presence = UpdatePresencePayload::new(
+        [MinimalActivity {
+            kind: ActivityType::Playing,
+            name: "/help".into(),
+            url: None,
+        }
+        .into()],
+        false,
+        None,
+        Status::Online,
+    )
+    .expect("required activity is provided");
+
     let (cluster, events) = Cluster::builder(config.bot.token.clone(), Intents::GUILDS)
         .event_types(
             EventTypeFlags::READY
@@ -59,6 +74,7 @@ pub async fn initialize(
                 | EventTypeFlags::GUILD_DELETE
                 | EventTypeFlags::INTERACTION_CREATE,
         )
+        .presence(presence)
         .http_client(Arc::clone(&client))
         .build()
         .await?;
