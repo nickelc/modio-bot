@@ -17,11 +17,13 @@ use crate::error::Error;
 
 mod basic;
 mod game;
+mod help;
 pub mod mods;
 mod subs;
 
 fn commands() -> Vec<Command> {
     let mut cmds = Vec::new();
+    cmds.extend(help::commands());
     cmds.extend(basic::commands());
     cmds.extend(game::commands());
     cmds.extend(mods::commands());
@@ -37,6 +39,7 @@ pub async fn register(client: &InteractionClient<'_>) -> Result<(), Error> {
 pub async fn handle_command(ctx: &Context, interaction: &Interaction, command: &CommandData) {
     let res = match command.name.as_str() {
         "about" => basic::about(ctx, interaction).await,
+        "help" => help::help(ctx, interaction, command).await,
         "settings" => basic::settings(ctx, interaction, command).await,
         "games" => game::games(ctx, interaction, command).await,
         "game" => game::game(ctx, interaction).await,
@@ -84,6 +87,16 @@ impl EphemeralMessage for String {
     fn into_ephemeral(self) -> InteractionResponseData {
         InteractionResponseDataBuilder::new()
             .ephemeral(self)
+            .build()
+    }
+}
+
+impl EphemeralMessage for EmbedBuilder {
+    fn into_ephemeral(self) -> InteractionResponseData {
+        let embed = self.build();
+        InteractionResponseDataBuilder::new()
+            .flags(MessageFlags::EPHEMERAL)
+            .embeds([embed])
             .build()
     }
 }
