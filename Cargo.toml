@@ -5,7 +5,7 @@ description = """Discord bot for https://mod.io.
 ModBot provides commands to search for mods and notifications about added & edited mods."""
 readme = "README.md"
 repository = "https://github.com/nickelc/modio-bot"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 authors = ["Constantin Nickel <constantin.nickel@gmail.com>"]
 keywords = ["modio", "discord", "bot"]
 edition = "2021"
