@@ -131,9 +131,9 @@ pub async fn settings(
             builder = builder.content(format!("Game is set to '{}'.", game.name));
         } else {
             let msg = format!(
-                    ":no_entry: Third party API access is disabled for '{}' but is required for the commands.",
-                    game.name
-                );
+                ":no_entry: Third party API access is disabled for '{}' but is required for the commands.",
+                game.name
+            );
             builder = builder.ephemeral(msg);
         }
     } else {
