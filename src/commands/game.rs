@@ -7,7 +7,7 @@ use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
 use twilight_model::application::interaction::Interaction;
-use twilight_model::channel::embed::EmbedField;
+use twilight_model::channel::message::embed::EmbedField;
 use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 use twilight_util::builder::InteractionResponseDataBuilder;

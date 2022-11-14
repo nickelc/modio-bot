@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::future::Future;
+use std::future::{Future, IntoFuture};
 use std::time::Duration;
 
 use futures_util::stream::FuturesUnordered;
@@ -11,7 +11,7 @@ use modio::mods::{EventType, Mod};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
 use tracing::{debug, error, trace};
-use twilight_model::channel::embed::Embed;
+use twilight_model::channel::message::embed::Embed;
 use twilight_model::id::Id as ChannelId;
 use twilight_util::builder::embed::{
     EmbedAuthorBuilder, EmbedBuilder, EmbedFieldBuilder, EmbedFooterBuilder, ImageSource,
@@ -45,7 +45,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         if let Some(content) = &content {
                             msg = msg.content(content).unwrap();
                         }
-                        msg.exec()
+                        msg.into_future()
                     })
                     .collect::<FuturesUnordered<_>>();
 

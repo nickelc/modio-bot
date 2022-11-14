@@ -8,14 +8,13 @@ use modio::mods::filters::Popular;
 use modio::mods::{Mod, Statistics};
 use serde::{Deserialize, Serialize};
 use twilight_model::application::command::{Command, CommandType};
-use twilight_model::application::component::button::ButtonStyle;
-use twilight_model::application::component::{ActionRow, Button, Component};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::Interaction;
-use twilight_model::channel::embed::{Embed, EmbedField};
+use twilight_model::channel::message::component::{ActionRow, Button, ButtonStyle, Component};
+use twilight_model::channel::message::embed::{Embed, EmbedField};
 use twilight_model::http::interaction::{InteractionResponse, InteractionResponseType};
 use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 use twilight_util::builder::embed::{
@@ -203,7 +202,6 @@ pub async fn list_component(
                 data: Some(builder.build()),
             },
         )
-        .exec()
         .await?;
 
     Ok(())

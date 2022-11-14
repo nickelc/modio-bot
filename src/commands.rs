@@ -32,7 +32,7 @@ fn commands() -> Vec<Command> {
 }
 
 pub async fn register(client: &InteractionClient<'_>) -> Result<(), Error> {
-    client.set_global_commands(&commands()).exec().await?;
+    client.set_global_commands(&commands()).await?;
     Ok(())
 }
 
@@ -122,7 +122,6 @@ async fn create_response(
     };
     ctx.interaction()
         .create_response(interaction.id, &interaction.token, &response)
-        .exec()
         .await?;
     Ok(())
 }
@@ -153,7 +152,6 @@ async fn create_responses_from_content(
             ctx.interaction()
                 .create_followup(&interaction.token)
                 .embeds(&[embed])?
-                .exec()
                 .await?;
         }
     }

@@ -44,12 +44,7 @@ pub async fn initialize(
     metrics: Metrics,
 ) -> Result<(Cluster, Events, Context), Error> {
     let client = Arc::new(Client::new(config.bot.token.clone()));
-    let application = client
-        .current_user_application()
-        .exec()
-        .await?
-        .model()
-        .await?;
+    let application = client.current_user_application().await?.model().await?;
 
     let interaction = client.interaction(application.id);
     commands::register(&interaction).await?;
