@@ -47,7 +47,7 @@ impl fmt::Display for Error {
         match self {
             Error::Args(e) => e.fmt(fmt),
             Error::Message(e) => e.fmt(fmt),
-            Error::Io(e) => write!(fmt, "IO error: {}", e),
+            Error::Io(e) => write!(fmt, "IO error: {e}"),
             Error::Twilight(TwilightError::ClusterStart(e)) => e.fmt(fmt),
             Error::Twilight(TwilightError::Http(e)) => e.fmt(fmt),
             Error::Twilight(TwilightError::Validation(TwilightValidation::Message(e))) => {

@@ -37,8 +37,8 @@ pub fn task(bot: u64, metrics: Metrics, token: &str) -> Result<impl Future<Outpu
 
             tokio::spawn(async move {
                 match client.update_stats(bot, stats).await {
-                    Ok(_) => info!("Update bot stats [servers={}]", servers),
-                    Err(e) => error!("Failed to update bot stats: {:?}", e),
+                    Ok(_) => info!("Update bot stats [servers={servers}]"),
+                    Err(e) => error!("Failed to update bot stats: {e:?}"),
                 }
             });
         }

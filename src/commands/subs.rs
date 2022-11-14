@@ -136,7 +136,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
             let Some(name) = games.get(&game_id) else {
                 continue;
             };
-            let _ = write!(&mut content, "{}. {}", game_id, name);
+            let _ = write!(&mut content, "{game_id}. {name}");
 
             let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
                 (true, true) | (false, false) => " (+Δ)",
@@ -242,7 +242,7 @@ async fn subscribe(
     let data = match ret {
         Ok(_) => format!("Subscribed to '{}'.", game.name).into_ephemeral(),
         Err(e) => {
-            tracing::error!("{}", e);
+            tracing::error!("{e}");
 
             "Failed to add subscription.".into_ephemeral()
         }
@@ -319,7 +319,7 @@ async fn unsubscribe(
     let data = match ret {
         Ok(_) => format!("Unsubscribed from '{}'.", game.name).into_ephemeral(),
         Err(e) => {
-            tracing::error!("{}", e);
+            tracing::error!("{e}");
 
             "Failed to remove subscription.".into_ephemeral()
         }
@@ -449,7 +449,7 @@ async fn mods_mute(
                 .mute_mod(game.id, channel_id, guild_id, mod_.id);
 
             let content = if let Err(e) = ret {
-                tracing::error!("{}", e);
+                tracing::error!("{e}");
 
                 format!("Failed to mute '{}'.", mod_.name)
             } else {
@@ -508,7 +508,7 @@ async fn mods_unmute(
             let ret = ctx.subscriptions.unmute_mod(game.id, channel_id, mod_.id);
 
             let content = if let Err(e) = ret {
-                tracing::error!("{}", e);
+                tracing::error!("{e}");
 
                 format!("Failed to unmute '{}'.", mod_.name)
             } else {
@@ -559,7 +559,7 @@ async fn users_muted(
 
             let mut muted = ContentBuilder::new(4000);
             for (i, name) in users.iter().enumerate() {
-                let _ = writeln!(&mut muted, "{}. {}", i + 1, name);
+                let _ = writeln!(&mut muted, "{}. {name}", i + 1);
             }
             muted
         }
@@ -573,7 +573,7 @@ async fn users_muted(
                 .try_fold(ContentBuilder::new(4000), |mut buf, (game, users)| {
                     let _ = writeln!(&mut buf, "**{}**", game.name);
                     for (i, name) in users.iter().enumerate() {
-                        let _ = writeln!(&mut buf, "{}. {}", i + 1, name);
+                        let _ = writeln!(&mut buf, "{}. {name}", i + 1);
                     }
                     let _ = writeln!(&mut buf);
                     async { Ok(buf) }
@@ -623,11 +623,11 @@ async fn users_mute(
                 .mute_user(game.id, channel_id, guild_id, name);
 
             let content = if let Err(e) = ret {
-                tracing::error!("{}", e);
+                tracing::error!("{e}");
 
-                format!("Failed to mute '{}'.", name)
+                format!("Failed to mute '{name}'.")
             } else {
-                format!("The user '{}' is now muted for '{}'.", name, game.name)
+                format!("The user '{name}' is now muted for '{}'.", game.name)
             };
 
             builder = builder.ephemeral(content);
@@ -675,11 +675,11 @@ async fn users_unmute(
             let ret = ctx.subscriptions.unmute_user(game.id, channel_id, name);
 
             let content = if let Err(e) = ret {
-                tracing::error!("{}", e);
+                tracing::error!("{e}");
 
-                format!("Failed to unmute '{}'.", name)
+                format!("Failed to unmute '{name}'.")
             } else {
-                format!("The user '{}' is now unmuted for '{}'.", name, game.name)
+                format!("The user '{name}' is now unmuted for '{}'.", game.name)
             };
 
             builder = builder.ephemeral(content);

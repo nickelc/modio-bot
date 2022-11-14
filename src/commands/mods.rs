@@ -86,7 +86,7 @@ pub async fn list(
                 Ok(id) => (Id::eq(id), "Mods".into()),
                 Err(_) => (
                     Fulltext::eq(search),
-                    format!("Mods matching: '{}'", search).into(),
+                    format!("Mods matching: '{search}'").into(),
                 ),
             }
         } else {
@@ -169,7 +169,7 @@ pub async fn list_component(
     let (filter, title): (Filter, Cow<'_, _>) = if let Some(search) = search {
         (
             Fulltext::eq(search),
-            format!("Mods matching: '{}'", search).into(),
+            format!("Mods matching: '{search}'").into(),
         )
     } else {
         (Filter::default(), "Mods".into())
@@ -399,7 +399,7 @@ Votes: +{}/-{}"#,
         let updated = format_timestamp(m.date_updated as i64);
         EmbedField {
             name: "Dates".to_owned(),
-            value: format!("Created: {}\nUpdated: {}", added, updated),
+            value: format!("Created: {added}\nUpdated: {updated}"),
             inline: true,
         }
     }
@@ -410,14 +410,14 @@ Votes: +{}/-{}"#,
             String::new()
         };
         if let Some(homepage) = &m.homepage_url {
-            let _ = write!(info, "[Homepage]({}), ", homepage);
+            let _ = write!(info, "[Homepage]({homepage}), ");
         }
         if let Some(f) = &m.modfile {
             if with_ddl {
                 let _ = writeln!(info, "[Download]({})", f.download.binary_url);
             }
             if let Some(version) = &f.version {
-                let _ = writeln!(info, "Version: {}", version);
+                let _ = writeln!(info, "Version: {version}");
             }
             let _ = writeln!(info, "Size: {}", bytesize::to_string(f.filesize, false));
         }

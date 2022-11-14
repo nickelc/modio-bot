@@ -96,7 +96,7 @@ mod server {
         let server = Server::bind(&config.addr).serve(service);
         async move {
             if let Err(err) = server.await {
-                tracing::warn!("Metrics server error: {}", err);
+                tracing::warn!("Metrics server error: {err}");
             }
         }
     }

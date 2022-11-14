@@ -38,7 +38,7 @@ ENV:
 #[tokio::main]
 async fn main() {
     if let Err(e) = try_main().await {
-        tracing::error!("{}", e);
+        tracing::error!("{e}");
         std::process::exit(1);
     }
 }
@@ -49,7 +49,7 @@ async fn try_main() -> CliResult {
 
     let mut args = pico_args::Arguments::from_env();
     if args.contains(["-h", "--help"]) {
-        println!("{}", HELP);
+        println!("{HELP}");
         std::process::exit(0);
     }
 
@@ -58,7 +58,7 @@ async fn try_main() -> CliResult {
         .unwrap_or_else(|| String::from("bot.toml"));
 
     let config = config::load_from_file(&path)
-        .map_err(|e| format!("Failed to load config {:?}: {}", path, e))?;
+        .map_err(|e| format!("Failed to load config {path:?}: {e}"))?;
 
     let metrics = Metrics::new()?;
     let pool = init_db(&config.bot.database_url)?;

@@ -49,7 +49,7 @@ pub async fn handle_command(ctx: &Context, interaction: &Interaction, command: &
         _ => Ok(()),
     };
     if let Err(e) = res {
-        tracing::error!("{}", e);
+        tracing::error!("{e}");
     }
 }
 
@@ -67,7 +67,7 @@ pub async fn handle_component(
         _ => Ok(()),
     };
     if let Err(e) = res {
-        tracing::error!("{}", e);
+        tracing::error!("{e}");
     }
 }
 
