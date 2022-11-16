@@ -113,7 +113,7 @@ pub async fn handle_event(event: Event, context: Context) {
                 .map(|g| g.id.get())
                 .collect::<Vec<_>>();
             let data = load_settings(&context.pool, &guilds).unwrap_or_default();
-            tracing::info!("{:?}", data);
+            tracing::info!("{data:?}");
 
             let mut settings = context.settings.lock().unwrap();
             settings.data.extend(data);

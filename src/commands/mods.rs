@@ -293,8 +293,7 @@ fn create_list_embed(mods: &[Mod], title: &str, page: usize, page_count: usize) 
         .title(title)
         .description(content)
         .footer(EmbedFooterBuilder::new(format!(
-            "Page: {}/{}",
-            page, page_count,
+            "Page: {page}/{page_count}"
         )))
         .build()
 }
