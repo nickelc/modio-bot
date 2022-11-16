@@ -74,7 +74,7 @@ pub async fn about(ctx: &Context, interaction: &Interaction) -> Result<(), Error
         .field(
             EmbedFieldBuilder::new(
                 "Website/Blog",
-                "[ModBot for Discord](https://mod.io/blog/modbot-for-discord)",
+                "[ModBot for Discord](https://blog.mod.io/modbot-for-discord-blog-52c07be0d828)",
             )
             .inline(),
         )
