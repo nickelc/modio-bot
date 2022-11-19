@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
@@ -18,11 +19,10 @@ use twilight_util::builder::command::{
     CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder, SubCommandGroupBuilder,
 };
 use twilight_util::builder::embed::EmbedBuilder;
-use twilight_util::builder::InteractionResponseDataBuilder;
 
 use super::{
-    create_response, create_responses_from_content, search_game, EphemeralMessage,
-    InteractionResponseBuilderExt,
+    create_response, defer_ephemeral, search_game, update_response_content,
+    update_response_from_content, EphemeralMessage,
 };
 use crate::bot::Context;
 use crate::db::{Events, Tags};
@@ -120,10 +120,12 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     let channel_id = interaction.channel_id.unwrap();
     let subs = ctx.subscriptions.list_for_channel(channel_id.get())?;
 
-    let mut builder = InteractionResponseDataBuilder::new();
     if subs.is_empty() {
-        builder = builder.ephemeral("No subscriptions found.");
+        let data = "No subscriptions found.".into_ephemeral();
+        create_response(ctx, interaction, data).await?;
     } else {
+        defer_ephemeral(ctx, interaction).await?;
+
         let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
         let list = ctx.modio.games().search(filter).collect().await?;
         let games = list
@@ -154,11 +156,15 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
 
         let embed = EmbedBuilder::new()
             .title("Subscriptions")
-            .description(content);
-        builder = builder.embeds([embed.build()]);
-    }
+            .description(content)
+            .build();
 
-    create_response(ctx, interaction, builder.build()).await
+        ctx.interaction()
+            .update_response(&interaction.token)
+            .embeds(Some(&[embed]))?
+            .await?;
+    }
+    Ok(())
 }
 
 async fn subscribe(
@@ -169,14 +175,17 @@ async fn subscribe(
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
+
+    defer_ephemeral(ctx, interaction).await?;
+
     for opt in opts {
         match &opt.value {
             CommandOptionValue::String(s) if opt.name == "game" => {
                 game = search_game(ctx, s).await?;
 
                 if game.is_none() {
-                    let data = "Game not found.".into_ephemeral();
-                    return create_response(ctx, interaction, data).await;
+                    let content = "Game not found.";
+                    return update_response_content(ctx, interaction, content).await;
                 }
             }
             CommandOptionValue::String(s) if opt.name == "tags" => {
@@ -203,8 +212,7 @@ async fn subscribe(
             ":no_entry: Third party API access is disabled for '{}' but is required for subscriptions.",
             game.name
         );
-        let data = content.into_ephemeral();
-        return create_response(ctx, interaction, data).await;
+        return update_response_content(ctx, interaction, &content).await;
     }
 
     let channel_id = interaction.channel_id.unwrap().get();
@@ -230,8 +238,7 @@ async fn subscribe(
         content.push_str("\nAvailable tags: ");
         push_tags(&mut content, game_tags.iter());
 
-        let data = content.into_ephemeral();
-        return create_response(ctx, interaction, data).await;
+        return update_response_content(ctx, interaction, &content).await;
     }
     sub_tags.extend(hidden);
 
@@ -239,16 +246,16 @@ async fn subscribe(
         .subscriptions
         .add(game.id, channel_id, sub_tags, guild_id, evts);
 
-    let data = match ret {
-        Ok(_) => format!("Subscribed to '{}'.", game.name).into_ephemeral(),
+    let content: Cow<'_, str> = match ret {
+        Ok(_) => format!("Subscribed to '{}'.", game.name).into(),
         Err(e) => {
             tracing::error!("{e}");
 
-            "Failed to add subscription.".into_ephemeral()
+            "Failed to add subscription.".into()
         }
     };
 
-    create_response(ctx, interaction, data).await
+    update_response_content(ctx, interaction, &content).await
 }
 
 async fn unsubscribe(
@@ -259,14 +266,17 @@ async fn unsubscribe(
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
+
+    defer_ephemeral(ctx, interaction).await?;
+
     for opt in opts {
         match &opt.value {
             CommandOptionValue::String(s) if opt.name == "game" => {
                 game = search_game(ctx, s).await?;
 
                 if game.is_none() {
-                    let data = "Game not found.".into_ephemeral();
-                    return create_response(ctx, interaction, data).await;
+                    let content = "Game not found.";
+                    return update_response_content(ctx, interaction, content).await;
                 }
             }
             CommandOptionValue::String(s) if opt.name == "tags" => {
@@ -307,8 +317,7 @@ async fn unsubscribe(
         content.push_str("\nAvailable tags: ");
         push_tags(&mut content, game_tags.iter());
 
-        let data = content.into_ephemeral();
-        return create_response(ctx, interaction, data).await;
+        return update_response_content(ctx, interaction, &content).await;
     }
     sub_tags.extend(hidden);
 
@@ -316,16 +325,16 @@ async fn unsubscribe(
         .subscriptions
         .remove(game.id, channel_id, sub_tags, evts);
 
-    let data = match ret {
-        Ok(_) => format!("Unsubscribed from '{}'.", game.name).into_ephemeral(),
+    let content: Cow<'_, str> = match ret {
+        Ok(_) => format!("Unsubscribed from '{}'.", game.name).into(),
         Err(e) => {
             tracing::error!("{e}");
 
-            "Failed to remove subscription.".into_ephemeral()
+            "Failed to remove subscription.".into()
         }
     };
 
-    create_response(ctx, interaction, data).await
+    update_response_content(ctx, interaction, &content).await
 }
 
 /// `/subs mods`
@@ -338,6 +347,9 @@ async fn mods(
         CommandOptionValue::SubCommand(opts) => Some((e.name.as_str(), opts)),
         _ => None,
     });
+
+    defer_ephemeral(ctx, interaction).await?;
+
     match subcommand {
         Some(("muted", opts)) => mods_muted(ctx, interaction, opts).await,
         Some(("mute", opts)) => mods_mute(ctx, interaction, opts).await,
@@ -357,8 +369,8 @@ async fn mods_muted(
 
     let muted = match excluded.len() {
         0 => {
-            let data = "No mod is muted.".into_ephemeral();
-            return create_response(ctx, interaction, data).await;
+            let content = "No mod is muted.";
+            return update_response_content(ctx, interaction, content).await;
         }
         1 => {
             let (game, mods) = excluded.into_iter().next().unwrap();
@@ -398,7 +410,7 @@ async fn mods_muted(
         }
     };
 
-    create_responses_from_content(ctx, interaction, "Muted Mods", &muted.content).await
+    update_response_from_content(ctx, interaction, "Muted Mods", &muted.content).await
 }
 
 /// `/subs mods mute <game> <mod>`
@@ -432,14 +444,9 @@ async fn mods_mute(
 
     let game_mod = find_game_mod(ctx.modio.clone(), game_filter, mod_filter).await?;
 
-    let mut builder = InteractionResponseDataBuilder::new();
-    match game_mod {
-        (None, _) => {
-            builder = builder.ephemeral("Game not found.");
-        }
-        (_, None) => {
-            builder = builder.ephemeral("Mod not found.");
-        }
+    let content: Cow<'_, str> = match game_mod {
+        (None, _) => "Game not found.".into(),
+        (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
             let channel_id = interaction.channel_id.unwrap().get();
             let guild_id = interaction.guild_id.map(DiscordId::get);
@@ -456,11 +463,11 @@ async fn mods_mute(
                 format!("The mod '{}' is now muted.", mod_.name)
             };
 
-            builder = builder.ephemeral(content);
+            content.into()
         }
-    }
+    };
 
-    create_response(ctx, interaction, builder.build()).await
+    update_response_content(ctx, interaction, &content).await
 }
 
 /// `/subs mods unmute <game> <mod>`
@@ -494,14 +501,9 @@ async fn mods_unmute(
 
     let game_mod = find_game_mod(ctx.modio.clone(), game_filter, mod_filter).await?;
 
-    let mut builder = InteractionResponseDataBuilder::new();
-    match game_mod {
-        (None, _) => {
-            builder = builder.ephemeral("Game not found.");
-        }
-        (_, None) => {
-            builder = builder.ephemeral("Mod not found.");
-        }
+    let content: Cow<'_, str> = match game_mod {
+        (None, _) => "Game not found.".into(),
+        (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
             let channel_id = interaction.channel_id.unwrap().get();
 
@@ -515,11 +517,11 @@ async fn mods_unmute(
                 format!("The mod '{}' is now unmuted.", mod_.name)
             };
 
-            builder = builder.ephemeral(content);
+            content.into()
         }
-    }
+    };
 
-    create_response(ctx, interaction, builder.build()).await
+    update_response_content(ctx, interaction, &content).await
 }
 
 /// `/subs users`
@@ -532,6 +534,9 @@ async fn users(
         CommandOptionValue::SubCommand(opts) => Some((e.name.as_str(), opts)),
         _ => None,
     });
+
+    defer_ephemeral(ctx, interaction).await?;
+
     match subcommand {
         Some(("muted", opts)) => users_muted(ctx, interaction, opts).await,
         Some(("mute", opts)) => users_mute(ctx, interaction, opts).await,
@@ -551,8 +556,8 @@ async fn users_muted(
 
     let muted = match excluded.len() {
         0 => {
-            let data = "No user is muted.".into_ephemeral();
-            return create_response(ctx, interaction, data).await;
+            let content = "No user is muted.";
+            return update_response_content(ctx, interaction, content).await;
         }
         1 => {
             let (_, users) = excluded.into_iter().next().unwrap();
@@ -582,7 +587,7 @@ async fn users_muted(
         }
     };
 
-    create_responses_from_content(ctx, interaction, "Muted Users", &muted.content).await
+    update_response_from_content(ctx, interaction, "Muted Users", &muted.content).await
 }
 
 /// `/subs users mute <game> <username>`
@@ -612,8 +617,7 @@ async fn users_mute(
     let name = name.expect("required option");
 
     let game = ctx.modio.games().search(game_filter).first().await?;
-    let mut builder = InteractionResponseDataBuilder::new();
-    match game {
+    let content: Cow<'_, str> = match game {
         Some(game) => {
             let guild_id = interaction.guild_id.map(DiscordId::get);
             let channel_id = interaction.channel_id.unwrap().get();
@@ -630,14 +634,12 @@ async fn users_mute(
                 format!("The user '{name}' is now muted for '{}'.", game.name)
             };
 
-            builder = builder.ephemeral(content);
+            content.into()
         }
-        None => {
-            builder = builder.ephemeral("Game not found.");
-        }
-    }
+        None => "Game not found.".into(),
+    };
 
-    create_response(ctx, interaction, builder.build()).await
+    update_response_content(ctx, interaction, &content).await
 }
 
 /// `/subs users unmute <game> <username>`
@@ -667,8 +669,7 @@ async fn users_unmute(
     let name = name.expect("required option");
 
     let game = ctx.modio.games().search(game_filter).first().await?;
-    let mut builder = InteractionResponseDataBuilder::new();
-    match game {
+    let content: Cow<'_, str> = match game {
         Some(game) => {
             let channel_id = interaction.channel_id.unwrap().get();
 
@@ -682,14 +683,12 @@ async fn users_unmute(
                 format!("The user '{name}' is now unmuted for '{}'.", game.name)
             };
 
-            builder = builder.ephemeral(content);
+            content.into()
         }
-        None => {
-            builder = builder.ephemeral("Game not found.");
-        }
-    }
+        None => "Game not found.".into(),
+    };
 
-    create_response(ctx, interaction, builder.build()).await
+    update_response_content(ctx, interaction, &content).await
 }
 
 async fn find_game_mod(

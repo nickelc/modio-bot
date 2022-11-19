@@ -126,7 +126,65 @@ async fn create_response(
     Ok(())
 }
 
-async fn create_responses_from_content(
+async fn defer_ephemeral(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
+    ctx.interaction()
+        .create_response(
+            interaction.id,
+            &interaction.token,
+            &InteractionResponse {
+                kind: InteractionResponseType::DeferredChannelMessageWithSource,
+                data: Some(
+                    InteractionResponseDataBuilder::new()
+                        .flags(MessageFlags::EPHEMERAL)
+                        .build(),
+                ),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+async fn defer_response(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
+    ctx.interaction()
+        .create_response(
+            interaction.id,
+            &interaction.token,
+            &InteractionResponse {
+                kind: InteractionResponseType::DeferredChannelMessageWithSource,
+                data: None,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+async fn defer_component_response(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
+    ctx.interaction()
+        .create_response(
+            interaction.id,
+            &interaction.token,
+            &InteractionResponse {
+                kind: InteractionResponseType::DeferredUpdateMessage,
+                data: None,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+async fn update_response_content(
+    ctx: &Context,
+    interaction: &Interaction,
+    content: &str,
+) -> Result<(), Error> {
+    ctx.interaction()
+        .update_response(&interaction.token)
+        .content(Some(content))?
+        .await?;
+    Ok(())
+}
+
+async fn update_response_from_content(
     ctx: &Context,
     interaction: &Interaction,
     title: &str,
@@ -139,9 +197,10 @@ async fn create_responses_from_content(
             .description(content)
             .build();
 
-        let data = InteractionResponseDataBuilder::new().embeds([embed]);
-
-        create_response(ctx, interaction, data.build()).await?;
+        ctx.interaction()
+            .update_response(&interaction.token)
+            .embeds(Some(&[embed]))?
+            .await?;
 
         for content in contents {
             let embed = EmbedBuilder::new()

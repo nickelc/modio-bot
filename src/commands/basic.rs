@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use modio::filter::prelude::*;
 use modio::games::ApiAccessOptions;
 use twilight_model::application::command::{Command, CommandType};
@@ -12,7 +14,7 @@ use twilight_util::builder::embed::{
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-use super::{create_response, InteractionResponseBuilderExt};
+use super::{create_response, defer_ephemeral, update_response_content};
 use crate::bot::Context;
 use crate::error::Error;
 
@@ -117,30 +119,29 @@ pub async fn settings(
         _ => unreachable!(),
     };
 
+    defer_ephemeral(ctx, interaction).await?;
+
     let game = ctx.modio.games().search(filter).first().await?;
     let guild_id = interaction.guild_id.expect("guild only command");
 
-    let mut builder = InteractionResponseDataBuilder::new();
-    if let Some(game) = game {
+    let content: Cow<'_, str> = if let Some(game) = game {
         if game
             .api_access_options
             .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
         {
             let mut settings = ctx.settings.lock().unwrap();
             settings.set_game(guild_id.get(), game.id)?;
-            builder = builder.content(format!("Game is set to '{}'.", game.name));
+            format!("Game is set to '{}'.", game.name).into()
         } else {
             let msg = format!(
                 ":no_entry: Third party API access is disabled for '{}' but is required for the commands.",
                 game.name
             );
-            builder = builder.ephemeral(msg);
+            msg.into()
         }
     } else {
-        builder = builder.ephemeral("Game not found.");
-    }
+        "Game not found.".into()
+    };
 
-    create_response(ctx, interaction, builder.build()).await?;
-
-    Ok(())
+    update_response_content(ctx, interaction, &content).await
 }

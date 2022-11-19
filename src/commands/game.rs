@@ -10,9 +10,8 @@ use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::embed::EmbedField;
 use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
-use twilight_util::builder::InteractionResponseDataBuilder;
 
-use super::{create_response, create_responses_from_content, InteractionResponseBuilderExt};
+use super::{create_response, defer_response, update_response_from_content, EphemeralMessage};
 use crate::bot::Context;
 use crate::error::Error;
 use crate::util::ContentBuilder;
@@ -48,6 +47,8 @@ pub async fn games(
         _ => Filter::default(),
     };
 
+    defer_response(ctx, interaction).await?;
+
     let games = ctx
         .modio
         .games()
@@ -60,7 +61,7 @@ pub async fn games(
         })
         .await?;
 
-    create_responses_from_content(ctx, interaction, "Games", &games.content).await
+    update_response_from_content(ctx, interaction, "Games", &games.content).await
 }
 
 pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
@@ -69,8 +70,9 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
         interaction.guild_id.and_then(|id| settings.game(id.get()))
     };
 
-    let mut builder = InteractionResponseDataBuilder::new();
     if let Some(id) = game_id {
+        defer_response(ctx, interaction).await?;
+
         let stats = ctx.modio.game(id).statistics();
         let (game, stats) = future::try_join(ctx.modio.game(id).get(), stats).await?;
 
@@ -101,12 +103,15 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
             })
             .build();
 
-        builder = builder.embeds([embed]);
+        ctx.interaction()
+            .update_response(&interaction.token)
+            .embeds(Some(&[embed]))?
+            .await?;
     } else {
-        builder = builder.ephemeral("Default game is not set.");
-    }
+        let data = "Default game is not set.".into_ephemeral();
 
-    create_response(ctx, interaction, builder.build()).await?;
+        create_response(ctx, interaction, data).await?;
+    }
 
     Ok(())
 }
