@@ -64,10 +64,10 @@ async fn try_main() -> CliResult {
     let pool = init_db(&config.bot.database_url)?;
     let modio = init_modio(&config)?;
 
-    tokio::spawn(metrics::serve(&config.metrics, metrics.clone()));
+    let (cluster, mut events, context) =
+        bot::initialize(&config, modio, pool, metrics.clone()).await?;
 
-    let (cluster, mut events, context) = bot::initialize(&config, modio, pool, metrics).await?;
-
+    tokio::spawn(metrics::serve(&config.metrics, metrics));
     tokio::spawn(tasks::events::task(context.clone()));
 
     if let Some(token) = config.bot.dbl_token {
