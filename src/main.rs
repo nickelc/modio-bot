@@ -67,6 +67,18 @@ async fn try_main() -> CliResult {
     let (cluster, mut events, context) =
         bot::initialize(&config, modio, pool, metrics.clone()).await?;
 
+    if let Some(cmd) = args.subcommand()? {
+        match cmd {
+            cmd if cmd == "check" => {
+                check_subscriptions(&context).await?;
+            }
+            cmd => {
+                eprintln!("unknown subcommand: {cmd:?}");
+            }
+        }
+        std::process::exit(0);
+    }
+
     tokio::spawn(metrics::serve(&config.metrics, metrics));
     tokio::spawn(tasks::events::task(context.clone()));
 

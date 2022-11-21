@@ -1,11 +1,17 @@
+use std::collections::HashSet;
 use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use futures_util::stream::FuturesUnordered;
 use modio::{Credentials, Modio};
+use tokio_stream::StreamExt;
 use twilight_http::api_error::ApiError;
 use twilight_http::error::ErrorType;
+use twilight_model::id::Id;
 
+use crate::bot::Context;
 use crate::config::Config;
+use crate::db::ChannelId;
 use crate::error::Error;
 
 pub type CliResult = std::result::Result<(), Error>;
@@ -32,6 +38,48 @@ pub fn is_unknown_channel_error(err: &ErrorType) -> bool {
             ..
         } if status.get() == 404 && e.code == 10003
     )
+}
+
+async fn get_unknown_channels(ctx: &Context) -> Result<Vec<ChannelId>> {
+    let channels = ctx
+        .subscriptions
+        .load()?
+        .into_values()
+        .flatten()
+        .map(|s| s.0)
+        .collect::<HashSet<_>>();
+
+    let stream = channels
+        .into_iter()
+        .map(|id| async move { (id, ctx.client.channel(Id::new(id)).await) })
+        .collect::<FuturesUnordered<_>>()
+        .throttle(Duration::from_millis(40));
+
+    tokio::pin!(stream);
+
+    let mut unknown_channels = Vec::new();
+
+    while let Some((channel, ret)) = stream.next().await {
+        if let Err(e) = ret {
+            if is_unknown_channel_error(e.kind()) {
+                unknown_channels.push(channel);
+            } else {
+                tracing::error!("unexpected error for channel {channel}: {e}");
+            }
+        }
+    }
+
+    Ok(unknown_channels)
+}
+
+pub async fn check_subscriptions(ctx: &Context) -> Result<()> {
+    let unknown_channels = get_unknown_channels(ctx).await?;
+
+    tracing::info!("Found {} unknown channels", unknown_channels.len());
+
+    ctx.subscriptions
+        .cleanup_unknown_channels(&unknown_channels)?;
+    Ok(())
 }
 
 #[derive(Debug)]

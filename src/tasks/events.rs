@@ -71,7 +71,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         if util::is_unknown_channel_error(e.kind()) {
                             unknown_channels.insert(channel_id);
 
-                            if let Err(e) = subscriptions.cleanup_unknown_channel(channel_id) {
+                            if let Err(e) = subscriptions.cleanup_unknown_channels(&[channel_id]) {
                                 error!("{e}");
                             }
                         } else {
