@@ -83,25 +83,37 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 HashMap::default()
             });
 
-            for (game, channels) in subs {
+            for (game_id, channels) in subs {
                 if channels.is_empty() {
                     continue;
                 }
-                debug!("polling events at {tstamp} for game={game} channels: {channels:?}");
                 let sender = sender.clone();
                 let filter = filter.clone();
-                let game = ctx.modio.game(game);
-                let mods = game.mods();
+                let game = ctx.modio.game(game_id);
+                let mods = ctx.modio.game(game_id).mods();
+                let events = ctx.modio.game(game_id).mods().events(filter);
 
                 let task = async move {
                     type Events = BTreeMap<u32, Vec<(u32, EventType)>>;
+
+                    debug!("polling events at {tstamp} for game={game_id} channels: {channels:?}");
+
+                    let game = match game.get().await {
+                        Ok(game) => game,
+                        Err(e) => {
+                            tracing::warn!(
+                                "skipping polling: can't retrieve game (id={game_id}): {e}"
+                            );
+
+                            return Ok(());
+                        }
+                    };
 
                     // - Group the events by mod
                     // - Filter `MODFILE_CHANGED` events for new mods
                     // - Ungroup the events ordered by event id
 
-                    let mut events = mods
-                        .events(filter)
+                    let mut events = events
                         .iter()
                         .await?
                         .try_fold(Events::new(), |mut events, e| async move {
@@ -130,8 +142,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
                     // Load the mods for the events
                     let filter = Id::_in(events.keys().collect::<Vec<_>>());
-                    let events = game
-                        .mods()
+                    let events = mods
                         .search(filter)
                         .iter()
                         .await?
@@ -147,8 +158,6 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             updates.insert(event_id, (m, event_type));
                         }
                     }
-
-                    let game = game.get().await?;
 
                     for (_, (m, evt)) in updates {
                         let mut effected_channels = BTreeSet::new();
