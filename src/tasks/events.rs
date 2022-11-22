@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 
+use dashmap::DashSet;
 use futures_util::stream::FuturesUnordered;
 use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
@@ -30,16 +32,24 @@ const THROTTLE: Duration = Duration::from_millis(30);
 pub fn task(ctx: Context) -> impl Future<Output = ()> {
     let (sender, mut receiver) = mpsc::channel::<(BTreeSet<u64>, Option<String>, Embed)>(100);
 
+    let unknown_channels = Arc::new(DashSet::new());
+    let unknown_channels2 = unknown_channels.clone();
     let subscriptions = ctx.subscriptions.clone();
 
     tokio::spawn(async move {
         loop {
             if let Some((channels, content, embed)) = receiver.recv().await {
-                ctx.metrics.notifications.inc_by(channels.len() as u64);
-
                 let embeds = [embed];
                 let messages = channels
                     .into_iter()
+                    .filter(|id| {
+                        if unknown_channels.contains(id) {
+                            tracing::debug!("channel #{id} ignored: unknown channel");
+                            false
+                        } else {
+                            true
+                        }
+                    })
                     .map(|id| {
                         let mut msg = ctx
                             .client
@@ -59,12 +69,16 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 while let Some((channel_id, ret)) = messages.next().await {
                     if let Err(e) = ret {
                         if util::is_unknown_channel_error(e.kind()) {
+                            unknown_channels.insert(channel_id);
+
                             if let Err(e) = subscriptions.cleanup_unknown_channel(channel_id) {
                                 error!("{e}");
                             }
                         } else {
                             error!("{e}");
                         }
+                    } else {
+                        ctx.metrics.notifications.inc();
                     }
                 }
             }
@@ -81,6 +95,9 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
         loop {
             let tstamp = tstamp.take().unwrap_or_else(util::current_timestamp);
             interval.tick().await;
+
+            // Clear the unknown channels from the previous workload.
+            unknown_channels2.clear();
 
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
@@ -101,6 +118,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     continue;
                 }
                 let sender = sender.clone();
+                let unknown_channels = unknown_channels2.clone();
                 let filter = filter.clone();
                 let game = ctx.modio.game(game_id);
                 let mods = ctx.modio.game(game_id).mods();
@@ -176,6 +194,10 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         let mut effected_channels = BTreeSet::new();
 
                         for (channel, tags, _, evts, excluded_mods, excluded_users) in &channels {
+                            if unknown_channels.contains(channel) {
+                                debug!("event ignored #{channel}: unknown channel");
+                                continue;
+                            }
                             if *evt == EventType::ModAvailable
                                 && !evts.contains(crate::db::Events::NEW)
                                 || *evt == EventType::ModfileChanged
