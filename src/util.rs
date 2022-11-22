@@ -2,6 +2,8 @@ use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use modio::{Credentials, Modio};
+use twilight_http::api_error::ApiError;
+use twilight_http::error::ErrorType;
 
 use crate::config::Config;
 use crate::error::Error;
@@ -20,6 +22,16 @@ pub fn init_modio(config: &Config) -> Result<Modio> {
         .user_agent("modbot")
         .build()?;
     Ok(modio)
+}
+
+pub fn is_unknown_channel_error(err: &ErrorType) -> bool {
+    matches!(err,
+        ErrorType::Response {
+            error: ApiError::General(e),
+            status,
+            ..
+        } if status.get() == 404 && e.code == 10003
+    )
 }
 
 #[derive(Debug)]

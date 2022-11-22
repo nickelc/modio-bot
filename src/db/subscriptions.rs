@@ -65,6 +65,35 @@ impl Subscriptions {
         })
     }
 
+    pub fn cleanup_unknown_channel(&self, channel_id: ChannelId) -> Result<()> {
+        use schema::subscriptions::dsl::*;
+
+        block_in_place(|| {
+            let conn = &mut self.pool.get()?;
+            let filter = subscriptions.filter(channel.eq(channel_id as i64));
+            let num = diesel::delete(filter).execute(conn)?;
+            tracing::info!("Deleted {num} subscription(s).");
+
+            {
+                use schema::subscriptions_exclude_mods::dsl::*;
+                let filter = subscriptions_exclude_mods.filter(channel.eq(channel_id as i64));
+                let num = diesel::delete(filter).execute(conn)?;
+                if num > 0 {
+                    tracing::info!("Deleted {num} excluded mod entries.");
+                }
+            }
+            {
+                use schema::subscriptions_exclude_users::dsl::*;
+                let filter = subscriptions_exclude_users.filter(channel.eq(channel_id as i64));
+                let num = diesel::delete(filter).execute(conn)?;
+                if num > 0 {
+                    tracing::info!("Deleted {num} excluded user entries.");
+                }
+            }
+            Ok(())
+        })
+    }
+
     pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
         use super::Error;
         use schema::subscriptions::dsl::*;

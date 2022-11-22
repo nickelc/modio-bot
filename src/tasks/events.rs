@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::future::{Future, IntoFuture};
+use std::future::Future;
 use std::time::Duration;
 
 use futures_util::stream::FuturesUnordered;
@@ -30,6 +30,8 @@ const THROTTLE: Duration = Duration::from_millis(30);
 pub fn task(ctx: Context) -> impl Future<Output = ()> {
     let (sender, mut receiver) = mpsc::channel::<(BTreeSet<u64>, Option<String>, Embed)>(100);
 
+    let subscriptions = ctx.subscriptions.clone();
+
     tokio::spawn(async move {
         loop {
             if let Some((channels, content, embed)) = receiver.recv().await {
@@ -47,16 +49,22 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         if let Some(content) = &content {
                             msg = msg.content(content).unwrap();
                         }
-                        msg.into_future()
+                        async move { (id, msg.await) }
                     })
                     .collect::<FuturesUnordered<_>>();
 
                 let messages = messages.throttle(THROTTLE);
                 tokio::pin!(messages);
 
-                while let Some(ret) = messages.next().await {
+                while let Some((channel_id, ret)) = messages.next().await {
                     if let Err(e) = ret {
-                        error!("{e}");
+                        if util::is_unknown_channel_error(e.kind()) {
+                            if let Err(e) = subscriptions.cleanup_unknown_channel(channel_id) {
+                                error!("{e}");
+                            }
+                        } else {
+                            error!("{e}");
+                        }
                     }
                 }
             }
