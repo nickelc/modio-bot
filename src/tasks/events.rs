@@ -3,13 +3,14 @@ use std::future::{Future, IntoFuture};
 use std::time::Duration;
 
 use futures_util::stream::FuturesUnordered;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{EventType, Mod};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
+use tokio_stream::StreamExt;
 use tracing::{debug, error, trace};
 use twilight_model::channel::message::embed::Embed;
 use twilight_model::id::Id as ChannelId;
@@ -23,6 +24,7 @@ use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
+const THROTTLE: Duration = Duration::from_millis(30);
 
 #[allow(clippy::too_many_lines)]
 pub fn task(ctx: Context) -> impl Future<Output = ()> {
@@ -34,7 +36,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 ctx.metrics.notifications.inc_by(channels.len() as u64);
 
                 let embeds = [embed];
-                let mut cc = channels
+                let messages = channels
                     .into_iter()
                     .map(|id| {
                         let mut msg = ctx
@@ -49,7 +51,10 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     })
                     .collect::<FuturesUnordered<_>>();
 
-                while let Some(ret) = cc.next().await {
+                let messages = messages.throttle(THROTTLE);
+                tokio::pin!(messages);
+
+                while let Some(ret) = messages.next().await {
                     if let Err(e) = ret {
                         error!("{e}");
                     }
