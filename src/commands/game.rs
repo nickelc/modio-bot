@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use futures_util::{future, TryStreamExt};
+use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -78,10 +78,9 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 
     defer_response(ctx, interaction).await?;
 
-    let stats = ctx.modio.game(game_id).statistics();
-    let (game, stats) = future::try_join(ctx.modio.game(game_id).get(), stats).await?;
+    let game = ctx.modio.game(game_id).get().await?;
 
-    let embed = EmbedBuilder::new()
+    let mut embed = EmbedBuilder::new()
         .title(game.name)
         .url(game.profile_url.to_string())
         .description(game.summary)
@@ -95,8 +94,10 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
                 game.id, game.name_id, game.profile_url,
             ),
             inline: true,
-        })
-        .field(EmbedField {
+        });
+
+    if let Some(stats) = game.stats {
+        embed = embed.field(EmbedField {
             name: "Stats".into(),
             value: format!(
                 r#"**Mods:** {}
@@ -105,12 +106,12 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
                 stats.mods_total, stats.subscribers_total, stats.downloads.total,
             ),
             inline: true,
-        })
-        .build();
+        });
+    }
 
     ctx.interaction()
         .update_response(&interaction.token)
-        .embeds(Some(&[embed]))?
+        .embeds(Some(&[embed.build()]))?
         .await?;
 
     Ok(())
