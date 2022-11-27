@@ -2,9 +2,8 @@ use std::collections::HashSet;
 use std::fmt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use futures_util::stream::FuturesUnordered;
 use modio::{Credentials, Modio};
-use tokio_stream::StreamExt;
+use tokio_stream::{self as stream, StreamExt};
 use twilight_http::api_error::ApiError;
 use twilight_http::error::ErrorType;
 use twilight_model::id::Id;
@@ -49,18 +48,18 @@ async fn get_unknown_channels(ctx: &Context) -> Result<Vec<ChannelId>> {
         .map(|s| s.0)
         .collect::<HashSet<_>>();
 
-    let stream = channels
+    let requests = channels
         .into_iter()
-        .map(|id| async move { (id, ctx.client.channel(Id::new(id)).await) })
-        .collect::<FuturesUnordered<_>>()
-        .throttle(Duration::from_millis(40));
+        .map(|id| async move { (id, ctx.client.channel(Id::new(id)).await) });
+
+    let stream = stream::iter(requests).throttle(Duration::from_millis(40));
 
     tokio::pin!(stream);
 
     let mut unknown_channels = Vec::new();
 
-    while let Some((channel, ret)) = stream.next().await {
-        if let Err(e) = ret {
+    while let Some(fut) = stream.next().await {
+        if let (channel, Err(e)) = fut.await {
             if is_unknown_channel_error(e.kind()) {
                 unknown_channels.push(channel);
             } else {

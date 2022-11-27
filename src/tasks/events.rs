@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashSet;
-use futures_util::stream::FuturesUnordered;
 use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
 use modio::games::{ApiAccessOptions, Game};
@@ -12,7 +11,7 @@ use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::mods::{EventType, Mod};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
-use tokio_stream::StreamExt;
+use tokio_stream::{self as stream, StreamExt};
 use tracing::{debug, error, trace};
 use twilight_model::channel::message::embed::Embed;
 use twilight_model::id::Id as ChannelId;
@@ -40,7 +39,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
         loop {
             if let Some((channels, content, embed)) = receiver.recv().await {
                 let embeds = [embed];
-                let messages = channels
+                let requests = channels
                     .into_iter()
                     .filter(|id| {
                         if unknown_channels.contains(id) {
@@ -60,14 +59,13 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             msg = msg.content(content).unwrap();
                         }
                         async move { (id, msg.await) }
-                    })
-                    .collect::<FuturesUnordered<_>>();
+                    });
+                let messages = stream::iter(requests).throttle(THROTTLE);
 
-                let messages = messages.throttle(THROTTLE);
                 tokio::pin!(messages);
 
-                while let Some((channel_id, ret)) = messages.next().await {
-                    if let Err(e) = ret {
+                while let Some(fut) = messages.next().await {
+                    if let (channel_id, Err(e)) = fut.await {
                         if util::is_unknown_channel_error(e.kind()) {
                             unknown_channels.insert(channel_id);
 
