@@ -82,66 +82,66 @@ pub async fn list(
         interaction.guild_id.and_then(|id| settings.game(id.get()))
     });
 
-    if let Some(id) = game_id {
-        let (filter, title): (Filter, Cow<'_, _>) = if let Some(search) = search {
-            match search.parse::<u32>() {
-                Ok(id) => (Id::eq(id), "Mods".into()),
-                Err(_) => (
-                    Fulltext::eq(search),
-                    format!("Mods matching: '{search}'").into(),
-                ),
-            }
-        } else {
-            (Filter::default(), "Mods".into())
-        };
-        let game = ctx.modio.game(id);
-        let mods = game.mods();
+    let Some(game_id) = game_id else {
+        let content = "Default game is not set.";
+        return update_response_content(ctx, interaction, content).await;
+    };
 
-        let first_page = mods
-            .search(filter.limit(20))
-            .paged()
-            .await?
-            .try_next()
-            .await?;
-
-        if let Some(page) = first_page {
-            let (embeds, components) = match page.as_slice() {
-                [mod_] => {
-                    let game = game.get().await?;
-                    let embed = create_mod_embed(&game, mod_).build();
-                    (Some(vec![embed]), None)
-                }
-                list => {
-                    let embed = create_list_embed(list, &title, page.current(), page.page_count());
-
-                    let components = if page.total() > page.len() {
-                        Some(vec![create_browse_buttons(
-                            id,
-                            search.map(String::as_str),
-                            0,
-                            20,
-                            page.current(),
-                            page.page_count(),
-                        )])
-                    } else {
-                        None
-                    };
-                    (Some(vec![embed]), components)
-                }
-            };
-            ctx.interaction()
-                .update_response(&interaction.token)
-                .embeds(embeds.as_deref())?
-                .components(components.as_deref())?
-                .await?;
-        } else {
-            let content = "No mods found.";
-            update_response_content(ctx, interaction, content).await?;
+    let (filter, title): (Filter, Cow<'_, _>) = if let Some(search) = search {
+        match search.parse::<u32>() {
+            Ok(id) => (Id::eq(id), "Mods".into()),
+            Err(_) => (
+                Fulltext::eq(search),
+                format!("Mods matching: '{search}'").into(),
+            ),
         }
     } else {
-        let content = "Default game is not set.";
-        update_response_content(ctx, interaction, content).await?;
-    }
+        (Filter::default(), "Mods".into())
+    };
+    let game = ctx.modio.game(game_id);
+    let mods = game.mods();
+
+    let first_page = mods
+        .search(filter.limit(20))
+        .paged()
+        .await?
+        .try_next()
+        .await?;
+
+    let Some(page) = first_page else {
+        let content = "No mods found.";
+        return update_response_content(ctx, interaction, content).await;
+    };
+
+    let (embeds, components) = match page.as_slice() {
+        [mod_] => {
+            let game = game.get().await?;
+            let embed = create_mod_embed(&game, mod_).build();
+            (Some(vec![embed]), None)
+        }
+        list => {
+            let embed = create_list_embed(list, &title, page.current(), page.page_count());
+
+            let components = if page.total() > page.len() {
+                Some(vec![create_browse_buttons(
+                    game_id,
+                    search.map(String::as_str),
+                    0,
+                    20,
+                    page.current(),
+                    page.page_count(),
+                )])
+            } else {
+                None
+            };
+            (Some(vec![embed]), components)
+        }
+    };
+    ctx.interaction()
+        .update_response(&interaction.token)
+        .embeds(embeds.as_deref())?
+        .components(components.as_deref())?
+        .await?;
 
     Ok(())
 }
@@ -238,49 +238,50 @@ pub async fn popular(
         interaction.guild_id.and_then(|id| settings.game(id.get()))
     });
 
-    if let Some(id) = game_id {
-        let filter = with_limit(10).order_by(Popular::desc());
-        let game = ctx.modio.game(id);
-        let mods = game.mods().search(filter).first_page().await?;
-        let game = game.get().await?;
-
-        if mods.is_empty() {
-            let content = "No mods founds.";
-            update_response_content(ctx, interaction, content).await?;
-        } else {
-            let mut content = String::new();
-            for mod_ in mods {
-                let _ = writeln!(
-                    content,
-                    "{:02}. [{}]({}) ({}) +{}/-{}",
-                    mod_.stats.popularity.rank_position,
-                    mod_.name,
-                    mod_.profile_url,
-                    mod_.id,
-                    mod_.stats.ratings.positive,
-                    mod_.stats.ratings.negative,
-                );
-            }
-
-            let embed = EmbedBuilder::new()
-                .title("Popular Mods")
-                .description(content)
-                .author(
-                    EmbedAuthorBuilder::new(game.name)
-                        .url(game.profile_url)
-                        .icon_url(ImageSource::url(game.icon.thumb_64x64.to_string()).unwrap()),
-                )
-                .build();
-
-            ctx.interaction()
-                .update_response(&interaction.token)
-                .embeds(Some(&[embed]))?
-                .await?;
-        }
-    } else {
+    let Some(game_id) = game_id else {
         let content = "Default game is not set.";
-        update_response_content(ctx, interaction, content).await?;
+        return update_response_content(ctx, interaction, content).await;
+    };
+
+    let filter = with_limit(10).order_by(Popular::desc());
+    let game = ctx.modio.game(game_id);
+    let mods = game.mods().search(filter).first_page().await?;
+    let game = game.get().await?;
+
+    if mods.is_empty() {
+        let content = "No mods founds.";
+        return update_response_content(ctx, interaction, content).await;
     }
+
+    let mut content = String::new();
+    for mod_ in mods {
+        let _ = writeln!(
+            content,
+            "{:02}. [{}]({}) ({}) +{}/-{}",
+            mod_.stats.popularity.rank_position,
+            mod_.name,
+            mod_.profile_url,
+            mod_.id,
+            mod_.stats.ratings.positive,
+            mod_.stats.ratings.negative,
+        );
+    }
+
+    let embed = EmbedBuilder::new()
+        .title("Popular Mods")
+        .description(content)
+        .author(
+            EmbedAuthorBuilder::new(game.name)
+                .url(game.profile_url)
+                .icon_url(ImageSource::url(game.icon.thumb_64x64.to_string()).unwrap()),
+        )
+        .build();
+
+    ctx.interaction()
+        .update_response(&interaction.token)
+        .embeds(Some(&[embed]))?
+        .await?;
+
     Ok(())
 }
 

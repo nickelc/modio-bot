@@ -122,48 +122,49 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
 
     if subs.is_empty() {
         let data = "No subscriptions found.".into_ephemeral();
-        create_response(ctx, interaction, data).await?;
-    } else {
-        defer_ephemeral(ctx, interaction).await?;
-
-        let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
-        let list = ctx.modio.games().search(filter).collect().await?;
-        let games = list
-            .into_iter()
-            .map(|g| (g.id, g.name))
-            .collect::<HashMap<_, _>>();
-
-        let mut content = String::new();
-        for (game_id, tags, evts) in subs {
-            let Some(name) = games.get(&game_id) else {
-                continue;
-            };
-            let _ = write!(&mut content, "{game_id}. {name}");
-
-            let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
-                (true, true) | (false, false) => " (+Δ)",
-                (true, false) => " (+)",
-                (false, true) => " (Δ)",
-            };
-            content.push_str(suffix);
-
-            if !tags.is_empty() {
-                content.push_str(" | Tags: ");
-                push_tags(&mut content, tags.iter());
-            }
-            content.push('\n');
-        }
-
-        let embed = EmbedBuilder::new()
-            .title("Subscriptions")
-            .description(content)
-            .build();
-
-        ctx.interaction()
-            .update_response(&interaction.token)
-            .embeds(Some(&[embed]))?
-            .await?;
+        return create_response(ctx, interaction, data).await;
     }
+
+    defer_ephemeral(ctx, interaction).await?;
+
+    let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
+    let list = ctx.modio.games().search(filter).collect().await?;
+    let games = list
+        .into_iter()
+        .map(|g| (g.id, g.name))
+        .collect::<HashMap<_, _>>();
+
+    let mut content = String::new();
+    for (game_id, tags, evts) in subs {
+        let Some(name) = games.get(&game_id) else {
+            continue;
+        };
+        let _ = write!(&mut content, "{game_id}. {name}");
+
+        let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
+            (true, true) | (false, false) => " (+Δ)",
+            (true, false) => " (+)",
+            (false, true) => " (Δ)",
+        };
+        content.push_str(suffix);
+
+        if !tags.is_empty() {
+            content.push_str(" | Tags: ");
+            push_tags(&mut content, tags.iter());
+        }
+        content.push('\n');
+    }
+
+    let embed = EmbedBuilder::new()
+        .title("Subscriptions")
+        .description(content)
+        .build();
+
+    ctx.interaction()
+        .update_response(&interaction.token)
+        .embeds(Some(&[embed]))?
+        .await?;
+
     Ok(())
 }
 

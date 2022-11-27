@@ -70,48 +70,48 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
         interaction.guild_id.and_then(|id| settings.game(id.get()))
     };
 
-    if let Some(id) = game_id {
-        defer_response(ctx, interaction).await?;
-
-        let stats = ctx.modio.game(id).statistics();
-        let (game, stats) = future::try_join(ctx.modio.game(id).get(), stats).await?;
-
-        let embed = EmbedBuilder::new()
-            .title(game.name)
-            .url(game.profile_url.to_string())
-            .description(game.summary)
-            .image(ImageSource::url(game.logo.thumb_640x360).unwrap())
-            .field(EmbedField {
-                name: "Info".into(),
-                value: format!(
-                    r#"**Id:** {}
-**Name-Id:** {}
-**Profile:** {}"#,
-                    game.id, game.name_id, game.profile_url,
-                ),
-                inline: true,
-            })
-            .field(EmbedField {
-                name: "Stats".into(),
-                value: format!(
-                    r#"**Mods:** {}
-**Subscribers:** {}
-**Downloads:** {}"#,
-                    stats.mods_total, stats.subscribers_total, stats.downloads.total,
-                ),
-                inline: true,
-            })
-            .build();
-
-        ctx.interaction()
-            .update_response(&interaction.token)
-            .embeds(Some(&[embed]))?
-            .await?;
-    } else {
+    let Some(game_id) = game_id else {
         let data = "Default game is not set.".into_ephemeral();
 
-        create_response(ctx, interaction, data).await?;
-    }
+        return create_response(ctx, interaction, data).await;
+    };
+
+    defer_response(ctx, interaction).await?;
+
+    let stats = ctx.modio.game(game_id).statistics();
+    let (game, stats) = future::try_join(ctx.modio.game(game_id).get(), stats).await?;
+
+    let embed = EmbedBuilder::new()
+        .title(game.name)
+        .url(game.profile_url.to_string())
+        .description(game.summary)
+        .image(ImageSource::url(game.logo.thumb_640x360).unwrap())
+        .field(EmbedField {
+            name: "Info".into(),
+            value: format!(
+                r#"**Id:** {}
+**Name-Id:** {}
+**Profile:** {}"#,
+                game.id, game.name_id, game.profile_url,
+            ),
+            inline: true,
+        })
+        .field(EmbedField {
+            name: "Stats".into(),
+            value: format!(
+                r#"**Mods:** {}
+**Subscribers:** {}
+**Downloads:** {}"#,
+                stats.mods_total, stats.subscribers_total, stats.downloads.total,
+            ),
+            inline: true,
+        })
+        .build();
+
+    ctx.interaction()
+        .update_response(&interaction.token)
+        .embeds(Some(&[embed]))?
+        .await?;
 
     Ok(())
 }
