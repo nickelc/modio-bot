@@ -288,7 +288,9 @@ pub async fn popular(
 async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error> {
     let filter = match search.parse::<u32>() {
         Ok(id) => Id::eq(id),
-        Err(_) => Fulltext::eq(search),
+        Err(_) => search
+            .strip_prefix('@')
+            .map_or_else(|| Fulltext::eq(search), NameId::eq),
     };
     let game = ctx.modio.games().search(filter).first().await?;
     Ok(game)

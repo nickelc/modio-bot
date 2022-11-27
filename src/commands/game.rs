@@ -47,7 +47,9 @@ pub async fn games(
             ..
         }] => match s.parse::<u32>() {
             Ok(id) => Id::eq(id),
-            Err(_) => Fulltext::eq(s),
+            Err(_) => s
+                .strip_prefix('@')
+                .map_or_else(|| Fulltext::eq(s), NameId::eq),
         },
         _ => Filter::default(),
     };
