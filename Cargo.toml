@@ -1,6 +1,6 @@
 [package]
 name = "modbot"
-version = "0.5.1"
+version = "0.5.2"
 description = """Discord bot for https://mod.io.
 ModBot provides commands to search for mods and notifications about added & edited mods."""
 repository = "https://github.com/nickelc/modio-bot"
