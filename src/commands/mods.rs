@@ -77,10 +77,11 @@ pub async fn list(
         }
     }
 
-    let game_id = game_id.or_else(|| {
-        let settings = ctx.settings.lock().unwrap();
-        interaction.guild_id.and_then(|id| settings.game(id.get()))
-    });
+    let game_id = match (game_id, interaction.guild_id) {
+        (Some(game_id), _) => Some(game_id),
+        (_, Some(guild_id)) => ctx.settings.game(guild_id.get())?,
+        _ => None,
+    };
 
     let Some(game_id) = game_id else {
         let content = "Default game is not set.";
@@ -233,10 +234,11 @@ pub async fn popular(
         _ => None,
     };
 
-    let game_id = game_id.or_else(|| {
-        let settings = ctx.settings.lock().unwrap();
-        interaction.guild_id.and_then(|id| settings.game(id.get()))
-    });
+    let game_id = match (game_id, interaction.guild_id) {
+        (Some(game_id), _) => Some(game_id),
+        (_, Some(guild_id)) => ctx.settings.game(guild_id.get())?,
+        _ => None,
+    };
 
     let Some(game_id) = game_id else {
         let content = "Default game is not set.";

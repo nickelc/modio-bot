@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use modio::Modio;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
@@ -15,7 +14,7 @@ use twilight_model::oauth::Application;
 
 use crate::commands;
 use crate::config::Config;
-use crate::db::{load_settings, DbPool, Settings, Subscriptions};
+use crate::db::{DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::metrics::Metrics;
 
@@ -26,7 +25,7 @@ pub struct Context {
     pub cache: Arc<InMemoryCache>,
     pub modio: Modio,
     pub pool: DbPool,
-    pub settings: Arc<Mutex<Settings>>,
+    pub settings: Settings,
     pub subscriptions: Subscriptions,
     pub metrics: Metrics,
 }
@@ -84,10 +83,7 @@ pub async fn initialize(
         cache: Arc::new(cache),
         modio,
         pool: pool.clone(),
-        settings: Arc::new(Mutex::new(Settings {
-            pool: pool.clone(),
-            data: HashMap::new(),
-        })),
+        settings: Settings { pool: pool.clone() },
         subscriptions: Subscriptions { pool },
         metrics,
     };
@@ -112,11 +108,9 @@ pub async fn handle_event(event: Event, context: Context) {
                 .into_iter()
                 .map(|g| g.id.get())
                 .collect::<Vec<_>>();
-            let data = load_settings(&context.pool, &guilds).unwrap_or_default();
-            tracing::info!("{data:?}");
-
-            let mut settings = context.settings.lock().unwrap();
-            settings.data.extend(data);
+            if let Err(e) = context.settings.cleanup(&guilds) {
+                tracing::error!("{e}");
+            }
         }
         Event::InteractionCreate(interaction) => match &interaction.data {
             Some(InteractionData::ApplicationCommand(command)) => {

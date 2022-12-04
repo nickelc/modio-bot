@@ -131,8 +131,7 @@ pub async fn settings(
             .api_access_options
             .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
         {
-            let mut settings = ctx.settings.lock().unwrap();
-            settings.set_game(guild_id.get(), game.id)?;
+            ctx.settings.set_game(guild_id.get(), game.id)?;
             format!("Game is set to '{}'.", game.name).into()
         } else {
             let msg = format!(

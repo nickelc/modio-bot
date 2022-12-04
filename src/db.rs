@@ -19,7 +19,7 @@ mod schema;
 mod settings;
 mod subscriptions;
 
-pub use settings::{load_settings, Settings};
+pub use settings::Settings;
 pub use subscriptions::{Events, Subscriptions, Tags};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;

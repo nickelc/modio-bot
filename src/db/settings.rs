@@ -1,33 +1,19 @@
-use std::collections::HashMap;
-
 use diesel::prelude::*;
 use tokio::task::block_in_place;
 
 use super::{schema, DbPool, GameId, GuildId, Result};
-use schema::settings;
 
-#[derive(Debug, Default)]
-pub struct GuildSettings {
-    game: Option<GameId>,
-}
-
-#[derive(Insertable)]
-#[diesel(table_name = settings)]
-#[allow(clippy::option_option)]
-struct ChangeSettings {
-    pub guild: i64,
-    pub game: Option<Option<i32>>,
-}
-
+#[derive(Clone)]
 pub struct Settings {
     pub pool: DbPool,
-    pub data: HashMap<GuildId, GuildSettings>,
 }
 
 impl Settings {
-    fn persist(&self, change: ChangeSettings) -> Result<()> {
+    pub fn set_game(&self, guild_id: GuildId, game_id: GameId) -> Result<()> {
         use diesel::result::Error;
         use schema::settings::dsl::*;
+
+        let change = (guild.eq(guild_id as i64), game.eq(game_id as i32));
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
@@ -42,55 +28,38 @@ impl Settings {
         })
     }
 
-    pub fn game(&self, guild: GuildId) -> Option<GameId> {
-        self.data.get(&guild).and_then(|s| s.game)
+    pub fn game(&self, guild_id: GuildId) -> Result<Option<GameId>> {
+        use schema::settings::dsl::*;
+
+        let guild_id = guild_id as i64;
+
+        let conn = &mut self.pool.get()?;
+        let value = settings
+            .select(game)
+            .filter(guild.eq(guild_id))
+            .first::<Option<i32>>(conn)
+            .optional()?
+            .flatten()
+            .map(|id| id as u32);
+
+        Ok(value)
     }
 
-    pub fn set_game(&mut self, guild: GuildId, game: GameId) -> Result<()> {
-        let change = (guild, game);
-        self.persist(change.into())?;
+    pub fn cleanup(&self, guilds: &[GuildId]) -> Result<()> {
+        use schema::settings::dsl::*;
 
-        self.data.entry(guild).or_default().game = Some(game);
-        Ok(())
-    }
-}
+        block_in_place(|| {
+            let conn = &mut self.pool.get()?;
 
-pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, GuildSettings>> {
-    use schema::settings::dsl::*;
+            let it = guilds.iter().map(|g| *g as i64);
+            let ids = it.collect::<Vec<_>>();
+            let filter = settings.filter(guild.ne_all(ids));
+            match diesel::delete(filter).execute(conn) {
+                Ok(num) => tracing::info!("Deleted {num} guild(s)."),
+                Err(e) => tracing::error!("{e}"),
+            }
 
-    type Record = (i64, Option<i32>);
-
-    let list = block_in_place::<_, Result<_>>(|| {
-        let conn = &mut pool.get()?;
-
-        let it = guilds.iter().map(|g| *g as i64);
-        let ids = it.collect::<Vec<_>>();
-        let filter = settings.filter(guild.ne_all(ids));
-        match diesel::delete(filter).execute(conn) {
-            Ok(num) => tracing::info!("Deleted {num} guild(s)."),
-            Err(e) => tracing::error!("{e}"),
-        }
-
-        Ok(settings.load::<Record>(conn).unwrap_or_default())
-    })?;
-
-    let mut map = HashMap::new();
-    for r in list {
-        map.insert(
-            r.0 as u64,
-            GuildSettings {
-                game: r.1.map(|id| id as u32),
-            },
-        );
-    }
-    Ok(map)
-}
-
-impl From<(GuildId, GameId)> for ChangeSettings {
-    fn from((guild, game): (GuildId, GameId)) -> Self {
-        Self {
-            guild: guild as i64,
-            game: Some(Some(game as i32)),
-        }
+            Ok(())
+        })
     }
 }

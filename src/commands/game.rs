@@ -90,9 +90,9 @@ pub async fn games(
 }
 
 pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let game_id = {
-        let settings = ctx.settings.lock().unwrap();
-        interaction.guild_id.and_then(|id| settings.game(id.get()))
+    let game_id = match interaction.guild_id {
+        Some(guild_id) => ctx.settings.game(guild_id.get())?,
+        _ => None,
     };
 
     let Some(game_id) = game_id else {
