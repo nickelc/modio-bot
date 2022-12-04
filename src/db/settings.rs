@@ -11,7 +11,7 @@ pub struct GuildSettings {
     game: Option<GameId>,
 }
 
-#[derive(Insertable, AsChangeset)]
+#[derive(Insertable)]
 #[diesel(table_name = settings)]
 #[allow(clippy::option_option)]
 struct ChangeSettings {
@@ -31,15 +31,11 @@ impl Settings {
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
-            let target = settings.filter(guild.eq(change.guild));
 
             conn.transaction::<_, Error, _>(|conn| {
-                let query = diesel::update(target).set(&change);
-
-                if query.execute(conn)? == 0 {
-                    let query = diesel::insert_into(settings).values(change);
-                    query.execute(conn)?;
-                }
+                diesel::replace_into(settings)
+                    .values(&change)
+                    .execute(conn)?;
                 Ok(())
             })?;
             Ok(())
