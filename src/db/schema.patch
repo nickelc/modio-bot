@@ -1,5 +1,7 @@
---- src/db/schema.rs.orig	2022-09-21 11:58:12.604181040 +0200
-+++ src/db/schema.rs	2022-09-21 11:59:53.941227238 +0200
+diff --git a/src/db/schema.rs b/src/db/schema.rs
+index f1eb2dc..0541c98 100644
+--- a/src/db/schema.rs
++++ b/src/db/schema.rs
 @@ -2,19 +2,19 @@
  
  diesel::table! {
@@ -21,9 +23,9 @@
 -        guild -> Integer,
 +        guild -> BigInt,
          game -> Nullable<Integer>,
-         prefix -> Nullable<Text>,
      }
-@@ -23,9 +23,9 @@
+ }
+@@ -22,9 +22,9 @@ diesel::table! {
  diesel::table! {
      subscriptions (game, channel, tags) {
          game -> Integer,
@@ -35,7 +37,7 @@
          events -> Integer,
      }
  }
-@@ -33,8 +33,8 @@
+@@ -32,8 +32,8 @@ diesel::table! {
  diesel::table! {
      subscriptions_exclude_mods (game, channel, mod_id) {
          game -> Integer,
@@ -46,7 +48,7 @@
          mod_id -> Integer,
      }
  }
-@@ -42,8 +42,8 @@
+@@ -41,8 +41,8 @@ diesel::table! {
  diesel::table! {
      subscriptions_exclude_users (game, channel, user) {
          game -> Integer,

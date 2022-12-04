@@ -9,7 +9,6 @@ use schema::settings;
 #[derive(Debug, Default)]
 pub struct GuildSettings {
     game: Option<GameId>,
-    prefix: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset)]
@@ -18,7 +17,6 @@ pub struct GuildSettings {
 struct ChangeSettings {
     pub guild: i64,
     pub game: Option<Option<i32>>,
-    pub prefix: Option<Option<String>>,
 }
 
 pub struct Settings {
@@ -59,26 +57,12 @@ impl Settings {
         self.data.entry(guild).or_default().game = Some(game);
         Ok(())
     }
-
-    #[allow(dead_code)]
-    pub fn prefix(&self, guild: Option<GuildId>) -> Option<String> {
-        self.data.get(&guild?).and_then(|s| s.prefix.clone())
-    }
-
-    #[allow(dead_code)]
-    pub fn set_prefix(&mut self, guild: GuildId, prefix: Option<String>) -> Result<()> {
-        let change = (guild, prefix.clone());
-        self.persist(change.into())?;
-
-        self.data.entry(guild).or_default().prefix = prefix;
-        Ok(())
-    }
 }
 
 pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildId, GuildSettings>> {
     use schema::settings::dsl::*;
 
-    type Record = (i64, Option<i32>, Option<String>);
+    type Record = (i64, Option<i32>);
 
     let list = block_in_place::<_, Result<_>>(|| {
         let conn = &mut pool.get()?;
@@ -100,7 +84,6 @@ pub fn load_settings(pool: &DbPool, guilds: &[GuildId]) -> Result<HashMap<GuildI
             r.0 as u64,
             GuildSettings {
                 game: r.1.map(|id| id as u32),
-                prefix: r.2,
             },
         );
     }
@@ -112,17 +95,6 @@ impl From<(GuildId, GameId)> for ChangeSettings {
         Self {
             guild: guild as i64,
             game: Some(Some(game as i32)),
-            prefix: None,
-        }
-    }
-}
-
-impl From<(GuildId, Option<String>)> for ChangeSettings {
-    fn from((guild, prefix): (GuildId, Option<String>)) -> Self {
-        Self {
-            guild: guild as i64,
-            game: None,
-            prefix: Some(prefix),
         }
     }
 }
