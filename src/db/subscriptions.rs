@@ -98,6 +98,18 @@ impl Subscriptions {
         })
     }
 
+    pub fn get_channels(&self) -> Result<HashSet<ChannelId>> {
+        use schema::subscriptions::dsl::*;
+
+        let channels = block_in_place::<_, Result<_>>(|| {
+            let conn = &mut self.pool.get()?;
+
+            Ok(subscriptions.select(channel).distinct().load::<i64>(conn)?)
+        })?;
+
+        Ok(channels.into_iter().map(|c| c as u64).collect())
+    }
+
     pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
         use super::Error;
         use schema::subscriptions::dsl::*;

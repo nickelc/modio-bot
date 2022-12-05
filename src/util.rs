@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fmt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -40,13 +39,7 @@ pub fn is_unknown_channel_error(err: &ErrorType) -> bool {
 }
 
 async fn get_unknown_channels(ctx: &Context) -> Result<Vec<ChannelId>> {
-    let channels = ctx
-        .subscriptions
-        .load()?
-        .into_values()
-        .flatten()
-        .map(|s| s.0)
-        .collect::<HashSet<_>>();
+    let channels = ctx.subscriptions.get_channels()?;
 
     let requests = channels
         .into_iter()
