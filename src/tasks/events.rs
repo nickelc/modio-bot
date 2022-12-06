@@ -106,13 +106,16 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 ]))
                 .order_by(Id::asc());
 
-            let subs = ctx.subscriptions.load().unwrap_or_else(|e| {
-                error!("failed to load subscriptions: {e}");
-                HashMap::default()
-            });
+            let (subs, excluded_mods, excluded_users) =
+                ctx.subscriptions.load().unwrap_or_else(|e| {
+                    error!("failed to load subscriptions: {e}");
+                    (HashMap::default(), HashMap::default(), HashMap::default())
+                });
+            let excluded_mods = Arc::new(excluded_mods);
+            let excluded_users = Arc::new(excluded_users);
 
-            for (game_id, channels) in subs {
-                if channels.is_empty() {
+            for (game_id, subs) in subs {
+                if subs.is_empty() {
                     continue;
                 }
                 let sender = sender.clone();
@@ -121,11 +124,13 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 let game = ctx.modio.game(game_id);
                 let mods = ctx.modio.game(game_id).mods();
                 let events = ctx.modio.game(game_id).mods().events(filter);
+                let excluded_mods = Arc::clone(&excluded_mods);
+                let excluded_users = Arc::clone(&excluded_users);
 
                 let task = async move {
                     type Events = BTreeMap<u32, Vec<(u32, EventType)>>;
 
-                    debug!("polling events at {tstamp} for game={game_id} channels: {channels:?}");
+                    debug!("polling events at {tstamp} for game={game_id} subs: {subs:?}");
 
                     let game = match game.get().await {
                         Ok(game) => game,
@@ -191,7 +196,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     for (_, (m, evt)) in updates {
                         let mut effected_channels = BTreeSet::new();
 
-                        for (channel, tags, _, evts, excluded_mods, excluded_users) in &channels {
+                        for (channel, tags, _, evts) in &subs {
                             if unknown_channels.contains(channel) {
                                 debug!("event ignored #{channel}: unknown channel");
                                 continue;
@@ -204,18 +209,22 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                 debug!("event ignored #{channel}: {evt} for {:?}", m.name);
                                 continue;
                             }
-                            if excluded_users.contains(&m.submitted_by.username)
-                                || excluded_users.contains(&m.submitted_by.name_id)
-                            {
-                                debug!(
-                                    "user ignored #{channel}: {evt} for {:?}/{:?}",
-                                    m.submitted_by.name_id, m.name,
-                                );
-                                continue;
+                            if let Some(users) = excluded_users.get(&(game_id, *channel)) {
+                                if users.contains(&m.submitted_by.username)
+                                    || users.contains(&m.submitted_by.name_id)
+                                {
+                                    debug!(
+                                        "user ignored #{channel}: {evt} for {:?}/{:?}",
+                                        m.submitted_by.name_id, m.name,
+                                    );
+                                    continue;
+                                }
                             }
-                            if excluded_mods.contains(&m.id) {
-                                debug!("mod ignored #{channel}: {evt} for {:?}", m.name);
-                                continue;
+                            if let Some(mods) = excluded_mods.get(&(game_id, *channel)) {
+                                if mods.contains(&m.id) {
+                                    debug!("mod ignored #{channel}: {evt} for {:?}", m.name);
+                                    continue;
+                                }
                             }
                             if !tags.is_empty() {
                                 let mod_tags = m.tags.iter().map(|t| t.name.as_str()).collect();

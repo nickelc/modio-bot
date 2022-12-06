@@ -8,15 +8,10 @@ use super::{schema, ChannelId, DbPool, GameId, GuildId, Result};
 
 pub type ExcludedMods = HashSet<u32>;
 pub type ExcludedUsers = HashSet<String>;
+pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
+pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
 pub type Tags = HashSet<String>;
-pub type Subscription = (
-    ChannelId,
-    Tags,
-    Option<GuildId>,
-    Events,
-    ExcludedMods,
-    ExcludedUsers,
-);
+pub type Subscription = (ChannelId, Tags, Option<GuildId>, Events);
 
 #[derive(Clone)]
 pub struct Subscriptions {
@@ -110,13 +105,19 @@ impl Subscriptions {
         Ok(channels.into_iter().map(|c| c as u64).collect())
     }
 
-    pub fn load(&self) -> Result<HashMap<GameId, Vec<Subscription>>> {
+    pub fn load(
+        &self,
+    ) -> Result<(
+        HashMap<GameId, Vec<Subscription>>,
+        ExcludedModsMap,
+        ExcludedUsersMap,
+    )> {
         use super::Error;
         use schema::subscriptions::dsl::*;
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
-        let (list, mut excluded_mods, mut excluded_users) = block_in_place::<_, Result<_>>(|| {
+        let (list, excluded_mods, excluded_users) = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
 
             conn.transaction::<_, Error, _>(|conn| {
@@ -129,8 +130,8 @@ impl Subscriptions {
             })
         })?;
 
-        Ok(list.into_iter().fold(
-            HashMap::new(),
+        let subs = list.into_iter().fold(
+            HashMap::<_, Vec<_>>::new(),
             |mut map, (game_id, channel_id, sub_tags, guild_id, evt)| {
                 let game_id = game_id as GameId;
                 let channel_id = channel_id as ChannelId;
@@ -141,26 +142,17 @@ impl Subscriptions {
                     .collect();
                 let guild_id = guild_id.map(|id| id as GuildId);
                 let evt = Events::from_bits_truncate(evt);
-                let excluded_mods = excluded_mods
-                    .remove(&(game_id, channel_id))
-                    .unwrap_or_default();
-                let excluded_users = excluded_users
-                    .remove(&(game_id, channel_id))
-                    .unwrap_or_default();
-                map.entry(game_id).or_default().push((
-                    channel_id,
-                    sub_tags,
-                    guild_id,
-                    evt,
-                    excluded_mods,
-                    excluded_users,
-                ));
+                map.entry(game_id)
+                    .or_default()
+                    .push((channel_id, sub_tags, guild_id, evt));
                 map
             },
-        ))
+        );
+
+        Ok((subs, excluded_mods, excluded_users))
     }
 
-    fn load_excluded_mods(&self) -> Result<HashMap<(GameId, ChannelId), ExcludedMods>> {
+    fn load_excluded_mods(&self) -> Result<ExcludedModsMap> {
         use schema::subscriptions_exclude_mods::dsl::*;
 
         type Record = (i32, i64, Option<i64>, i32);
@@ -179,7 +171,7 @@ impl Subscriptions {
             }))
     }
 
-    fn load_excluded_users(&self) -> Result<HashMap<(GameId, ChannelId), ExcludedUsers>> {
+    fn load_excluded_users(&self) -> Result<ExcludedUsersMap> {
         use schema::subscriptions_exclude_users::dsl::*;
 
         type Record = (i32, i64, Option<i64>, String);
