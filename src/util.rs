@@ -1,6 +1,7 @@
 use std::fmt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use modio::filter::Filter;
 use modio::{Credentials, Modio};
 use tokio_stream::{self as stream, StreamExt};
 use twilight_http::api_error::ApiError;
@@ -62,6 +63,27 @@ async fn get_unknown_channels(ctx: &Context) -> Result<Vec<ChannelId>> {
     }
 
     Ok(unknown_channels)
+}
+
+pub trait IntoFilter {
+    fn into_filter(self) -> Filter;
+}
+
+impl<T: AsRef<str>> IntoFilter for T {
+    fn into_filter(self) -> Filter {
+        fn search_filter(value: &str) -> Filter {
+            use modio::filter::prelude::*;
+
+            match value.parse::<u32>() {
+                Ok(id) => Id::eq(id),
+                Err(_) => value
+                    .strip_prefix('@')
+                    .map_or_else(|| Fulltext::eq(value), NameId::eq),
+            }
+        }
+
+        search_filter(self.as_ref())
+    }
 }
 
 pub async fn check_subscriptions(ctx: &Context) -> Result<()> {

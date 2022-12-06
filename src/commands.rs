@@ -1,4 +1,3 @@
-use modio::filter::prelude::{Fulltext, Id as ModioId, *};
 use modio::games::Game;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::command::Command;
@@ -218,10 +217,9 @@ async fn update_response_from_content(
 }
 
 async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error> {
-    let filter = match search.parse::<u32>() {
-        Ok(id) => ModioId::eq(id),
-        Err(_) => Fulltext::eq(search),
-    };
+    use crate::util::IntoFilter;
+
+    let filter = search.into_filter();
     let game = ctx.modio.games().search(filter).first().await?;
     Ok(game)
 }

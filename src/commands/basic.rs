@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use modio::filter::prelude::*;
 use modio::games::ApiAccessOptions;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -17,6 +16,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 use super::{create_response, defer_ephemeral, update_response_content};
 use crate::bot::Context;
 use crate::error::Error;
+use crate::util::IntoFilter;
 
 pub fn commands() -> Vec<Command> {
     vec![
@@ -109,12 +109,7 @@ pub async fn settings(
             [CommandDataOption {
                 value: CommandOptionValue::String(s),
                 ..
-            }] => match s.parse::<u32>() {
-                Ok(id) => Id::eq(id),
-                Err(_) => s
-                    .strip_prefix('@')
-                    .map_or_else(|| Fulltext::eq(s), NameId::eq),
-            },
+            }] => s.into_filter(),
             _ => unreachable!(),
         },
 

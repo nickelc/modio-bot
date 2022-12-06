@@ -19,7 +19,7 @@ use super::{
 };
 use crate::bot::Context;
 use crate::error::Error;
-use crate::util::ContentBuilder;
+use crate::util::{ContentBuilder, IntoFilter};
 
 pub fn commands() -> Vec<Command> {
     vec![
@@ -45,12 +45,7 @@ pub async fn games(
         [CommandDataOption {
             value: CommandOptionValue::String(s),
             ..
-        }] => match s.parse::<u32>() {
-            Ok(id) => Id::eq(id),
-            Err(_) => s
-                .strip_prefix('@')
-                .map_or_else(|| Fulltext::eq(s), NameId::eq),
-        },
+        }] => s.into_filter(),
         _ => Filter::default(),
     };
 

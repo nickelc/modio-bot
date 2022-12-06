@@ -89,9 +89,10 @@ pub async fn list(
     };
 
     let (filter, title): (Filter, Cow<'_, _>) = if let Some(search) = search {
-        match search.parse::<u32>() {
-            Ok(id) => (Id::eq(id), "Mods".into()),
-            Err(_) => (
+        match (search.strip_prefix('@'), search.parse::<u32>()) {
+            (Some(name_id), _) => (NameId::eq(name_id), "Mods".into()),
+            (_, Ok(id)) => (Id::eq(id), "Mods".into()),
+            (_, Err(_)) => (
                 Fulltext::eq(search),
                 format!("Mods matching: '{search}'").into(),
             ),
@@ -288,12 +289,9 @@ pub async fn popular(
 }
 
 async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error> {
-    let filter = match search.parse::<u32>() {
-        Ok(id) => Id::eq(id),
-        Err(_) => search
-            .strip_prefix('@')
-            .map_or_else(|| Fulltext::eq(search), NameId::eq),
-    };
+    use crate::util::IntoFilter;
+
+    let filter = search.into_filter();
     let game = ctx.modio.games().search(filter).first().await?;
     Ok(game)
 }

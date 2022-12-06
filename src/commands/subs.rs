@@ -27,7 +27,7 @@ use super::{
 use crate::bot::Context;
 use crate::db::{Events, Tags};
 use crate::error::Error;
-use crate::util::ContentBuilder;
+use crate::util::{ContentBuilder, IntoFilter};
 
 pub fn commands() -> Vec<Command> {
     vec![CommandBuilder::new(
@@ -425,16 +425,10 @@ async fn mods_mute(
     for opt in opts {
         match &opt.value {
             CommandOptionValue::String(s) if opt.name == "game" => {
-                game_filter = match s.parse::<u32>() {
-                    Ok(id) => Some(Id::eq(id)),
-                    Err(_) => Some(Fulltext::eq(s)),
-                };
+                game_filter = Some(s.into_filter());
             }
             CommandOptionValue::String(s) if opt.name == "mod" => {
-                mod_filter = match s.parse::<u32>() {
-                    Ok(id) => Some(Id::eq(id)),
-                    Err(_) => Some(Fulltext::eq(s)),
-                };
+                mod_filter = Some(s.into_filter());
             }
             _ => {}
         }
@@ -482,16 +476,10 @@ async fn mods_unmute(
     for opt in opts {
         match &opt.value {
             CommandOptionValue::String(s) if opt.name == "game" => {
-                game_filter = match s.parse::<u32>() {
-                    Ok(id) => Some(Id::eq(id)),
-                    Err(_) => Some(Fulltext::eq(s)),
-                };
+                game_filter = Some(s.into_filter());
             }
             CommandOptionValue::String(s) if opt.name == "mod" => {
-                mod_filter = match s.parse::<u32>() {
-                    Ok(id) => Some(Id::eq(id)),
-                    Err(_) => Some(Fulltext::eq(s)),
-                };
+                mod_filter = Some(s.into_filter());
             }
             _ => {}
         }
@@ -602,10 +590,7 @@ async fn users_mute(
     for opt in opts {
         match &opt.value {
             CommandOptionValue::String(s) if opt.name == "game" => {
-                game_filter = match s.parse::<u32>() {
-                    Ok(id) => Some(Id::eq(id)),
-                    Err(_) => Some(Fulltext::eq(s)),
-                };
+                game_filter = Some(s.into_filter());
             }
             CommandOptionValue::String(s) if opt.name == "name" => {
                 name = Some(s);
@@ -654,10 +639,7 @@ async fn users_unmute(
     for opt in opts {
         match &opt.value {
             CommandOptionValue::String(s) if opt.name == "game" => {
-                game_filter = match s.parse::<u32>() {
-                    Ok(id) => Some(Id::eq(id)),
-                    Err(_) => Some(Fulltext::eq(s)),
-                };
+                game_filter = Some(s.into_filter());
             }
             CommandOptionValue::String(s) if opt.name == "name" => {
                 name = Some(s);
