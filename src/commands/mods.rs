@@ -21,8 +21,8 @@ use twilight_util::builder::embed::{
 };
 
 use super::{
-    create_response, defer_component_response, defer_response, update_response_content,
-    EphemeralMessage,
+    create_response, defer_component_response, defer_response, search_game,
+    update_response_content, EphemeralMessage,
 };
 use crate::bot::Context;
 use crate::error::Error;
@@ -286,14 +286,6 @@ pub async fn popular(
         .await?;
 
     Ok(())
-}
-
-async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error> {
-    use crate::util::IntoFilter;
-
-    let filter = search.into_filter();
-    let game = ctx.modio.games().search(filter).first().await?;
-    Ok(game)
 }
 
 fn create_list_embed(mods: &[Mod], title: &str, page: usize, page_count: usize) -> Embed {
