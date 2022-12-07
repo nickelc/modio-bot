@@ -4,14 +4,17 @@ use std::collections::HashSet;
 use diesel::prelude::*;
 use tokio::task::block_in_place;
 
+mod tags;
+
 use super::{schema, ChannelId, DbPool, GameId, GuildId, Result};
 
 pub type ExcludedMods = HashSet<u32>;
 pub type ExcludedUsers = HashSet<String>;
 pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
 pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
-pub type Tags = HashSet<String>;
 pub type Subscription = (ChannelId, Tags, Option<GuildId>, Events);
+
+pub use tags::Tags;
 
 #[derive(Clone)]
 pub struct Subscriptions {
@@ -135,11 +138,7 @@ impl Subscriptions {
             |mut map, (game_id, channel_id, sub_tags, guild_id, evt)| {
                 let game_id = game_id as GameId;
                 let channel_id = channel_id as ChannelId;
-                let sub_tags = sub_tags
-                    .split('\n')
-                    .filter(|t| !t.is_empty())
-                    .map(ToOwned::to_owned)
-                    .collect();
+                let sub_tags = Tags::from_str(&sub_tags);
                 let guild_id = guild_id.map(|id| id as GuildId);
                 let evt = Events::from_bits_truncate(evt);
                 map.entry(game_id)
@@ -206,11 +205,7 @@ impl Subscriptions {
         let records = records
             .into_iter()
             .map(|(game_id, sub_tags, evts)| {
-                let sub_tags = sub_tags
-                    .split('\n')
-                    .filter(|s| !s.is_empty())
-                    .map(ToOwned::to_owned)
-                    .collect();
+                let sub_tags = Tags::from_str(&sub_tags);
                 (game_id as u32, sub_tags, Events::from_bits_truncate(evts))
             })
             .collect();
@@ -286,9 +281,7 @@ impl Subscriptions {
         let game_id = game_id as i32;
         let channel_id = channel_id as i64;
 
-        let mut sub_tags = sub_tags.into_iter().collect::<Vec<_>>();
-        sub_tags.sort();
-        let sub_tags = sub_tags.join("\n");
+        let sub_tags = sub_tags.to_string();
 
         let pk = (game_id, channel_id, sub_tags.clone());
 
@@ -336,9 +329,7 @@ impl Subscriptions {
 
         type Record = (i32, i64, String, Option<i64>, i32);
 
-        let mut sub_tags = sub_tags.into_iter().collect::<Vec<_>>();
-        sub_tags.sort();
-        let sub_tags = sub_tags.join("\n");
+        let sub_tags = sub_tags.to_string();
 
         let pk = (game_id as i32, channel_id as i64, sub_tags);
 

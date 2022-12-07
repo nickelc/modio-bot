@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Write;
 
 use futures_util::stream::FuturesUnordered;
@@ -226,10 +226,8 @@ async fn subscribe(
         .collect::<Tags>();
 
     let (hidden, mut sub_tags) = tags
-        .and_then(string_to_tags)
-        .into_iter()
-        .flatten()
-        .partition::<Tags, _>(|e| e.starts_with('*'));
+        .map(|s| Tags::from_csv(s).partition())
+        .unwrap_or_default();
 
     if !sub_tags.is_subset(&game_tags) {
         let mut content = format!("Failed to subscribe to '{}'.\n", game.name);
@@ -305,10 +303,8 @@ async fn unsubscribe(
         .collect::<Tags>();
 
     let (hidden, mut sub_tags) = tags
-        .and_then(string_to_tags)
-        .into_iter()
-        .flatten()
-        .partition::<Tags, _>(|e| e.starts_with('*'));
+        .map(|s| Tags::from_csv(s).partition())
+        .unwrap_or_default();
 
     if !sub_tags.is_subset(&game_tags) {
         let mut content = format!("Failed to unsubscribe from '{}'.\n", game.name);
@@ -691,18 +687,6 @@ async fn find_game_mod(
         .await?;
 
     Ok((Some(game), mod_))
-}
-
-fn string_to_tags(s: &str) -> Option<HashSet<String>> {
-    let mut rdr = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .trim(csv::Trim::All)
-        .from_reader(s.as_bytes());
-    let mut record = csv::StringRecord::new();
-    match rdr.read_record(&mut record) {
-        Ok(true) => Some(record.iter().map(ToOwned::to_owned).collect()),
-        _ => None,
-    }
 }
 
 fn push_tags<'a, I>(s: &mut String, iter: I)
