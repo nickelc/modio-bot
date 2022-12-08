@@ -12,7 +12,7 @@ pub type ExcludedMods = HashSet<u32>;
 pub type ExcludedUsers = HashSet<String>;
 pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
 pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
-pub type Subscription = (ChannelId, Tags, Option<GuildId>, Events);
+pub type Subscription = (ChannelId, Tags, GuildId, Events);
 
 pub use tags::Tags;
 
@@ -118,7 +118,7 @@ impl Subscriptions {
         use super::Error;
         use schema::subscriptions::dsl::*;
 
-        type Record = (i32, i64, String, Option<i64>, i32);
+        type Record = (i32, i64, String, i64, i32);
 
         let (list, excluded_mods, excluded_users) = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
@@ -139,7 +139,7 @@ impl Subscriptions {
                 let game_id = game_id as GameId;
                 let channel_id = channel_id as ChannelId;
                 let sub_tags = Tags::from_str(&sub_tags);
-                let guild_id = guild_id.map(|id| id as GuildId);
+                let guild_id = guild_id as GuildId;
                 let evt = Events::from_bits_truncate(evt);
                 map.entry(game_id)
                     .or_default()
@@ -154,7 +154,7 @@ impl Subscriptions {
     fn load_excluded_mods(&self) -> Result<ExcludedModsMap> {
         use schema::subscriptions_exclude_mods::dsl::*;
 
-        type Record = (i32, i64, Option<i64>, i32);
+        type Record = (i32, i64, i64, i32);
 
         let list = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
@@ -173,7 +173,7 @@ impl Subscriptions {
     fn load_excluded_users(&self) -> Result<ExcludedUsersMap> {
         use schema::subscriptions_exclude_users::dsl::*;
 
-        type Record = (i32, i64, Option<i64>, String);
+        type Record = (i32, i64, i64, String);
 
         let list = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
@@ -270,13 +270,13 @@ impl Subscriptions {
         game_id: GameId,
         channel_id: ChannelId,
         sub_tags: Tags,
-        guild_id: Option<GuildId>,
+        guild_id: GuildId,
         evts: Events,
     ) -> Result<()> {
         use diesel::result::Error;
         use schema::subscriptions::dsl::*;
 
-        type Record = (i32, i64, String, Option<i64>, i32);
+        type Record = (i32, i64, String, i64, i32);
 
         let game_id = game_id as i32;
         let channel_id = channel_id as i64;
@@ -297,7 +297,7 @@ impl Subscriptions {
                         new_evts |= evts;
                         (game_id, channel_id, sub_tags, guild_id, new_evts.bits)
                     } else {
-                        let guild_id = guild_id.map(|g| g as i64);
+                        let guild_id = guild_id as i64;
                         (game_id, channel_id, sub_tags, guild_id, evts.bits)
                     };
 
@@ -327,7 +327,7 @@ impl Subscriptions {
         use diesel::result::Error;
         use schema::subscriptions::dsl::*;
 
-        type Record = (i32, i64, String, Option<i64>, i32);
+        type Record = (i32, i64, String, i64, i32);
 
         let sub_tags = sub_tags.to_string();
 
@@ -393,7 +393,7 @@ impl Subscriptions {
         &self,
         game_id: GameId,
         channel_id: ChannelId,
-        guild_id: Option<GuildId>,
+        guild_id: GuildId,
         id: u32,
     ) -> Result<()> {
         use schema::subscriptions_exclude_mods::dsl::*;
@@ -405,7 +405,7 @@ impl Subscriptions {
                 .values((
                     game.eq(game_id as i32),
                     channel.eq(channel_id as i64),
-                    guild.eq(guild_id.map(|g| g as i64)),
+                    guild.eq(guild_id as i64),
                     mod_id.eq(id as i32),
                 ))
                 .execute(conn)?;
@@ -433,7 +433,7 @@ impl Subscriptions {
         &self,
         game_id: GameId,
         channel_id: ChannelId,
-        guild_id: Option<GuildId>,
+        guild_id: GuildId,
         name: &str,
     ) -> Result<()> {
         use schema::subscriptions_exclude_users::dsl::*;
@@ -445,7 +445,7 @@ impl Subscriptions {
                 .values((
                     game.eq(game_id as i32),
                     channel.eq(channel_id as i64),
-                    guild.eq(guild_id.map(|g| g as i64)),
+                    guild.eq(guild_id as i64),
                     user.eq(name),
                 ))
                 .execute(conn)?;

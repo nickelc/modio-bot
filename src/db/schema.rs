@@ -24,7 +24,7 @@ diesel::table! {
         game -> Integer,
         channel -> BigInt,
         tags -> Text,
-        guild -> Nullable<BigInt>,
+        guild -> BigInt,
         events -> Integer,
     }
 }
@@ -33,7 +33,7 @@ diesel::table! {
     subscriptions_exclude_mods (game, channel, mod_id) {
         game -> Integer,
         channel -> BigInt,
-        guild -> Nullable<BigInt>,
+        guild -> BigInt,
         mod_id -> Integer,
     }
 }
@@ -42,7 +42,7 @@ diesel::table! {
     subscriptions_exclude_users (game, channel, user) {
         game -> Integer,
         channel -> BigInt,
-        guild -> Nullable<BigInt>,
+        guild -> BigInt,
         user -> Text,
     }
 }

@@ -14,7 +14,6 @@ use twilight_model::application::interaction::application_command::{
 };
 use twilight_model::application::interaction::Interaction;
 use twilight_model::guild::Permissions;
-use twilight_model::id::Id as DiscordId;
 use twilight_util::builder::command::{
     CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder, SubCommandGroupBuilder,
 };
@@ -217,7 +216,7 @@ async fn subscribe(
     }
 
     let channel_id = interaction.channel_id.unwrap().get();
-    let guild_id = interaction.guild_id.map(DiscordId::get);
+    let guild_id = interaction.guild_id.unwrap().get();
 
     let game_tags = game
         .tag_options
@@ -440,7 +439,7 @@ async fn mods_mute(
         (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
             let channel_id = interaction.channel_id.unwrap().get();
-            let guild_id = interaction.guild_id.map(DiscordId::get);
+            let guild_id = interaction.guild_id.unwrap().get();
 
             let ret = ctx
                 .subscriptions
@@ -601,7 +600,7 @@ async fn users_mute(
     let game = ctx.modio.games().search(game_filter).first().await?;
     let content: Cow<'_, str> = match game {
         Some(game) => {
-            let guild_id = interaction.guild_id.map(DiscordId::get);
+            let guild_id = interaction.guild_id.unwrap().get();
             let channel_id = interaction.channel_id.unwrap().get();
 
             let ret = ctx

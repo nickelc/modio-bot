@@ -32,8 +32,8 @@ index f1eb2dc..0541c98 100644
 -        channel -> Integer,
 +        channel -> BigInt,
          tags -> Text,
--        guild -> Nullable<Integer>,
-+        guild -> Nullable<BigInt>,
+-        guild -> Integer,
++        guild -> BigInt,
          events -> Integer,
      }
  }
@@ -42,9 +42,9 @@ index f1eb2dc..0541c98 100644
      subscriptions_exclude_mods (game, channel, mod_id) {
          game -> Integer,
 -        channel -> Integer,
--        guild -> Nullable<Integer>,
+-        guild -> Integer,
 +        channel -> BigInt,
-+        guild -> Nullable<BigInt>,
++        guild -> BigInt,
          mod_id -> Integer,
      }
  }
@@ -53,9 +53,9 @@ index f1eb2dc..0541c98 100644
      subscriptions_exclude_users (game, channel, user) {
          game -> Integer,
 -        channel -> Integer,
--        guild -> Nullable<Integer>,
+-        guild -> Integer,
 +        channel -> BigInt,
-+        guild -> Nullable<BigInt>,
++        guild -> BigInt,
          user -> Text,
      }
  }
