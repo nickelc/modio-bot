@@ -6,6 +6,8 @@
     clippy::wildcard_imports
 )]
 
+use std::path::PathBuf;
+
 use dotenv::dotenv;
 use futures_util::StreamExt;
 
@@ -54,8 +56,8 @@ async fn try_main() -> CliResult {
     }
 
     let path = args
-        .opt_value_from_str("-c")?
-        .unwrap_or_else(|| String::from("bot.toml"));
+        .opt_value_from_os_str("-c", |s| PathBuf::try_from(s))?
+        .unwrap_or_else(|| PathBuf::from("bot.toml"));
 
     let config = config::load_from_file(&path)
         .map_err(|e| format!("Failed to load config {path:?}: {e}"))?;
