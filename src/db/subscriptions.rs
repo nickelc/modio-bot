@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use diesel::prelude::*;
 use tokio::task::block_in_place;
@@ -13,6 +12,7 @@ pub type ExcludedUsers = HashSet<String>;
 pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
 pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
 pub type Subscription = (ChannelId, Tags, GuildId, Events);
+pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Tags, Events)>>;
 
 pub use tags::Tags;
 
@@ -187,6 +187,81 @@ impl Subscriptions {
                 map.entry(key).or_default().insert(name);
                 map
             }))
+    }
+
+    pub fn list_for_overview(
+        &self,
+        guild_id: GuildId,
+    ) -> Result<(GroupedSubscriptions, ExcludedModsMap, ExcludedUsersMap)> {
+        let (subs, excluded_mods, excluded_users) = block_in_place::<_, Result<_>>(|| {
+            use schema::subscriptions::dsl::*;
+
+            let conn = &mut self.pool.get()?;
+
+            let subs = subscriptions
+                .select((channel, game, tags, events))
+                .filter(guild.eq(guild_id as i64))
+                .load::<(i64, i32, String, i32)>(conn)?;
+
+            let excluded_mods = {
+                use schema::subscriptions_exclude_mods::dsl::*;
+
+                subscriptions_exclude_mods
+                    .select((channel, game, mod_id))
+                    .filter(guild.eq(guild_id as i64))
+                    .load::<(i64, i32, i32)>(conn)?
+            };
+
+            let excluded_users = {
+                use schema::subscriptions_exclude_users::dsl::*;
+
+                subscriptions_exclude_users
+                    .select((channel, game, user))
+                    .filter(guild.eq(guild_id as i64))
+                    .load::<(i64, i32, String)>(conn)?
+            };
+            Ok((subs, excluded_mods, excluded_users))
+        })?;
+
+        let subs = subs.into_iter().fold(
+            GroupedSubscriptions::new(),
+            |mut map, (channel_id, game_id, tags, events)| {
+                let channel_id = channel_id as u64;
+                let game_id = game_id as u32;
+                let tags = Tags::from_str(&tags);
+                let events = Events::from_bits_truncate(events);
+
+                map.entry(channel_id)
+                    .or_default()
+                    .push((game_id, tags, events));
+                map
+            },
+        );
+
+        let excluded_mods = excluded_mods.into_iter().fold(
+            ExcludedModsMap::new(),
+            |mut map, (channel_id, game_id, mod_id)| {
+                let channel_id = channel_id as u64;
+                let game_id = game_id as u32;
+                let mod_id = mod_id as u32;
+
+                map.entry((game_id, channel_id)).or_default().insert(mod_id);
+                map
+            },
+        );
+
+        let excluded_users = excluded_users.into_iter().fold(
+            ExcludedUsersMap::new(),
+            |mut map, (channel_id, game_id, user)| {
+                let channel_id = channel_id as u64;
+                let game_id = game_id as u32;
+
+                map.entry((game_id, channel_id)).or_default().insert(user);
+                map
+            },
+        );
+
+        Ok((subs, excluded_mods, excluded_users))
     }
 
     pub fn list_for_channel(&self, channel_id: ChannelId) -> Result<Vec<(GameId, Tags, Events)>> {

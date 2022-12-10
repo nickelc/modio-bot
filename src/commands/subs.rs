@@ -17,7 +17,7 @@ use twilight_model::guild::Permissions;
 use twilight_util::builder::command::{
     CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder, SubCommandGroupBuilder,
 };
-use twilight_util::builder::embed::EmbedBuilder;
+use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use super::{
     create_response, defer_ephemeral, search_game, update_response_content,
@@ -34,6 +34,10 @@ pub fn commands() -> Vec<Command> {
         "Manage subscriptions in the current channel to mod updates of a game.",
         CommandType::ChatInput,
     )
+    .option(SubCommandBuilder::new(
+        "overview",
+        "Show an overview of the current setup of this server.",
+    ))
     .option(SubCommandBuilder::new("list", "List subscriptions"))
     .option(
         SubCommandBuilder::new(
@@ -106,6 +110,7 @@ pub async fn handle_command(
     });
 
     match subcommand {
+        Some(("overview", _)) => overview(ctx, interaction).await,
         Some(("list", _)) => list(ctx, interaction).await,
         Some(("add", opts)) => subscribe(ctx, interaction, opts).await,
         Some(("rm", opts)) => unsubscribe(ctx, interaction, opts).await,
@@ -113,6 +118,109 @@ pub async fn handle_command(
         Some(("users", opts)) => users(ctx, interaction, opts).await,
         _ => Ok(()),
     }
+}
+
+async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
+    let guild_id = interaction.guild_id.unwrap().get();
+
+    let (subs, excluded_mods, excluded_users) = ctx.subscriptions.list_for_overview(guild_id)?;
+
+    if subs.is_empty() && excluded_mods.is_empty() && excluded_users.is_empty() {
+        let data = "No subscriptions found.".into_ephemeral();
+        return create_response(ctx, interaction, data).await;
+    }
+
+    defer_ephemeral(ctx, interaction).await?;
+
+    // Collect all game ids to fetch from modio.
+    let mut game_ids = subs
+        .values()
+        .flatten()
+        .map(|(g, _, _)| g)
+        .chain(excluded_mods.keys().map(|(g, _)| g))
+        .chain(excluded_users.keys().map(|(g, _)| g))
+        .collect::<Vec<_>>();
+
+    game_ids.sort_unstable();
+    game_ids.dedup();
+
+    let filter = Id::_in(game_ids);
+    let list = ctx.modio.games().search(filter).collect().await?;
+    let games = list
+        .into_iter()
+        .map(|g| (g.id, g.name))
+        .collect::<HashMap<_, _>>();
+
+    let mut embed = EmbedBuilder::new().title("Subscriptions");
+
+    let mut content = String::new();
+    for (channel_id, subs) in subs {
+        let _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
+        for (game_id, tags, evts) in subs {
+            if let Some(game) = games.get(&game_id) {
+                let _ = write!(&mut content, "{game_id}. {game}");
+            } else {
+                let _ = write!(&mut content, "{game_id}");
+            }
+            content.push_str(subs_suffix(evts));
+
+            if !tags.is_empty() {
+                content.push_str(" | Tags: ");
+                push_tags(&mut content, tags.iter());
+            }
+            content.push('\n');
+        }
+        content.push('\n');
+    }
+    embed = embed.description(content);
+
+    if !excluded_mods.is_empty() {
+        let mut content = String::new();
+        for ((game_id, channel_id), mods) in excluded_mods {
+            let _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
+            if let Some(game) = games.get(&game_id) {
+                let _ = write!(&mut content, "*{game_id}. {game}:* ");
+            } else {
+                let _ = write!(&mut content, "*{game_id}:* ");
+            }
+            let mut it = mods.iter().peekable();
+            while let Some(mod_) = it.next() {
+                let _ = write!(&mut content, "{mod_}");
+                if it.peek().is_some() {
+                    content.push_str(", ");
+                }
+            }
+            content.push_str("\n\n");
+        }
+        embed = embed.field(EmbedFieldBuilder::new("Muted mods", content));
+    }
+
+    if !excluded_users.is_empty() {
+        let mut content = String::new();
+        for ((game_id, channel_id), users) in excluded_users {
+            let _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
+            if let Some(game) = games.get(&game_id) {
+                let _ = write!(&mut content, "*{game_id}. {game}:* ");
+            } else {
+                let _ = write!(&mut content, "*{game_id}:* ");
+            }
+            let mut it = users.iter().peekable();
+            while let Some(user) = it.next() {
+                let _ = write!(&mut content, "`{user}`");
+                if it.peek().is_some() {
+                    content.push_str(", ");
+                }
+            }
+            content.push_str("\n\n");
+        }
+        embed = embed.field(EmbedFieldBuilder::new("Muted users", content));
+    }
+    ctx.interaction()
+        .update_response(&interaction.token)
+        .embeds(Some(&[embed.build()]))?
+        .await?;
+
+    Ok(())
 }
 
 async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
@@ -140,12 +248,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
         };
         let _ = write!(&mut content, "{game_id}. {name}");
 
-        let suffix = match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
-            (true, true) | (false, false) => " (+Δ)",
-            (true, false) => " (+)",
-            (false, true) => " (Δ)",
-        };
-        content.push_str(suffix);
+        content.push_str(subs_suffix(evts));
 
         if !tags.is_empty() {
             content.push_str(" | Tags: ");
@@ -686,6 +789,14 @@ async fn find_game_mod(
         .await?;
 
     Ok((Some(game), mod_))
+}
+
+const fn subs_suffix(evts: Events) -> &'static str {
+    match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
+        (true, true) | (false, false) => " (+Δ)",
+        (true, false) => " (+)",
+        (false, true) => " (Δ)",
+    }
 }
 
 fn push_tags<'a, I>(s: &mut String, iter: I)

@@ -20,6 +20,10 @@ const HELP_SETTINGS_DEFAULT_GAME: (&str, &str) = (
     "**Command: /settings default-game**",
     include_str!("help/settings-default-game.md"),
 );
+const HELP_SUBS_OVERVIEW: (&str, &str) = (
+    "**Command: /subs overview**",
+    include_str!("help/subs-overview.md"),
+);
 const HELP_SUBS_LIST: (&str, &str) = ("**Command: /subs list**", include_str!("help/subs-list.md"));
 const HELP_SUBS_ADD: (&str, &str) = ("**Command: /subs add**", include_str!("help/subs-add.md"));
 const HELP_SUBS_RM: (&str, &str) = ("**Command: /subs rm**", include_str!("help/subs-rm.md"));
@@ -64,6 +68,7 @@ pub fn commands() -> Vec<Command> {
                 ("mods", "mods"),
                 ("popular", "popular"),
                 ("settings default-game", "settings default-game"),
+                ("subs overview", "subs overview"),
                 ("subs list", "subs list"),
                 ("subs add", "subs add"),
                 ("subs rm", "subs rm"),
@@ -94,6 +99,7 @@ pub async fn help(
         Some("mods") => HELP_MODS,
         Some("popular") => HELP_POPULAR,
         Some("settings default-game") => HELP_SETTINGS_DEFAULT_GAME,
+        Some("subs overview") => HELP_SUBS_OVERVIEW,
         Some("subs list") => HELP_SUBS_LIST,
         Some("subs add") => HELP_SUBS_ADD,
         Some("subs rm") => HELP_SUBS_RM,
