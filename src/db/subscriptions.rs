@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use diesel::prelude::*;
 use tokio::task::block_in_place;
 
+mod events;
 mod tags;
 
 use super::{schema, ChannelId, DbPool, GameId, GuildId, Result};
@@ -14,25 +15,12 @@ pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
 pub type Subscription = (ChannelId, Tags, GuildId, Events);
 pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Tags, Events)>>;
 
+pub use events::Events;
 pub use tags::Tags;
 
 #[derive(Clone)]
 pub struct Subscriptions {
     pub pool: DbPool,
-}
-
-bitflags::bitflags! {
-    pub struct Events: i32 {
-        const NEW = 0b0001;
-        const UPD = 0b0010;
-        const ALL = Self::NEW.bits | Self::UPD.bits;
-    }
-}
-
-impl Default for Events {
-    fn default() -> Self {
-        Events::ALL
-    }
 }
 
 impl Subscriptions {
@@ -370,10 +358,10 @@ impl Subscriptions {
                     if let Ok((game_id, channel_id, sub_tags, guild_id, old_evts)) = first {
                         let mut new_evts = Events::from_bits_truncate(old_evts);
                         new_evts |= evts;
-                        (game_id, channel_id, sub_tags, guild_id, new_evts.bits)
+                        (game_id, channel_id, sub_tags, guild_id, new_evts.bits())
                     } else {
                         let guild_id = guild_id as i64;
-                        (game_id, channel_id, sub_tags, guild_id, evts.bits)
+                        (game_id, channel_id, sub_tags, guild_id, evts.bits())
                     };
 
                 let values = (
@@ -451,7 +439,7 @@ impl Subscriptions {
                             channel.eq(channel_id),
                             tags.eq(sub_tags),
                             guild.eq(guild_id),
-                            events.eq(new_evts.bits),
+                            events.eq(new_evts.bits()),
                         );
                         diesel::replace_into(subscriptions)
                             .values(values)
