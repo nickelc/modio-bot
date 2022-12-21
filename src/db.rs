@@ -1,5 +1,3 @@
-#![allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
-
 use std::collections::HashSet;
 use std::fmt;
 
@@ -18,15 +16,13 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 mod schema;
 mod settings;
 mod subscriptions;
+pub mod types;
 
 pub use settings::Settings;
 pub use subscriptions::{Events, Subscriptions, Tags};
+use types::{GuildId, UserId};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
-pub type GameId = u32;
-pub type ChannelId = u64;
-pub type GuildId = u64;
-pub type UserId = u64;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
@@ -70,10 +66,16 @@ pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
 
     block_in_place(|| {
         let conn = &mut pool.get()?;
-        let guilds = blocked_guilds.load::<(i64,)>(conn).ok().unwrap_or_default();
-        let users = blocked_users.load::<(i64,)>(conn).ok().unwrap_or_default();
-        let guilds = guilds.iter().map(|id| id.0 as GuildId).collect();
-        let users = users.iter().map(|id| id.0 as UserId).collect();
+        let guilds = blocked_guilds
+            .load::<(GuildId,)>(conn)
+            .map(|ids| ids.into_iter().map(|(id,)| id).collect())
+            .ok()
+            .unwrap_or_default();
+        let users = blocked_users
+            .load::<(UserId,)>(conn)
+            .map(|ids| ids.into_iter().map(|(id,)| id).collect())
+            .ok()
+            .unwrap_or_default();
         Ok(Blocked { guilds, users })
     })
 }

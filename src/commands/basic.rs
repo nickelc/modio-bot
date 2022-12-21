@@ -15,6 +15,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use super::{create_response, defer_ephemeral, update_response_content};
 use crate::bot::Context;
+use crate::db::types::{GameId, GuildId};
 use crate::error::Error;
 use crate::util::IntoFilter;
 
@@ -126,7 +127,7 @@ pub async fn settings(
             .api_access_options
             .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
         {
-            ctx.settings.set_game(guild_id.get(), game.id)?;
+            ctx.settings.set_game(GuildId(guild_id), GameId(game.id))?;
             format!("Game is set to '{}'.", game.name).into()
         } else {
             let msg = format!(

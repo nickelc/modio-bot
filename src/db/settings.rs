@@ -1,7 +1,8 @@
 use diesel::prelude::*;
 use tokio::task::block_in_place;
 
-use super::{schema, DbPool, GameId, GuildId, Result};
+use super::types::{GameId, GuildId};
+use super::{schema, DbPool, Result};
 
 #[derive(Clone)]
 pub struct Settings {
@@ -13,7 +14,7 @@ impl Settings {
         use diesel::result::Error;
         use schema::settings::dsl::*;
 
-        let change = (guild.eq(guild_id as i64), game.eq(game_id as i32));
+        let change = (guild.eq(guild_id), game.eq(game_id));
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
@@ -31,16 +32,13 @@ impl Settings {
     pub fn game(&self, guild_id: GuildId) -> Result<Option<GameId>> {
         use schema::settings::dsl::*;
 
-        let guild_id = guild_id as i64;
-
         let conn = &mut self.pool.get()?;
         let value = settings
             .select(game)
             .filter(guild.eq(guild_id))
-            .first::<Option<i32>>(conn)
+            .first::<Option<GameId>>(conn)
             .optional()?
-            .flatten()
-            .map(|id| id as u32);
+            .flatten();
 
         Ok(value)
     }
@@ -51,9 +49,7 @@ impl Settings {
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
 
-            let it = guilds.iter().map(|g| *g as i64);
-            let ids = it.collect::<Vec<_>>();
-            let filter = settings.filter(guild.ne_all(ids));
+            let filter = settings.filter(guild.ne_all(guilds));
             match diesel::delete(filter).execute(conn) {
                 Ok(num) => tracing::info!("Deleted {num} guild(s)."),
                 Err(e) => tracing::error!("{e}"),

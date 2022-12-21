@@ -25,6 +25,7 @@ use super::{
     update_response_content, EphemeralMessage,
 };
 use crate::bot::Context;
+use crate::db::types::GuildId;
 use crate::error::Error;
 use crate::util::format_timestamp;
 
@@ -77,9 +78,9 @@ pub async fn list(
         }
     }
 
-    let game_id = match (game_id, interaction.guild_id) {
+    let game_id = match (game_id, interaction.guild_id.map(GuildId)) {
         (Some(game_id), _) => Some(game_id),
-        (_, Some(guild_id)) => ctx.settings.game(guild_id.get())?,
+        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,
     };
 
@@ -235,9 +236,9 @@ pub async fn popular(
         _ => None,
     };
 
-    let game_id = match (game_id, interaction.guild_id) {
+    let game_id = match (game_id, interaction.guild_id.map(GuildId)) {
         (Some(game_id), _) => Some(game_id),
-        (_, Some(guild_id)) => ctx.settings.game(guild_id.get())?,
+        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,
     };
 

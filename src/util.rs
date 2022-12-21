@@ -6,11 +6,10 @@ use modio::{Credentials, Modio};
 use tokio_stream::{self as stream, StreamExt};
 use twilight_http::api_error::ApiError;
 use twilight_http::error::ErrorType;
-use twilight_model::id::Id;
 
 use crate::bot::Context;
 use crate::config::Config;
-use crate::db::ChannelId;
+use crate::db::types::ChannelId;
 use crate::error::Error;
 
 pub type CliResult = std::result::Result<(), Error>;
@@ -44,7 +43,7 @@ async fn get_unknown_channels(ctx: &Context) -> Result<Vec<ChannelId>> {
 
     let requests = channels
         .into_iter()
-        .map(|id| async move { (id, ctx.client.channel(Id::new(id)).await) });
+        .map(|id| async move { (id, ctx.client.channel(*id).await) });
 
     let stream = stream::iter(requests).throttle(Duration::from_millis(40));
 

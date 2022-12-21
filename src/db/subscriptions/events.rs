@@ -1,4 +1,13 @@
+use diesel::backend::RawValue;
+use diesel::deserialize::{self, FromSql, FromSqlRow};
+use diesel::expression::AsExpression;
+use diesel::serialize::{self, ToSql};
+use diesel::sql_types::Integer;
+use diesel::sqlite::Sqlite;
+
 bitflags::bitflags! {
+    #[derive(AsExpression, FromSqlRow)]
+    #[diesel(sql_type = Integer)]
     pub struct Events: i32 {
         const NEW = 0b0001;
         const UPD = 0b0010;
@@ -9,5 +18,19 @@ bitflags::bitflags! {
 impl Default for Events {
     fn default() -> Self {
         Self::ALL
+    }
+}
+
+impl FromSql<Integer, Sqlite> for Events {
+    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+        let bits = i32::from_sql(bytes)?;
+        Ok(Self::from_bits_truncate(bits))
+    }
+}
+
+impl ToSql<Integer, Sqlite> for Events {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
+        out.set_value(self.bits());
+        Ok(serialize::IsNull::No)
     }
 }

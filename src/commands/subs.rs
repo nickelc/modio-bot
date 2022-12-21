@@ -24,6 +24,7 @@ use super::{
     update_response_from_content, EphemeralMessage,
 };
 use crate::bot::Context;
+use crate::db::types::{ChannelId, GameId, GuildId, ModId};
 use crate::db::{Events, Tags};
 use crate::error::Error;
 use crate::util::{ContentBuilder, IntoFilter};
@@ -121,7 +122,7 @@ pub async fn handle_command(
 }
 
 async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let guild_id = interaction.guild_id.unwrap().get();
+    let guild_id = interaction.guild_id.map(GuildId).unwrap();
 
     let (subs, excluded_mods, excluded_users) = ctx.subscriptions.list_for_overview(guild_id)?;
 
@@ -224,8 +225,8 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 }
 
 async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let channel_id = interaction.channel_id.unwrap();
-    let subs = ctx.subscriptions.list_for_channel(channel_id.get())?;
+    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+    let subs = ctx.subscriptions.list_for_channel(channel_id)?;
 
     if subs.is_empty() {
         let data = "No subscriptions found.".into_ephemeral();
@@ -318,8 +319,8 @@ async fn subscribe(
         return update_response_content(ctx, interaction, &content).await;
     }
 
-    let channel_id = interaction.channel_id.unwrap().get();
-    let guild_id = interaction.guild_id.unwrap().get();
+    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+    let guild_id = interaction.guild_id.map(GuildId).unwrap();
 
     let game_tags = game
         .tag_options
@@ -345,7 +346,7 @@ async fn subscribe(
 
     let ret = ctx
         .subscriptions
-        .add(game.id, channel_id, sub_tags, guild_id, evts);
+        .add(GameId(game.id), channel_id, sub_tags, guild_id, evts);
 
     let content: Cow<'_, str> = match ret {
         Ok(_) => format!("Subscribed to '{}'.", game.name).into(),
@@ -396,7 +397,7 @@ async fn unsubscribe(
     }
 
     let game = game.expect("required option");
-    let channel_id = interaction.channel_id.unwrap().get();
+    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
 
     let game_tags = game
         .tag_options
@@ -422,7 +423,7 @@ async fn unsubscribe(
 
     let ret = ctx
         .subscriptions
-        .remove(game.id, channel_id, sub_tags, evts);
+        .remove(GameId(game.id), channel_id, sub_tags, evts);
 
     let content: Cow<'_, str> = match ret {
         Ok(_) => format!("Unsubscribed from '{}'.", game.name).into(),
@@ -463,7 +464,7 @@ async fn mods_muted(
     interaction: &Interaction,
     _opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let channel_id = interaction.channel_id.unwrap().get();
+    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
     let excluded = ctx.subscriptions.list_excluded_mods(channel_id)?;
 
     let muted = match excluded.len() {
@@ -472,7 +473,7 @@ async fn mods_muted(
             return update_response_content(ctx, interaction, content).await;
         }
         1 => {
-            let (game, mods) = excluded.into_iter().next().unwrap();
+            let (GameId(game), mods) = excluded.into_iter().next().unwrap();
             let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
             ctx.modio
                 .game(game)
@@ -489,7 +490,7 @@ async fn mods_muted(
         _ => {
             excluded
                 .into_iter()
-                .map(|(game, mods)| {
+                .map(|(GameId(game), mods)| {
                     let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
                     future::try_join(
                         ctx.modio.game(game).get(),
@@ -541,12 +542,12 @@ async fn mods_mute(
         (None, _) => "Game not found.".into(),
         (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
-            let channel_id = interaction.channel_id.unwrap().get();
-            let guild_id = interaction.guild_id.unwrap().get();
+            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+            let guild_id = interaction.guild_id.map(GuildId).unwrap();
 
-            let ret = ctx
-                .subscriptions
-                .mute_mod(game.id, channel_id, guild_id, mod_.id);
+            let ret =
+                ctx.subscriptions
+                    .mute_mod(GameId(game.id), channel_id, guild_id, ModId(mod_.id));
 
             let content = if let Err(e) = ret {
                 tracing::error!("{e}");
@@ -592,9 +593,11 @@ async fn mods_unmute(
         (None, _) => "Game not found.".into(),
         (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
-            let channel_id = interaction.channel_id.unwrap().get();
+            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
 
-            let ret = ctx.subscriptions.unmute_mod(game.id, channel_id, mod_.id);
+            let ret = ctx
+                .subscriptions
+                .unmute_mod(GameId(game.id), channel_id, ModId(mod_.id));
 
             let content = if let Err(e) = ret {
                 tracing::error!("{e}");
@@ -638,7 +641,7 @@ async fn users_muted(
     interaction: &Interaction,
     _opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let channel_id = interaction.channel_id.unwrap().get();
+    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
     let excluded = ctx.subscriptions.list_excluded_users(channel_id)?;
 
     let muted = match excluded.len() {
@@ -658,7 +661,7 @@ async fn users_muted(
         _ => {
             excluded
                 .into_iter()
-                .map(|(game, users)| {
+                .map(|(GameId(game), users)| {
                     future::try_join(ctx.modio.game(game).get(), async { Ok(users) })
                 })
                 .collect::<FuturesUnordered<_>>()
@@ -703,12 +706,12 @@ async fn users_mute(
     let game = ctx.modio.games().search(game_filter).first().await?;
     let content: Cow<'_, str> = match game {
         Some(game) => {
-            let guild_id = interaction.guild_id.unwrap().get();
-            let channel_id = interaction.channel_id.unwrap().get();
+            let guild_id = interaction.guild_id.map(GuildId).unwrap();
+            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
 
             let ret = ctx
                 .subscriptions
-                .mute_user(game.id, channel_id, guild_id, name);
+                .mute_user(GameId(game.id), channel_id, guild_id, name);
 
             let content = if let Err(e) = ret {
                 tracing::error!("{e}");
@@ -752,9 +755,11 @@ async fn users_unmute(
     let game = ctx.modio.games().search(game_filter).first().await?;
     let content: Cow<'_, str> = match game {
         Some(game) => {
-            let channel_id = interaction.channel_id.unwrap().get();
+            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
 
-            let ret = ctx.subscriptions.unmute_user(game.id, channel_id, name);
+            let ret = ctx
+                .subscriptions
+                .unmute_user(GameId(game.id), channel_id, name);
 
             let content = if let Err(e) = ret {
                 tracing::error!("{e}");

@@ -14,6 +14,7 @@ use twilight_model::oauth::Application;
 
 use crate::commands;
 use crate::config::Config;
+use crate::db::types::GuildId;
 use crate::db::{DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::metrics::Metrics;
@@ -96,7 +97,11 @@ pub async fn handle_event(event: Event, context: Context) {
 
     match event {
         Event::Ready(ready) => {
-            let guilds = ready.guilds.iter().map(|g| g.id.get()).collect::<Vec<_>>();
+            let guilds = ready
+                .guilds
+                .iter()
+                .map(|g| GuildId(g.id))
+                .collect::<Vec<_>>();
             tracing::info!("Guilds: {guilds:?}");
             context.metrics.guilds.set(ready.guilds.len() as u64);
 
@@ -106,7 +111,7 @@ pub async fn handle_event(event: Event, context: Context) {
             let guilds = ready
                 .guilds
                 .into_iter()
-                .map(|g| g.id.get())
+                .map(|g| GuildId(g.id))
                 .collect::<Vec<_>>();
             if let Err(e) = context.settings.cleanup(&guilds) {
                 tracing::error!("{e}");

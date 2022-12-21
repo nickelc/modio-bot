@@ -18,6 +18,7 @@ use super::{
     EphemeralMessage,
 };
 use crate::bot::Context;
+use crate::db::types::GuildId;
 use crate::error::Error;
 use crate::util::{ContentBuilder, IntoFilter};
 
@@ -85,8 +86,8 @@ pub async fn games(
 }
 
 pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let game_id = match interaction.guild_id {
-        Some(guild_id) => ctx.settings.game(guild_id.get())?,
+    let game_id = match interaction.guild_id.map(GuildId) {
+        Some(guild_id) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,
     };
 

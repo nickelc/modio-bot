@@ -3,7 +3,15 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Deref;
 
-#[derive(Debug, Default)]
+use diesel::backend::RawValue;
+use diesel::deserialize::{self, FromSql, FromSqlRow};
+use diesel::expression::AsExpression;
+use diesel::serialize::{self, ToSql};
+use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
+
+#[derive(Debug, Default, AsExpression, FromSqlRow)]
+#[diesel(sql_type = Text)]
 pub struct Tags(pub BTreeSet<String>);
 
 impl Tags {
@@ -56,6 +64,26 @@ impl Deref for Tags {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl FromSql<Text, Sqlite> for Tags {
+    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+        let tags = <String as FromSql<Text, Sqlite>>::from_sql(bytes)?;
+        Ok(Tags::from_str(&tags))
+    }
+}
+
+impl ToSql<Text, Sqlite> for Tags {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
+        let tags = self.to_string();
+        // Workaround for the issue with empty owned strings being serialized as null values.
+        if tags.is_empty() {
+            out.set_value("");
+        } else {
+            out.set_value(tags);
+        }
+        Ok(serialize::IsNull::No)
     }
 }
 

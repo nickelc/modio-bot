@@ -14,13 +14,13 @@ use tokio::time::{self, Instant};
 use tokio_stream::{self as stream, StreamExt};
 use tracing::{debug, error, trace};
 use twilight_model::channel::message::embed::Embed;
-use twilight_model::id::Id as ChannelId;
 use twilight_util::builder::embed::{
     EmbedAuthorBuilder, EmbedBuilder, EmbedFieldBuilder, EmbedFooterBuilder, ImageSource,
 };
 
 use crate::bot::Context;
 use crate::commands::mods::create_fields;
+use crate::db::types::{ChannelId, ModId};
 use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
@@ -29,7 +29,7 @@ const THROTTLE: Duration = Duration::from_millis(30);
 
 #[allow(clippy::too_many_lines)]
 pub fn task(ctx: Context) -> impl Future<Output = ()> {
-    let (sender, mut receiver) = mpsc::channel::<(BTreeSet<u64>, Option<String>, Embed)>(100);
+    let (sender, mut receiver) = mpsc::channel::<(BTreeSet<ChannelId>, Option<String>, Embed)>(100);
 
     let unknown_channels = Arc::new(DashSet::new());
     let unknown_channels2 = unknown_channels.clone();
@@ -50,11 +50,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         }
                     })
                     .map(|id| {
-                        let mut msg = ctx
-                            .client
-                            .create_message(ChannelId::new(id))
-                            .embeds(&embeds)
-                            .unwrap();
+                        let mut msg = ctx.client.create_message(*id).embeds(&embeds).unwrap();
                         if let Some(content) = &content {
                             msg = msg.content(content).unwrap();
                         }
@@ -121,9 +117,9 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 let sender = sender.clone();
                 let unknown_channels = unknown_channels2.clone();
                 let filter = filter.clone();
-                let game = ctx.modio.game(game_id);
-                let mods = ctx.modio.game(game_id).mods();
-                let events = ctx.modio.game(game_id).mods().events(filter);
+                let game = ctx.modio.game(*game_id);
+                let mods = ctx.modio.game(*game_id).mods();
+                let events = ctx.modio.game(*game_id).mods().events(filter);
                 let excluded_mods = Arc::clone(&excluded_mods);
                 let excluded_users = Arc::clone(&excluded_users);
 
@@ -221,7 +217,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                 }
                             }
                             if let Some(mods) = excluded_mods.get(&(game_id, *channel)) {
-                                if mods.contains(&m.id) {
+                                if mods.contains(&ModId(m.id)) {
                                     debug!("mod ignored #{channel}: {evt} for {:?}", m.name);
                                     continue;
                                 }
