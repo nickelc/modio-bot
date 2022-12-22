@@ -21,6 +21,7 @@ use twilight_util::builder::embed::{
 use crate::bot::Context;
 use crate::commands::mods::create_fields;
 use crate::db::types::{ChannelId, ModId};
+use crate::db::Subscription;
 use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
@@ -192,7 +193,12 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     for (_, (m, evt)) in updates {
                         let mut effected_channels = BTreeSet::new();
 
-                        for (channel, tags, _, evts) in &subs {
+                        for Subscription {
+                            channel,
+                            tags,
+                            events: evts,
+                        } in &subs
+                        {
                             if unknown_channels.contains(channel) {
                                 debug!("event ignored #{channel}: unknown channel");
                                 continue;

@@ -13,11 +13,18 @@ pub type ExcludedMods = HashSet<ModId>;
 pub type ExcludedUsers = HashSet<String>;
 pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
 pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
-pub type Subscription = (ChannelId, Tags, GuildId, Events);
 pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Tags, Events)>>;
 
 pub use events::Events;
 pub use tags::Tags;
+
+#[derive(Debug, Queryable, Selectable)]
+#[diesel(table_name = schema::subscriptions)]
+pub struct Subscription {
+    pub channel: ChannelId,
+    pub tags: Tags,
+    pub events: Events,
+}
 
 #[derive(Clone)]
 pub struct Subscriptions {
@@ -102,13 +109,13 @@ impl Subscriptions {
         use super::Error;
         use schema::subscriptions::dsl::*;
 
-        type Record = (GameId, ChannelId, Tags, GuildId, Events);
-
         let (list, excluded_mods, excluded_users) = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
 
             conn.transaction::<_, Error, _>(|conn| {
-                let list = subscriptions.load::<Record>(conn)?;
+                let list = subscriptions
+                    .select((game, Subscription::as_select()))
+                    .load(conn)?;
 
                 let excluded_mods = self.load_excluded_mods()?;
                 let excluded_users = self.load_excluded_users()?;
@@ -117,15 +124,12 @@ impl Subscriptions {
             })
         })?;
 
-        let subs = list.into_iter().fold(
-            HashMap::<_, Vec<_>>::new(),
-            |mut map, (game_id, channel_id, sub_tags, guild_id, evt)| {
-                map.entry(game_id)
-                    .or_default()
-                    .push((channel_id, sub_tags, guild_id, evt));
+        let subs = list
+            .into_iter()
+            .fold(HashMap::<_, Vec<_>>::new(), |mut map, (game_id, sub)| {
+                map.entry(game_id).or_default().push(sub);
                 map
-            },
-        );
+            });
 
         Ok((subs, excluded_mods, excluded_users))
     }

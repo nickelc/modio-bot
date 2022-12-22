@@ -19,7 +19,7 @@ mod subscriptions;
 pub mod types;
 
 pub use settings::Settings;
-pub use subscriptions::{Events, Subscriptions, Tags};
+pub use subscriptions::{Events, Subscription, Subscriptions, Tags};
 use types::{GuildId, UserId};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
