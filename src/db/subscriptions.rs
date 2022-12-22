@@ -135,38 +135,38 @@ impl Subscriptions {
     }
 
     fn load_excluded_mods(&self) -> Result<ExcludedModsMap> {
-        use schema::subscriptions_exclude_mods::dsl::*;
-
-        type Record = (GameId, ChannelId, GuildId, ModId);
-
         let list = block_in_place::<_, Result<_>>(|| {
+            use schema::subscriptions_exclude_mods::dsl::*;
+
             let conn = &mut self.pool.get()?;
-            Ok(subscriptions_exclude_mods.load::<Record>(conn)?)
+            let list = subscriptions_exclude_mods
+                .select(((game, channel), mod_id))
+                .load(conn)?;
+            Ok(list)
         })?;
 
         Ok(list
             .into_iter()
-            .fold(HashMap::new(), |mut map, (game_id, channel_id, _, mid)| {
-                let key = (game_id, channel_id);
-                map.entry(key).or_default().insert(mid);
+            .fold(ExcludedModsMap::new(), |mut map, (key, mod_id)| {
+                map.entry(key).or_default().insert(mod_id);
                 map
             }))
     }
 
     fn load_excluded_users(&self) -> Result<ExcludedUsersMap> {
-        use schema::subscriptions_exclude_users::dsl::*;
-
-        type Record = (GameId, ChannelId, GuildId, String);
-
         let list = block_in_place::<_, Result<_>>(|| {
+            use schema::subscriptions_exclude_users::dsl::*;
+
             let conn = &mut self.pool.get()?;
-            Ok(subscriptions_exclude_users.load::<Record>(conn)?)
+            let list = subscriptions_exclude_users
+                .select(((game, channel), user))
+                .load(conn)?;
+            Ok(list)
         })?;
 
         Ok(list
             .into_iter()
-            .fold(HashMap::new(), |mut map, (game_id, channel_id, _, name)| {
-                let key = (game_id, channel_id);
+            .fold(ExcludedUsersMap::new(), |mut map, (key, name)| {
                 map.entry(key).or_default().insert(name);
                 map
             }))
@@ -255,9 +255,9 @@ impl Subscriptions {
         &self,
         channel_id: ChannelId,
     ) -> Result<HashMap<GameId, ExcludedMods>> {
-        use schema::subscriptions_exclude_mods::dsl::*;
-
         let records = block_in_place::<_, Result<_>>(|| {
+            use schema::subscriptions_exclude_mods::dsl::*;
+
             let conn = &mut self.pool.get()?;
 
             let records = subscriptions_exclude_mods
@@ -267,23 +267,21 @@ impl Subscriptions {
             Ok(records)
         })?;
 
-        let records: HashMap<GameId, ExcludedMods> =
-            records
-                .into_iter()
-                .fold(HashMap::new(), |mut map, (game_id, mid)| {
-                    map.entry(game_id).or_default().insert(mid);
-                    map
-                });
-        Ok(records)
+        Ok(records
+            .into_iter()
+            .fold(HashMap::new(), |mut map, (game_id, mod_id)| {
+                map.entry(game_id).or_default().insert(mod_id);
+                map
+            }))
     }
 
     pub fn list_excluded_users(
         &self,
         channel_id: ChannelId,
     ) -> Result<HashMap<GameId, ExcludedUsers>> {
-        use schema::subscriptions_exclude_users::dsl::*;
-
         let records = block_in_place::<_, Result<_>>(|| {
+            use schema::subscriptions_exclude_users::dsl::*;
+
             let conn = &mut self.pool.get()?;
 
             let records = subscriptions_exclude_users
@@ -293,14 +291,12 @@ impl Subscriptions {
             Ok(records)
         })?;
 
-        let records: HashMap<GameId, ExcludedUsers> =
-            records
-                .into_iter()
-                .fold(HashMap::new(), |mut map, (game_id, name)| {
-                    map.entry(game_id).or_default().insert(name);
-                    map
-                });
-        Ok(records)
+        Ok(records
+            .into_iter()
+            .fold(HashMap::new(), |mut map, (game_id, name)| {
+                map.entry(game_id).or_default().insert(name);
+                map
+            }))
     }
 
     pub fn add(
