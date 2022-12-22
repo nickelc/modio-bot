@@ -1,8 +1,8 @@
 CREATE TABLE subscriptions_exclude_mods_new (
-    game INTEGER NOT NULL,
+    game    INTEGER NOT NULL,
     channel INTEGER NOT NULL,
-    guild INTEGER,
-    mod_id INTEGER NOT NULL,
+    guild   INTEGER,
+    mod_id  INTEGER NOT NULL,
     PRIMARY KEY (game, channel, mod_id)
 );
 

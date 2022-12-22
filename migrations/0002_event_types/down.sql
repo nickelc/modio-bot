@@ -1,7 +1,7 @@
 CREATE TABLE subscriptions_tmp (
-    game INTEGER NOT NULL,
+    game    INTEGER NOT NULL,
     channel INTEGER NOT NULL,
-    guild INTEGER,
+    guild   INTEGER,
     PRIMARY KEY (game, channel)
 );
 

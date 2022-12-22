@@ -1,9 +1,9 @@
-CREATE TABLE "subscriptions_tmp" (
-	"game"	INTEGER NOT NULL,
-	"channel"	INTEGER NOT NULL,
-	"guild"	INTEGER,
-	"events"	INTEGER DEFAULT 3,
-	PRIMARY KEY("game","channel")
+CREATE TABLE subscriptions_tmp (
+    game	INTEGER NOT NULL,
+    channel	INTEGER NOT NULL,
+    guild	INTEGER,
+    events	INTEGER DEFAULT 3,
+    PRIMARY KEY (game, channel)
 );
 
 INSERT INTO subscriptions_tmp (game, channel, guild, events)

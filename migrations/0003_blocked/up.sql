@@ -3,5 +3,5 @@ CREATE TABLE blocked_guilds (
 );
 
 CREATE TABLE blocked_users (
-    "user" INTEGER PRIMARY KEY NOT NULL
+    user INTEGER PRIMARY KEY NOT NULL
 );

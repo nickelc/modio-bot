@@ -4,7 +4,7 @@ CREATE TABLE subscriptions_new (
     tags    TEXT NOT NULL DEFAULT "",
     guild   INTEGER NOT NULL,
     events  INTEGER NOT NULL DEFAULT 3,
-    PRIMARY KEY(game, channel, tags)
+    PRIMARY KEY (game, channel, tags)
 );
 
 INSERT INTO subscriptions_new (game, channel, tags, guild, events)
