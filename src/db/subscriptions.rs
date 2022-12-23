@@ -424,6 +424,7 @@ impl Subscriptions {
                     guild.eq(guild_id),
                     mod_id.eq(id),
                 ))
+                .on_conflict_do_nothing()
                 .execute(conn)?;
             Ok(())
         })
@@ -464,6 +465,7 @@ impl Subscriptions {
                     guild.eq(guild_id),
                     user.eq(name),
                 ))
+                .on_conflict_do_nothing()
                 .execute(conn)?;
             Ok(())
         })
