@@ -308,27 +308,13 @@ impl Subscriptions {
         evts: Events,
     ) -> Result<()> {
         use diesel::result::Error;
+        use operators::BitwiseExtensions;
         use schema::subscriptions::dsl::*;
-
-        type Record = (GameId, ChannelId, Tags, GuildId, Events);
-
-        let pk = (game_id, channel_id, sub_tags.to_string());
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
 
             conn.transaction::<_, Error, _>(|conn| {
-                let first = subscriptions.find(pk).first::<Record>(conn);
-
-                let (game_id, channel_id, sub_tags, guild_id, evts) =
-                    if let Ok((game_id, channel_id, sub_tags, guild_id, old_evts)) = first {
-                        let mut new_evts = old_evts;
-                        new_evts |= evts;
-                        (game_id, channel_id, sub_tags, guild_id, new_evts)
-                    } else {
-                        (game_id, channel_id, sub_tags, guild_id, evts)
-                    };
-
                 let values = (
                     game.eq(game_id),
                     channel.eq(channel_id),
@@ -336,8 +322,11 @@ impl Subscriptions {
                     guild.eq(guild_id),
                     events.eq(evts),
                 );
-                diesel::replace_into(subscriptions)
+                diesel::insert_into(subscriptions)
                     .values(values)
+                    .on_conflict((game, channel, tags))
+                    .do_update()
+                    .set(events.eq(events.bit_or(evts)))
                     .execute(conn)
             })?;
 
@@ -495,4 +484,20 @@ impl Subscriptions {
             Ok(())
         })
     }
+}
+
+mod operators {
+    use diesel::expression::AsExpression;
+    use diesel::prelude::*;
+    use diesel::sql_types::Integer;
+
+    diesel::infix_operator!(BitOr, " | ", Integer);
+
+    pub trait BitwiseExtensions: Expression<SqlType = Integer> + Sized {
+        fn bit_or<T: AsExpression<Integer>>(self, other: T) -> BitOr<Self, T::Expression> {
+            BitOr::new(self, other.as_expression())
+        }
+    }
+
+    impl<T: Expression<SqlType = Integer>> BitwiseExtensions for T {}
 }
