@@ -41,9 +41,7 @@ impl Tags {
 
     /// Returns a pair of tags, all hidden tags that begin with `*`, and all of the rest.
     pub fn partition(self) -> (Self, Self) {
-        let (hidden, tags) = self.0.into_iter().partition(|s| s.starts_with('*'));
-
-        (Self(hidden), Self(tags))
+        self.0.into_iter().partition(|s| s.starts_with('*'))
     }
 }
 
