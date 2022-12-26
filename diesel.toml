@@ -1,3 +1,2 @@
 [print_schema]
 file = "src/db/schema.rs"
-patch_file = "src/db/schema.patch"
