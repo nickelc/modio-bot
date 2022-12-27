@@ -1,6 +1,6 @@
 use modio::games::Game;
 use twilight_http::client::InteractionClient;
-use twilight_model::application::command::Command;
+use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionChoiceData};
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::Interaction;
@@ -12,6 +12,7 @@ use twilight_util::builder::embed::EmbedBuilder;
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::Context;
+use crate::db::autocomplete::{games_by_name, games_by_name_id};
 use crate::error::Error;
 
 mod basic;
@@ -213,6 +214,37 @@ async fn update_response_from_content(
                 .await?;
         }
     }
+    Ok(())
+}
+
+async fn autocomplete_games(
+    ctx: &Context,
+    interaction: &Interaction,
+    value: &str,
+) -> Result<(), Error> {
+    let games = value.strip_prefix('@').map_or_else(
+        || games_by_name(&ctx.pool, value),
+        |value| games_by_name_id(&ctx.pool, value),
+    )?;
+
+    let choices = games.into_iter().map(|(id, name)| {
+        let data = CommandOptionChoiceData {
+            name,
+            name_localizations: None,
+            value: id.to_string(),
+        };
+        CommandOptionChoice::String(data)
+    });
+    let data = InteractionResponseDataBuilder::new()
+        .choices(choices)
+        .build();
+    let response = InteractionResponse {
+        kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
+        data: Some(data),
+    };
+    ctx.interaction()
+        .create_response(interaction.id, &interaction.token, &response)
+        .await?;
     Ok(())
 }
 

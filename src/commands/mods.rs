@@ -21,7 +21,7 @@ use twilight_util::builder::embed::{
 };
 
 use super::{
-    create_response, defer_component_response, defer_response, search_game,
+    autocomplete_games, create_response, defer_component_response, defer_response, search_game,
     update_response_content, EphemeralMessage,
 };
 use crate::bot::Context;
@@ -38,14 +38,14 @@ pub fn commands() -> Vec<Command> {
         )
         .dm_permission(false)
         .option(StringBuilder::new("mod", "ID or search"))
-        .option(StringBuilder::new("game", "ID or search"))
+        .option(StringBuilder::new("game", "ID or search").autocomplete(true))
         .build(),
         CommandBuilder::new("popular", "List popular mods.", CommandType::ChatInput)
             .dm_permission(false)
-            .option(StringBuilder::new(
-                "game",
-                "ID or search game instead of the default game.",
-            ))
+            .option(
+                StringBuilder::new("game", "ID or search game instead of the default game.")
+                    .autocomplete(true),
+            )
             .build(),
     ]
 }
@@ -55,6 +55,15 @@ pub async fn list(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
+    for opt in &command.options {
+        match &opt.value {
+            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
+                return autocomplete_games(ctx, interaction, value).await;
+            }
+            _ => {}
+        }
+    }
+
     let mut search = None;
     let mut game_id = None;
 
@@ -219,6 +228,15 @@ pub async fn popular(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
+    for opt in &command.options {
+        match &opt.value {
+            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
+                return autocomplete_games(ctx, interaction, value).await;
+            }
+            _ => {}
+        }
+    }
+
     defer_response(ctx, interaction).await?;
 
     let game_id = match command.options.as_slice() {

@@ -20,7 +20,7 @@ use twilight_util::builder::command::{
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use super::{
-    create_response, defer_ephemeral, search_game, update_response_content,
+    autocomplete_games, create_response, defer_ephemeral, search_game, update_response_content,
     update_response_from_content, EphemeralMessage,
 };
 use crate::bot::Context;
@@ -45,7 +45,11 @@ pub fn commands() -> Vec<Command> {
             "add",
             "Subscribe the current channel to mod update of a game.",
         )
-        .option(StringBuilder::new("game", "ID or search").required(true))
+        .option(
+            StringBuilder::new("game", "ID or search")
+                .required(true)
+                .autocomplete(true),
+        )
         .option(StringBuilder::new("tags", "Comma-separated list of tags"))
         .option(
             IntegerBuilder::new("type", "Type of the mod updates.").choices([
@@ -60,7 +64,11 @@ pub fn commands() -> Vec<Command> {
             "rm",
             "Unsubscribe the current channel from mod update of a game.",
         )
-        .option(StringBuilder::new("game", "ID or search").required(true))
+        .option(
+            StringBuilder::new("game", "ID or search")
+                .required(true)
+                .autocomplete(true),
+        )
         .option(StringBuilder::new("tags", "Comma-separated list of tags"))
         .option(
             IntegerBuilder::new("type", "Type of the mod updates.").choices([
@@ -74,10 +82,18 @@ pub fn commands() -> Vec<Command> {
         SubCommandGroupBuilder::new("mods", "Mute update notifications for a mod.").subcommands([
             SubCommandBuilder::new("muted", "List muted mods"),
             SubCommandBuilder::new("mute", "Mute update notifications for a mod.")
-                .option(StringBuilder::new("game", "ID or search").required(true))
+                .option(
+                    StringBuilder::new("game", "ID or search")
+                        .required(true)
+                        .autocomplete(true),
+                )
                 .option(StringBuilder::new("mod", "ID or search").required(true)),
             SubCommandBuilder::new("unmute", "Unmute update notifications for a mod.")
-                .option(StringBuilder::new("game", "ID or search").required(true))
+                .option(
+                    StringBuilder::new("game", "ID or search")
+                        .required(true)
+                        .autocomplete(true),
+                )
                 .option(StringBuilder::new("mod", "ID or search").required(true)),
         ]),
     )
@@ -86,10 +102,18 @@ pub fn commands() -> Vec<Command> {
             .subcommands([
                 SubCommandBuilder::new("muted", "List muted user"),
                 SubCommandBuilder::new("mute", "Mute update notifications for mods of a user.")
-                    .option(StringBuilder::new("game", "ID or search").required(true))
+                    .option(
+                        StringBuilder::new("game", "ID or search")
+                            .required(true)
+                            .autocomplete(true),
+                    )
                     .option(StringBuilder::new("name", "username").required(true)),
                 SubCommandBuilder::new("unmute", "Unmute update notifications for mods of a user.")
-                    .option(StringBuilder::new("game", "ID or search").required(true))
+                    .option(
+                        StringBuilder::new("game", "ID or search")
+                            .required(true)
+                            .autocomplete(true),
+                    )
                     .option(StringBuilder::new("name", "username").required(true)),
             ]),
     )
@@ -276,6 +300,15 @@ async fn subscribe(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
+    for opt in opts {
+        match &opt.value {
+            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
+                return autocomplete_games(ctx, interaction, value).await;
+            }
+            _ => {}
+        }
+    }
+
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
@@ -365,6 +398,15 @@ async fn unsubscribe(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
+    for opt in opts {
+        match &opt.value {
+            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
+                return autocomplete_games(ctx, interaction, value).await;
+            }
+            _ => {}
+        }
+    }
+
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
@@ -447,6 +489,17 @@ async fn mods(
         CommandOptionValue::SubCommand(opts) => Some((e.name.as_str(), opts)),
         _ => None,
     });
+
+    if let Some((_, opts)) = subcommand {
+        for opt in opts {
+            match &opt.value {
+                CommandOptionValue::Focused(value, _) if opt.name == "game" => {
+                    return autocomplete_games(ctx, interaction, value).await;
+                }
+                _ => {}
+            }
+        }
+    }
 
     defer_ephemeral(ctx, interaction).await?;
 
@@ -624,6 +677,17 @@ async fn users(
         CommandOptionValue::SubCommand(opts) => Some((e.name.as_str(), opts)),
         _ => None,
     });
+
+    if let Some((_, opts)) = subcommand {
+        for opt in opts {
+            match &opt.value {
+                CommandOptionValue::Focused(value, _) if opt.name == "game" => {
+                    return autocomplete_games(ctx, interaction, value).await;
+                }
+                _ => {}
+            }
+        }
+    }
 
     defer_ephemeral(ctx, interaction).await?;
 

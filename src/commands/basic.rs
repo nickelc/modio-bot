@@ -15,6 +15,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use super::{create_response, defer_ephemeral, update_response_content};
 use crate::bot::Context;
+use crate::commands::autocomplete_games;
 use crate::db::types::{GameId, GuildId};
 use crate::error::Error;
 use crate::util::IntoFilter;
@@ -31,7 +32,11 @@ pub fn commands() -> Vec<Command> {
         .default_member_permissions(Permissions::MANAGE_GUILD)
         .option(
             SubCommandBuilder::new("default-game", "Set the default game for `/mods` command")
-                .option(StringBuilder::new("value", "ID or search").required(true)),
+                .option(
+                    StringBuilder::new("value", "ID or search")
+                        .required(true)
+                        .autocomplete(true),
+                ),
         )
         .build(),
     ]
@@ -107,6 +112,12 @@ pub async fn settings(
             value: CommandOptionValue::SubCommand(commands),
             ..
         }] => match commands.as_slice() {
+            [CommandDataOption {
+                value: CommandOptionValue::Focused(value, _),
+                ..
+            }] => {
+                return autocomplete_games(ctx, interaction, value).await;
+            }
             [CommandDataOption {
                 value: CommandOptionValue::String(s),
                 ..

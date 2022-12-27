@@ -14,6 +14,7 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[rustfmt::skip]
 mod schema;
+pub mod autocomplete;
 mod settings;
 mod subscriptions;
 pub mod types;

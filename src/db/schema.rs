@@ -13,6 +13,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    games (id) {
+        id -> Integer,
+        name -> Text,
+        name_id -> Text,
+        api_access_options -> Integer,
+        autocomplete -> Bool,
+    }
+}
+
+diesel::table! {
     settings (guild) {
         guild -> BigInt,
         game -> Nullable<Integer>,
@@ -50,6 +60,7 @@ diesel::table! {
 diesel::allow_tables_to_appear_in_same_query!(
     blocked_guilds,
     blocked_users,
+    games,
     settings,
     subscriptions,
     subscriptions_exclude_mods,
