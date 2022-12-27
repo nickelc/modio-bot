@@ -21,7 +21,7 @@ use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use super::{
     autocomplete_games, create_response, defer_ephemeral, search_game, update_response_content,
-    update_response_from_content, EphemeralMessage,
+    update_response_from_content, EphemeralMessage, SubCommandExt,
 };
 use crate::bot::Context;
 use crate::db::types::{ChannelId, GameId, GuildId, ModId};
@@ -127,14 +127,7 @@ pub async fn handle_command(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
-    let subcommand = command.options.iter().find_map(|e| match &e.value {
-        CommandOptionValue::SubCommand(opts) | CommandOptionValue::SubCommandGroup(opts) => {
-            Some((e.name.as_str(), opts))
-        }
-        _ => None,
-    });
-
-    match subcommand {
+    match command.subcommand() {
         Some(("overview", _)) => overview(ctx, interaction).await,
         Some(("list", _)) => list(ctx, interaction).await,
         Some(("add", opts)) => subscribe(ctx, interaction, opts).await,
@@ -485,10 +478,7 @@ async fn mods(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let subcommand = opts.iter().find_map(|e| match &e.value {
-        CommandOptionValue::SubCommand(opts) => Some((e.name.as_str(), opts)),
-        _ => None,
-    });
+    let subcommand = opts.subcommand();
 
     if let Some((_, opts)) = subcommand {
         for opt in opts {
@@ -673,10 +663,7 @@ async fn users(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let subcommand = opts.iter().find_map(|e| match &e.value {
-        CommandOptionValue::SubCommand(opts) => Some((e.name.as_str(), opts)),
-        _ => None,
-    });
+    let subcommand = opts.subcommand();
 
     if let Some((_, opts)) = subcommand {
         for opt in opts {

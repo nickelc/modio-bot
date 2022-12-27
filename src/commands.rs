@@ -1,7 +1,9 @@
 use modio::games::Game;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionChoiceData};
-use twilight_model::application::interaction::application_command::CommandData;
+use twilight_model::application::interaction::application_command::{
+    CommandData, CommandDataOption, CommandOptionValue,
+};
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::MessageFlags;
@@ -108,6 +110,31 @@ trait InteractionResponseBuilderExt {
 impl InteractionResponseBuilderExt for InteractionResponseDataBuilder {
     fn ephemeral(self, content: impl Into<String>) -> InteractionResponseDataBuilder {
         self.content(content).flags(MessageFlags::EPHEMERAL)
+    }
+}
+
+trait SubCommandExt {
+    fn subcommand(&self) -> Option<(&str, &[CommandDataOption])>;
+}
+
+fn find_subcommand(opts: &[CommandDataOption]) -> Option<(&str, &[CommandDataOption])> {
+    opts.iter().find_map(|opt| match &opt.value {
+        CommandOptionValue::SubCommandGroup(opts) | CommandOptionValue::SubCommand(opts) => {
+            Some((opt.name.as_str(), opts.as_slice()))
+        }
+        _ => None,
+    })
+}
+
+impl SubCommandExt for &CommandData {
+    fn subcommand(&self) -> Option<(&str, &[CommandDataOption])> {
+        find_subcommand(&self.options)
+    }
+}
+
+impl SubCommandExt for &[CommandDataOption] {
+    fn subcommand(&self) -> Option<(&str, &[CommandDataOption])> {
+        find_subcommand(self)
     }
 }
 
