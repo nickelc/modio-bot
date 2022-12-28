@@ -184,7 +184,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
             } else {
                 let _ = write!(&mut content, "{game_id}");
             }
-            content.push_str(subs_suffix(evts));
+            content.push_str(evts.to_suffix());
 
             if !tags.is_empty() {
                 content.push_str(" | Tags: ");
@@ -270,7 +270,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
         };
         let _ = write!(&mut content, "{game_id}. {name}");
 
-        content.push_str(subs_suffix(evts));
+        content.push_str(evts.to_suffix());
 
         if !tags.is_empty() {
             content.push_str(" | Tags: ");
@@ -807,11 +807,13 @@ async fn find_game_mod(
     Ok((Some(game), mod_))
 }
 
-const fn subs_suffix(evts: Events) -> &'static str {
-    match (evts.contains(Events::NEW), evts.contains(Events::UPD)) {
-        (true, true) | (false, false) => " (+Δ)",
-        (true, false) => " (+)",
-        (false, true) => " (Δ)",
+impl Events {
+    const fn to_suffix(&self) -> &'static str {
+        match (self.contains(Events::NEW), self.contains(Events::UPD)) {
+            (true, true) | (false, false) => " (+Δ)",
+            (true, false) => " (+)",
+            (false, true) => " (Δ)",
+        }
     }
 }
 
