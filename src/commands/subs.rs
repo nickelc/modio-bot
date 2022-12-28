@@ -21,7 +21,7 @@ use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use super::{
     autocomplete_games, create_response, defer_ephemeral, search_game, update_response_content,
-    update_response_from_content, EphemeralMessage, SubCommandExt,
+    update_response_from_content, AutocompleteExt, EphemeralMessage, SubCommandExt,
 };
 use crate::bot::Context;
 use crate::db::types::{ChannelId, GameId, GuildId, ModId};
@@ -127,6 +127,10 @@ pub async fn handle_command(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
+    if let Some(("game", value)) = command.autocomplete() {
+        return autocomplete_games(ctx, interaction, value).await;
+    }
+
     match command.subcommand() {
         Some(("overview", _)) => overview(ctx, interaction).await,
         Some(("list", _)) => list(ctx, interaction).await,
@@ -293,15 +297,6 @@ async fn subscribe(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    for opt in opts {
-        match &opt.value {
-            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
-                return autocomplete_games(ctx, interaction, value).await;
-            }
-            _ => {}
-        }
-    }
-
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
@@ -391,15 +386,6 @@ async fn unsubscribe(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    for opt in opts {
-        match &opt.value {
-            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
-                return autocomplete_games(ctx, interaction, value).await;
-            }
-            _ => {}
-        }
-    }
-
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
@@ -478,22 +464,9 @@ async fn mods(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let subcommand = opts.subcommand();
-
-    if let Some((_, opts)) = subcommand {
-        for opt in opts {
-            match &opt.value {
-                CommandOptionValue::Focused(value, _) if opt.name == "game" => {
-                    return autocomplete_games(ctx, interaction, value).await;
-                }
-                _ => {}
-            }
-        }
-    }
-
     defer_ephemeral(ctx, interaction).await?;
 
-    match subcommand {
+    match opts.subcommand() {
         Some(("muted", opts)) => mods_muted(ctx, interaction, opts).await,
         Some(("mute", opts)) => mods_mute(ctx, interaction, opts).await,
         Some(("unmute", opts)) => mods_unmute(ctx, interaction, opts).await,
@@ -663,22 +636,9 @@ async fn users(
     interaction: &Interaction,
     opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let subcommand = opts.subcommand();
-
-    if let Some((_, opts)) = subcommand {
-        for opt in opts {
-            match &opt.value {
-                CommandOptionValue::Focused(value, _) if opt.name == "game" => {
-                    return autocomplete_games(ctx, interaction, value).await;
-                }
-                _ => {}
-            }
-        }
-    }
-
     defer_ephemeral(ctx, interaction).await?;
 
-    match subcommand {
+    match opts.subcommand() {
         Some(("muted", opts)) => users_muted(ctx, interaction, opts).await,
         Some(("mute", opts)) => users_mute(ctx, interaction, opts).await,
         Some(("unmute", opts)) => users_unmute(ctx, interaction, opts).await,

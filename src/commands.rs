@@ -138,6 +138,29 @@ impl SubCommandExt for &[CommandDataOption] {
     }
 }
 
+trait AutocompleteExt {
+    fn autocomplete(&self) -> Option<(&str, &str)>;
+}
+
+fn find_autocomplete_option(opts: &[CommandDataOption]) -> Option<(&str, &str)> {
+    for opt in opts {
+        match &opt.value {
+            CommandOptionValue::SubCommand(opts) | CommandOptionValue::SubCommandGroup(opts) => {
+                return find_autocomplete_option(opts)
+            }
+            CommandOptionValue::Focused(value, _) => return Some((&opt.name, value)),
+            _ => {}
+        }
+    }
+    None
+}
+
+impl AutocompleteExt for &CommandData {
+    fn autocomplete(&self) -> Option<(&str, &str)> {
+        find_autocomplete_option(&self.options)
+    }
+}
+
 async fn create_response(
     ctx: &Context,
     interaction: &Interaction,

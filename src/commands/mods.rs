@@ -22,7 +22,7 @@ use twilight_util::builder::embed::{
 
 use super::{
     autocomplete_games, create_response, defer_component_response, defer_response, search_game,
-    update_response_content, EphemeralMessage,
+    update_response_content, AutocompleteExt, EphemeralMessage,
 };
 use crate::bot::Context;
 use crate::db::types::GuildId;
@@ -55,13 +55,8 @@ pub async fn list(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
-    for opt in &command.options {
-        match &opt.value {
-            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
-                return autocomplete_games(ctx, interaction, value).await;
-            }
-            _ => {}
-        }
+    if let Some(("game", value)) = command.autocomplete() {
+        return autocomplete_games(ctx, interaction, value).await;
     }
 
     let mut search = None;
@@ -228,13 +223,8 @@ pub async fn popular(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
-    for opt in &command.options {
-        match &opt.value {
-            CommandOptionValue::Focused(value, _) if opt.name == "game" => {
-                return autocomplete_games(ctx, interaction, value).await;
-            }
-            _ => {}
-        }
+    if let Some(("game", value)) = command.autocomplete() {
+        return autocomplete_games(ctx, interaction, value).await;
     }
 
     defer_response(ctx, interaction).await?;
