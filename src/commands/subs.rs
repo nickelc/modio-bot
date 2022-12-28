@@ -552,7 +552,7 @@ async fn mods_mute(
     let game_filter = game_filter.expect("required option");
     let mod_filter = mod_filter.expect("required option");
 
-    let game_mod = find_game_mod(ctx.modio.clone(), game_filter, mod_filter).await?;
+    let game_mod = find_game_mod(&ctx.modio, game_filter, mod_filter).await?;
 
     let content: Cow<'_, str> = match game_mod {
         (None, _) => "Game not found.".into(),
@@ -603,7 +603,7 @@ async fn mods_unmute(
     let game_filter = game_filter.expect("required option");
     let mod_filter = mod_filter.expect("required option");
 
-    let game_mod = find_game_mod(ctx.modio.clone(), game_filter, mod_filter).await?;
+    let game_mod = find_game_mod(&ctx.modio, game_filter, mod_filter).await?;
 
     let content: Cow<'_, str> = match game_mod {
         (None, _) => "Game not found.".into(),
@@ -789,7 +789,7 @@ async fn users_unmute(
 }
 
 async fn find_game_mod(
-    modio: Modio,
+    modio: &Modio,
     game_filter: Filter,
     mod_filter: Filter,
 ) -> Result<(Option<Game>, Option<Mod>), Error> {
