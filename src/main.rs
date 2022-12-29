@@ -10,6 +10,8 @@ use std::path::PathBuf;
 
 use dotenv::dotenv;
 use futures_util::StreamExt;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::EnvFilter;
 
 mod bot;
 mod commands;
@@ -47,7 +49,10 @@ async fn main() {
 
 async fn try_main() -> CliResult {
     dotenv().ok();
-    tracing_subscriber::fmt::init();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let mut args = pico_args::Arguments::from_env();
     if args.contains(["-h", "--help"]) {
