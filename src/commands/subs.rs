@@ -220,7 +220,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
                         content.push_str(", ");
                     }
                 }
-                content.push_str("\n");
+                content.push('\n');
             }
         }
         embed = embed.field(EmbedFieldBuilder::new("Muted mods", content));
@@ -250,7 +250,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
                         content.push_str(", ");
                     }
                 }
-                content.push_str("\n");
+                content.push('\n');
             }
         }
         embed = embed.field(EmbedFieldBuilder::new("Muted users", content));
@@ -826,7 +826,7 @@ async fn find_game_mod(
 }
 
 impl Events {
-    const fn to_suffix(&self) -> &'static str {
+    const fn to_suffix(self) -> &'static str {
         match (self.contains(Events::NEW), self.contains(Events::UPD)) {
             (true, true) | (false, false) => " (+Δ)",
             (true, false) => " (+)",
