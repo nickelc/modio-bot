@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 
 use futures_util::stream::FuturesUnordered;
 use futures_util::{future, TryStreamExt};
@@ -197,63 +197,17 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     embed = embed.description(content);
 
     if !excluded_mods.is_empty() {
-        let excluded_mods = excluded_mods
-            .into_iter()
-            .map(|((game_id, channel_id), mods)| (channel_id, (game_id, mods)))
-            .fold(BTreeMap::<_, Vec<_>>::new(), | mut map, (key, value)| {
-                map.entry(key).or_default().push(value);
-                map
-            });
-        let mut content = String::new();
-        for (channel_id, entries) in excluded_mods {
-            let _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
-            for (game_id, mods) in entries {
-                if let Some(game) = games.get(&game_id) {
-                    let _ = write!(&mut content, "{game_id}. {game}: ");
-                } else {
-                    let _ = write!(&mut content, "{game_id}: ");
-                }
-                let mut it = mods.iter().peekable();
-                while let Some(mod_) = it.next() {
-                    let _ = write!(&mut content, "{mod_}");
-                    if it.peek().is_some() {
-                        content.push_str(", ");
-                    }
-                }
-                content.push('\n');
-            }
-        }
-        embed = embed.field(EmbedFieldBuilder::new("Muted mods", content));
+        embed = embed.field(EmbedFieldBuilder::new(
+            "Muted mods",
+            to_content(&games, excluded_mods),
+        ));
     }
 
     if !excluded_users.is_empty() {
-        let excluded_users = excluded_users
-            .into_iter()
-            .map(|((game_id, channel_id), users)| (channel_id, (game_id, users)))
-            .fold(BTreeMap::<_, Vec<_>>::new(), |mut map, (key, value)| {
-                map.entry(key).or_default().push(value);
-                map
-            });
-        let mut content = String::new();
-        for (channel_id, entries) in excluded_users {
-            let _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
-            for (game_id, users) in entries {
-                if let Some(game) = games.get(&game_id) {
-                    let _ = write!(&mut content, "{game_id}. {game}: ");
-                } else {
-                    let _ = write!(&mut content, "{game_id}: ");
-                }
-                let mut it = users.iter().peekable();
-                while let Some(user) = it.next() {
-                    let _ = write!(&mut content, "`{user}`");
-                    if it.peek().is_some() {
-                        content.push_str(", ");
-                    }
-                }
-                content.push('\n');
-            }
-        }
-        embed = embed.field(EmbedFieldBuilder::new("Muted users", content));
+        embed = embed.field(EmbedFieldBuilder::new(
+            "Muted users",
+            to_content(&games, excluded_users),
+        ));
     }
     ctx.interaction()
         .update_response(&interaction.token)
@@ -261,6 +215,42 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
         .await?;
 
     Ok(())
+}
+
+fn to_content<I, E, D>(games: &HashMap<u32, String>, excluded: I) -> String
+where
+    I: IntoIterator<Item = ((GameId, ChannelId), E)>,
+    E: IntoIterator<Item = D>,
+    D: Display,
+{
+    let excluded = excluded
+        .into_iter()
+        .map(|((game_id, channel_id), items)| (channel_id, (game_id, items)))
+        .fold(BTreeMap::<_, Vec<_>>::new(), |mut map, (key, value)| {
+            map.entry(key).or_default().push(value);
+            map
+        });
+
+    let mut content = String::new();
+    for (channel_id, entries) in excluded {
+        let _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
+        for (game_id, items) in entries {
+            if let Some(game) = games.get(&game_id) {
+                let _ = write!(&mut content, "{game_id}. {game}: ");
+            } else {
+                let _ = write!(&mut content, "{game_id}: ");
+            }
+            let mut it = items.into_iter().peekable();
+            while let Some(item) = it.next() {
+                let _ = write!(&mut content, "`{item}`");
+                if it.peek().is_some() {
+                    content.push_str(", ");
+                }
+            }
+            content.push('\n');
+        }
+    }
+    content
 }
 
 async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
