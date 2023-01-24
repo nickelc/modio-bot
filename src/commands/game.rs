@@ -14,8 +14,8 @@ use twilight_util::builder::command::{CommandBuilder, StringBuilder};
 use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
 use super::{
-    create_response, defer_response, update_response_content, update_response_from_content,
-    EphemeralMessage,
+    autocomplete_games, create_response, defer_response, update_response_content,
+    update_response_from_content, AutocompleteExt, EphemeralMessage,
 };
 use crate::bot::Context;
 use crate::db::types::GuildId;
@@ -29,7 +29,7 @@ pub fn commands() -> Vec<Command> {
             "List all games on <https://mod.io>",
             CommandType::ChatInput,
         )
-        .option(StringBuilder::new("search", "ID or search"))
+        .option(StringBuilder::new("search", "ID or search").autocomplete(true))
         .build(),
         CommandBuilder::new("game", "Display the default game.", CommandType::ChatInput)
             .dm_permission(false)
@@ -42,6 +42,10 @@ pub async fn games(
     interaction: &Interaction,
     command: &CommandData,
 ) -> Result<(), Error> {
+    if let Some(("search", value)) = command.autocomplete() {
+        return autocomplete_games(ctx, interaction, value).await;
+    }
+
     let filter = match command.options.as_slice() {
         [CommandDataOption {
             value: CommandOptionValue::String(s),
