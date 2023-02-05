@@ -116,6 +116,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     continue;
                 }
                 let sender = sender.clone();
+                let subscriptions = ctx.subscriptions.clone();
                 let unknown_channels = unknown_channels2.clone();
                 let filter = filter.clone();
                 let game = ctx.modio.game(*game_id);
@@ -135,6 +136,12 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             tracing::warn!(
                                 "skipping polling: can't retrieve game (id={game_id}): {e}"
                             );
+
+                            if e.status().map(|s| s.as_u16()) == Some(404) {
+                                if let Err(e) = subscriptions.cleanup_unknown_games(&[game_id]) {
+                                    error!("{e}");
+                                }
+                            }
 
                             return Ok(());
                         }
