@@ -52,7 +52,7 @@ default-features = false
 features = ["rustls-tls"]
 
 [build-dependencies]
-git2 = { version = "0.15", default-features = false }
+git2 = { version = "0.16", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
