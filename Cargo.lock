@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "modbot"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "bitflags 2.0.1",
  "bytesize",
