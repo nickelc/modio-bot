@@ -890,9 +890,9 @@ dependencies = [
 
 [[package]]
 name = "modio"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d15a0f38ad898e558330c4befbe48e05a082a64d456bc16253717296f67f6e67"
+checksum = "30a8a0c9498f7dd5c67222ed94acb2347326307808d7966a3b46bb13174de4cc"
 dependencies = [
  "bitflags",
  "bytes",
