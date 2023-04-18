@@ -74,13 +74,7 @@ impl FromSql<Text, Sqlite> for Tags {
 
 impl ToSql<Text, Sqlite> for Tags {
     fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
-        let tags = self.to_string();
-        // Workaround for the issue with empty owned strings being serialized as null values.
-        if tags.is_empty() {
-            out.set_value("");
-        } else {
-            out.set_value(tags);
-        }
+        out.set_value(self.to_string());
         Ok(serialize::IsNull::No)
     }
 }
