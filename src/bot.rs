@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use modio::Modio;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
-use twilight_gateway::cluster::Events;
-use twilight_gateway::{Cluster, EventTypeFlags, Intents};
+use twilight_gateway::{stream, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::client::InteractionClient;
 use twilight_http::Client;
 use twilight_model::application::interaction::InteractionData;
@@ -42,7 +41,7 @@ pub async fn initialize(
     modio: Modio,
     pool: DbPool,
     metrics: Metrics,
-) -> Result<(Cluster, Events, Context), Error> {
+) -> Result<(Vec<Shard>, Context), Error> {
     let client = Arc::new(Client::new(config.bot.token.clone()));
     let application = client.current_user_application().await?.model().await?;
 
@@ -62,7 +61,7 @@ pub async fn initialize(
     )
     .expect("required activity is provided");
 
-    let (cluster, events) = Cluster::builder(config.bot.token.clone(), Intents::GUILDS)
+    let config = ConfigBuilder::new(config.bot.token.clone(), Intents::GUILDS)
         .event_types(
             EventTypeFlags::READY
                 | EventTypeFlags::GUILD_CREATE
@@ -70,9 +69,11 @@ pub async fn initialize(
                 | EventTypeFlags::INTERACTION_CREATE,
         )
         .presence(presence)
-        .http_client(Arc::clone(&client))
-        .build()
-        .await?;
+        .build();
+
+    let shards = stream::create_recommended(&client, config, |_, config| config.build())
+        .await?
+        .collect::<Vec<_>>();
 
     let cache = InMemoryCache::builder()
         .resource_types(ResourceType::USER_CURRENT)
@@ -89,7 +90,7 @@ pub async fn initialize(
         metrics,
     };
 
-    Ok((cluster, events, ctx))
+    Ok((shards, ctx))
 }
 
 pub async fn handle_event(event: Event, context: Context) {

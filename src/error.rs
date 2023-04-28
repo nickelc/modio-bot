@@ -18,9 +18,16 @@ pub enum Error {
     Modio(ModioError),
     Dbl(DblError),
     Database(DatabaseErrorInner),
+    Tokio(TokioError),
     Twilight(TwilightError),
     Config(TomlError),
     Metrics(PrometheusError),
+}
+
+#[derive(Debug)]
+pub enum TokioError {
+    Join(tokio::task::JoinError),
+    WatchSend(tokio::sync::watch::error::SendError<bool>),
 }
 
 #[derive(Debug)]
@@ -31,7 +38,7 @@ pub enum DatabaseErrorInner {
 
 #[derive(Debug)]
 pub enum TwilightError {
-    ClusterStart(twilight_gateway::cluster::ClusterStartError),
+    Start(twilight_gateway::stream::StartRecommendedError),
     Http(twilight_http::Error),
     Validation(TwilightValidation),
     Deserialization(twilight_http::response::DeserializeBodyError),
@@ -48,7 +55,9 @@ impl fmt::Display for Error {
             Error::Args(e) => e.fmt(fmt),
             Error::Message(e) => e.fmt(fmt),
             Error::Io(e) => write!(fmt, "IO error: {e}"),
-            Error::Twilight(TwilightError::ClusterStart(e)) => e.fmt(fmt),
+            Error::Tokio(TokioError::Join(e)) => e.fmt(fmt),
+            Error::Tokio(TokioError::WatchSend(e)) => e.fmt(fmt),
+            Error::Twilight(TwilightError::Start(e)) => e.fmt(fmt),
             Error::Twilight(TwilightError::Http(e)) => e.fmt(fmt),
             Error::Twilight(TwilightError::Validation(TwilightValidation::Message(e))) => {
                 e.fmt(fmt)
@@ -112,9 +121,21 @@ impl From<PrometheusError> for Error {
     }
 }
 
-impl From<twilight_gateway::cluster::ClusterStartError> for Error {
-    fn from(e: twilight_gateway::cluster::ClusterStartError) -> Self {
-        Error::Twilight(TwilightError::ClusterStart(e))
+impl From<tokio::task::JoinError> for Error {
+    fn from(e: tokio::task::JoinError) -> Self {
+        Error::Tokio(TokioError::Join(e))
+    }
+}
+
+impl From<tokio::sync::watch::error::SendError<bool>> for Error {
+    fn from(e: tokio::sync::watch::error::SendError<bool>) -> Self {
+        Error::Tokio(TokioError::WatchSend(e))
+    }
+}
+
+impl From<twilight_gateway::stream::StartRecommendedError> for Error {
+    fn from(e: twilight_gateway::stream::StartRecommendedError) -> Self {
+        Error::Twilight(TwilightError::Start(e))
     }
 }
 

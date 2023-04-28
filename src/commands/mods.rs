@@ -22,10 +22,9 @@ use twilight_util::builder::embed::{
 
 use super::{
     autocomplete_games, create_response, defer_component_response, defer_response, search_game,
-    update_response_content, AutocompleteExt, EphemeralMessage,
+    update_response_content, AutocompleteExt, EphemeralMessage, InteractionExt,
 };
 use crate::bot::Context;
-use crate::db::types::GuildId;
 use crate::error::Error;
 use crate::util::format_timestamp;
 
@@ -82,7 +81,7 @@ pub async fn list(
         }
     }
 
-    let game_id = match (game_id, interaction.guild_id.map(GuildId)) {
+    let game_id = match (game_id, interaction.guild_id()) {
         (Some(game_id), _) => Some(game_id),
         (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,
@@ -244,7 +243,7 @@ pub async fn popular(
         _ => None,
     };
 
-    let game_id = match (game_id, interaction.guild_id.map(GuildId)) {
+    let game_id = match (game_id, interaction.guild_id()) {
         (Some(game_id), _) => Some(game_id),
         (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,

@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 
 use dotenv::dotenv;
-use futures_util::StreamExt;
+use futures_util::{future, StreamExt};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -22,8 +22,11 @@ mod metrics;
 mod tasks;
 mod util;
 
+use bot::Context;
 use db::init_db;
 use metrics::Metrics;
+use twilight_gateway::stream::ShardEventStream;
+use twilight_gateway::{CloseFrame, Shard};
 use util::*;
 
 const HELP: &str = "\
@@ -71,8 +74,7 @@ async fn try_main() -> CliResult {
     let pool = init_db(&config.bot.database_url)?;
     let modio = init_modio(&config)?;
 
-    let (cluster, mut events, context) =
-        bot::initialize(&config, modio, pool, metrics.clone()).await?;
+    let (mut shards, context) = bot::initialize(&config, modio, pool, metrics.clone()).await?;
 
     if let Some(cmd) = args.subcommand()? {
         match cmd {
@@ -96,20 +98,46 @@ async fn try_main() -> CliResult {
         tokio::spawn(tasks::dbl::task(bot, metrics, &token)?);
     }
 
-    cluster.up().await;
+    let (tx, mut rx) = tokio::sync::watch::channel(false);
 
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to listen to ctrlc event.");
-        tracing::info!("Shutting down cluster");
-        cluster.down();
+    let handle = tokio::spawn(async move {
+        tokio::select! {
+            _ = gateway_runner(context, shards.iter_mut()) => {},
+            _ = rx.changed() => {
+                future::join_all(shards.iter_mut().map(|shard| async move {
+                    shard.close(CloseFrame::NORMAL).await
+                })).await;
+            }
+        }
     });
 
-    while let Some((_, event)) = events.next().await {
+    tokio::signal::ctrl_c().await?;
+
+    tracing::info!("Shutting down");
+    tx.send(true)?;
+
+    handle.await?;
+    Ok(())
+}
+
+async fn gateway_runner(context: Context, shards: impl Iterator<Item = &mut Shard>) {
+    let mut stream = ShardEventStream::new(shards);
+
+    loop {
+        let event = match stream.next().await {
+            Some((_, Ok(event))) => event,
+            Some((_, Err(source))) => {
+                tracing::warn!(?source, "error receiving event");
+
+                if source.is_fatal() {
+                    break;
+                }
+                continue;
+            }
+            None => break,
+        };
+
         let context = context.clone();
         tokio::spawn(bot::handle_event(event, context));
     }
-
-    Ok(())
 }

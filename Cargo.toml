@@ -42,12 +42,12 @@ diesel_migrations = "2.0"
 libsqlite3-sys = { version = ">=0.17.2, <0.26.0", optional = true }
 
 # twilight
-twilight-gateway = "0.14"
-twilight-http = "0.14"
-twilight-model= "0.14"
-twilight-cache-inmemory = "0.14"
-twilight-util = { version = "0.14", features = ["builder"] }
-twilight-validate = "0.14"
+twilight-gateway = "0.15"
+twilight-http = "0.15"
+twilight-model= "0.15"
+twilight-cache-inmemory = "0.15"
+twilight-util = { version = "0.15", features = ["builder"] }
+twilight-validate = "0.15"
 
 [dependencies.modio]
 version = "0.7.2"

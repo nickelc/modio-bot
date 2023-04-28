@@ -15,10 +15,9 @@ use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
 use super::{
     autocomplete_games, create_response, defer_response, update_response_content,
-    update_response_from_content, AutocompleteExt, EphemeralMessage,
+    update_response_from_content, AutocompleteExt, EphemeralMessage, InteractionExt,
 };
 use crate::bot::Context;
-use crate::db::types::GuildId;
 use crate::error::Error;
 use crate::util::{ContentBuilder, IntoFilter};
 
@@ -90,7 +89,7 @@ pub async fn games(
 }
 
 pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let game_id = match interaction.guild_id.map(GuildId) {
+    let game_id = match interaction.guild_id() {
         Some(guild_id) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,
     };

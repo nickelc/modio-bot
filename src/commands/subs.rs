@@ -21,10 +21,10 @@ use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use super::{
     autocomplete_games, create_response, defer_ephemeral, search_game, update_response_content,
-    update_response_from_content, AutocompleteExt, EphemeralMessage, SubCommandExt,
+    update_response_from_content, AutocompleteExt, EphemeralMessage, InteractionExt, SubCommandExt,
 };
 use crate::bot::Context;
-use crate::db::types::{ChannelId, GameId, GuildId, ModId};
+use crate::db::types::{ChannelId, GameId, ModId};
 use crate::db::{Events, Tags};
 use crate::error::Error;
 use crate::util::{ContentBuilder, IntoFilter};
@@ -143,7 +143,7 @@ pub async fn handle_command(
 }
 
 async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let guild_id = interaction.guild_id.map(GuildId).unwrap();
+    let guild_id = interaction.guild_id().unwrap();
 
     let (subs, excluded_mods, excluded_users) = ctx.subscriptions.list_for_overview(guild_id)?;
 
@@ -254,7 +254,7 @@ where
 }
 
 async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
-    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+    let channel_id = interaction.channel_id().unwrap();
     let subs = ctx.subscriptions.list_for_channel(channel_id)?;
 
     if subs.is_empty() {
@@ -348,8 +348,8 @@ async fn subscribe(
         return update_response_content(ctx, interaction, &content).await;
     }
 
-    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
-    let guild_id = interaction.guild_id.map(GuildId).unwrap();
+    let channel_id = interaction.channel_id().unwrap();
+    let guild_id = interaction.guild_id().unwrap();
 
     let game_tags = game
         .tag_options
@@ -426,7 +426,7 @@ async fn unsubscribe(
     }
 
     let game = game.expect("required option");
-    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+    let channel_id = interaction.channel_id().unwrap();
 
     let game_tags = game
         .tag_options
@@ -488,7 +488,7 @@ async fn mods_muted(
     interaction: &Interaction,
     _opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+    let channel_id = interaction.channel_id().unwrap();
     let excluded = ctx.subscriptions.list_excluded_mods(channel_id)?;
 
     let muted = match excluded.len() {
@@ -566,8 +566,8 @@ async fn mods_mute(
         (None, _) => "Game not found.".into(),
         (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
-            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
-            let guild_id = interaction.guild_id.map(GuildId).unwrap();
+            let channel_id = interaction.channel_id().unwrap();
+            let guild_id = interaction.guild_id().unwrap();
 
             let ret =
                 ctx.subscriptions
@@ -617,7 +617,7 @@ async fn mods_unmute(
         (None, _) => "Game not found.".into(),
         (_, None) => "Mod not found.".into(),
         (Some(game), Some(mod_)) => {
-            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+            let channel_id = interaction.channel_id().unwrap();
 
             let ret = ctx
                 .subscriptions
@@ -660,7 +660,7 @@ async fn users_muted(
     interaction: &Interaction,
     _opts: &[CommandDataOption],
 ) -> Result<(), Error> {
-    let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+    let channel_id = interaction.channel_id().unwrap();
     let excluded = ctx.subscriptions.list_excluded_users(channel_id)?;
 
     let muted = match excluded.len() {
@@ -725,8 +725,8 @@ async fn users_mute(
     let game = ctx.modio.games().search(game_filter).first().await?;
     let content: Cow<'_, str> = match game {
         Some(game) => {
-            let guild_id = interaction.guild_id.map(GuildId).unwrap();
-            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+            let guild_id = interaction.guild_id().unwrap();
+            let channel_id = interaction.channel_id().unwrap();
 
             let ret = ctx
                 .subscriptions
@@ -774,7 +774,7 @@ async fn users_unmute(
     let game = ctx.modio.games().search(game_filter).first().await?;
     let content: Cow<'_, str> = match game {
         Some(game) => {
-            let channel_id = interaction.channel_id.map(ChannelId).unwrap();
+            let channel_id = interaction.channel_id().unwrap();
 
             let ret = ctx
                 .subscriptions

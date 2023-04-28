@@ -1,6 +1,8 @@
 use modio::games::Game;
 use twilight_http::client::InteractionClient;
-use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionChoiceData};
+use twilight_model::application::command::{
+    Command, CommandOptionChoice, CommandOptionChoiceValue,
+};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
@@ -15,6 +17,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::Context;
 use crate::db::autocomplete::{games_by_name, games_by_name_id};
+use crate::db::types::{ChannelId, GuildId};
 use crate::error::Error;
 
 mod basic;
@@ -100,6 +103,21 @@ impl EphemeralMessage for EmbedBuilder {
             .flags(MessageFlags::EPHEMERAL)
             .embeds([embed])
             .build()
+    }
+}
+
+trait InteractionExt {
+    fn guild_id(&self) -> Option<GuildId>;
+    fn channel_id(&self) -> Option<ChannelId>;
+}
+
+impl InteractionExt for Interaction {
+    fn guild_id(&self) -> Option<GuildId> {
+        self.guild_id.map(GuildId)
+    }
+
+    fn channel_id(&self) -> Option<ChannelId> {
+        self.channel.as_ref().map(|c| ChannelId(c.id))
     }
 }
 
@@ -277,13 +295,10 @@ async fn autocomplete_games(
         |value| games_by_name_id(&ctx.pool, value),
     )?;
 
-    let choices = games.into_iter().map(|(id, name)| {
-        let data = CommandOptionChoiceData {
-            name,
-            name_localizations: None,
-            value: id.to_string(),
-        };
-        CommandOptionChoice::String(data)
+    let choices = games.into_iter().map(|(id, name)| CommandOptionChoice {
+        name,
+        name_localizations: None,
+        value: CommandOptionChoiceValue::String(id.to_string()),
     });
     let data = InteractionResponseDataBuilder::new()
         .choices(choices)
