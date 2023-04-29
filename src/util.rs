@@ -179,18 +179,29 @@ pub fn format_timestamp(seconds: i64) -> String {
     String::new()
 }
 
-pub fn strip_html_tags<S>(input: S) -> String
-where
-    S: AsRef<str>,
-{
-    use kuchiki::traits::*;
+pub fn strip_html_tags<S: AsRef<str>>(input: S) -> String {
+    use html5ever::tendril::TendrilSink;
+    use html5ever::{parse_document, ParseOpts};
+    use markup5ever_rcdom::{Node, NodeData, RcDom};
 
-    kuchiki::parse_html().one(input.as_ref()).text_contents()
+    fn fold_text(elem: &Node, out: &mut String) {
+        if let NodeData::Text { contents } = &elem.data {
+            out.push_str(&contents.borrow());
+        }
+        for child in &*elem.children.borrow() {
+            fold_text(child, out);
+        }
+    }
+
+    let dom = parse_document(RcDom::default(), ParseOpts::default()).one(input.as_ref());
+    let mut out = String::new();
+    fold_text(&dom.document, &mut out);
+    out
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ContentBuilder;
+    use super::{strip_html_tags, ContentBuilder};
     use std::fmt::Write;
 
     #[test]
@@ -216,6 +227,21 @@ mod tests {
         assert_eq!(c.content[0], "foo".repeat(5));
         assert_eq!(c.content[1], "foo".repeat(6));
         assert_eq!(c.content[2], "foobar");
+    }
+
+    #[test]
+    fn test_strip_html_tags() {
+        let input = "aaa<br/>";
+        assert_eq!("aaa", strip_html_tags(input));
+
+        let input = "aaa<br/> bbb";
+        assert_eq!("aaa bbb", strip_html_tags(input));
+
+        let input = "- aaa\n- bbb\n - ccc\n";
+        assert_eq!(input, strip_html_tags(input));
+
+        let input = "<div>- aaa\n- bbb\n - ccc\n</div>";
+        assert_eq!("- aaa\n- bbb\n - ccc\n", strip_html_tags(input));
     }
 }
 

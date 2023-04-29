@@ -21,7 +21,6 @@ dotenv = "0.15"
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 hyper = { version = "0.14", features = ["server"] }
-kuchiki = "0.8"
 pico-args = "0.5"
 prometheus = { version = "0.13", default-features = false }
 serde = { version = "1", features = ["derive"] }
@@ -32,6 +31,10 @@ tokio-stream = "0.1"
 toml = "0.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
+
+# strip html tags
+html5ever = "0.26.0"
+markup5ever_rcdom = "0.2.0"
 
 # diesel
 diesel = { version = "2.0.4", default-features = false, features = ["r2d2", "sqlite"] }
