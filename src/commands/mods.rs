@@ -267,7 +267,7 @@ pub async fn popular(
 
     let mut content = String::new();
     for mod_ in mods {
-        let _ = writeln!(
+        _ = writeln!(
             content,
             "{:02}. [{}]({}) ({}) +{}/-{}",
             mod_.stats.popularity.rank_position,
@@ -300,7 +300,7 @@ pub async fn popular(
 fn create_list_embed(mods: &[Mod], title: &str, page: usize, page_count: usize) -> Embed {
     let mut content = String::new();
     for mod_ in mods {
-        let _ = writeln!(content, "{}. {}", mod_.id, mod_.name);
+        _ = writeln!(content, "{}. {}", mod_.id, mod_.name);
     }
     EmbedBuilder::new()
         .title(title)
@@ -341,7 +341,7 @@ fn create_browse_buttons(
         ..custom_id
     };
     let next = Button {
-        custom_id: Some(serde_urlencoded::to_string(&custom_id).unwrap()),
+        custom_id: Some(serde_urlencoded::to_string(custom_id).unwrap()),
         style: ButtonStyle::Primary,
         label: Some("next".to_owned()),
         disabled: page == page_count,
@@ -420,16 +420,16 @@ Votes: +{}/-{}"#,
             String::new()
         };
         if let Some(homepage) = &m.homepage_url {
-            let _ = write!(info, "[Homepage]({homepage}), ");
+            _ = write!(info, "[Homepage]({homepage}), ");
         }
         if let Some(f) = &m.modfile {
             if with_ddl {
-                let _ = writeln!(info, "[Download]({})", f.download.binary_url);
+                _ = writeln!(info, "[Download]({})", f.download.binary_url);
             }
             if let Some(version) = &f.version {
-                let _ = writeln!(info, "Version: {version}");
+                _ = writeln!(info, "Version: {version}");
             }
-            let _ = writeln!(info, "Size: {}", bytesize::to_string(f.filesize, false));
+            _ = writeln!(info, "Size: {}", bytesize::to_string(f.filesize, false));
         }
         if info.len() > 7 {
             Some(EmbedField {
