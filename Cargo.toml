@@ -34,7 +34,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 
 # strip html tags
 html5ever = "0.26.0"
-markup5ever_rcdom = "0.2.0"
 
 # diesel
 diesel = { version = "2.0.4", default-features = false, features = ["r2d2", "sqlite"] }

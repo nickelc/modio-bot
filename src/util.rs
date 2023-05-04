@@ -182,21 +182,133 @@ pub fn format_timestamp(seconds: i64) -> String {
 pub fn strip_html_tags<S: AsRef<str>>(input: S) -> String {
     use html5ever::tendril::TendrilSink;
     use html5ever::{parse_document, ParseOpts};
-    use markup5ever_rcdom::{Node, NodeData, RcDom};
+    use sink::TextOnly;
 
-    fn fold_text(elem: &Node, out: &mut String) {
-        if let NodeData::Text { contents } = &elem.data {
-            out.push_str(&contents.borrow());
-        }
-        for child in &*elem.children.borrow() {
-            fold_text(child, out);
+    parse_document(TextOnly::default(), ParseOpts::default()).one(input.as_ref())
+}
+
+mod sink {
+    use std::borrow::Cow;
+    use std::rc::Rc;
+
+    use html5ever::tendril::StrTendril;
+    use html5ever::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
+    use html5ever::{Attribute, ExpandedName, QualName};
+
+    #[derive(Default)]
+    pub struct TextOnly {
+        text: String,
+    }
+
+    pub struct Node {
+        data: NodeData,
+    }
+
+    impl Node {
+        fn new(data: NodeData) -> Rc<Self> {
+            Rc::new(Self { data })
         }
     }
 
-    let dom = parse_document(RcDom::default(), ParseOpts::default()).one(input.as_ref());
-    let mut out = String::new();
-    fold_text(&dom.document, &mut out);
-    out
+    enum NodeData {
+        Document,
+        Comment,
+        ProcessingInformation,
+        Element { name: QualName },
+    }
+
+    type Handle = Rc<Node>;
+
+    impl TreeSink for TextOnly {
+        type Handle = Handle;
+
+        type Output = String;
+
+        fn finish(self) -> Self::Output {
+            self.text
+        }
+
+        fn parse_error(&mut self, _msg: Cow<'static, str>) {}
+
+        fn get_document(&mut self) -> Self::Handle {
+            Node::new(NodeData::Document)
+        }
+
+        fn elem_name<'a>(&'a self, target: &'a Self::Handle) -> ExpandedName<'a> {
+            match &target.data {
+                NodeData::Element { name } => name.expanded(),
+                _ => panic!("not an element!"),
+            }
+        }
+
+        fn create_element(
+            &mut self,
+            name: QualName,
+            _attrs: Vec<Attribute>,
+            _flags: ElementFlags,
+        ) -> Self::Handle {
+            Node::new(NodeData::Element { name })
+        }
+
+        fn create_comment(&mut self, _text: StrTendril) -> Self::Handle {
+            Node::new(NodeData::Comment)
+        }
+
+        fn create_pi(&mut self, _target: StrTendril, _data: StrTendril) -> Self::Handle {
+            Node::new(NodeData::ProcessingInformation)
+        }
+
+        fn append_doctype_to_document(
+            &mut self,
+            _name: StrTendril,
+            _public_id: StrTendril,
+            _system_id: StrTendril,
+        ) {
+        }
+
+        fn append(&mut self, _parent: &Self::Handle, child: NodeOrText<Self::Handle>) {
+            if let NodeOrText::AppendText(text) = &child {
+                self.text.push_str(text);
+            }
+        }
+
+        fn append_based_on_parent_node(
+            &mut self,
+            _element: &Self::Handle,
+            _prev_element: &Self::Handle,
+            child: NodeOrText<Self::Handle>,
+        ) {
+            if let NodeOrText::AppendText(text) = &child {
+                self.text.push_str(text);
+            }
+        }
+
+        fn append_before_sibling(
+            &mut self,
+            _sibling: &Self::Handle,
+            _new_node: NodeOrText<Self::Handle>,
+        ) {
+            // This would be called for `InsertionPoint::BeforeSibling` but this enum variant is
+            // currently not constructed in `html5ever`'s code.
+            unimplemented!()
+        }
+
+        fn get_template_contents(&mut self, _target: &Self::Handle) -> Self::Handle {
+            Node::new(NodeData::Document)
+        }
+
+        fn same_node(&self, x: &Self::Handle, y: &Self::Handle) -> bool {
+            Rc::ptr_eq(x, y)
+        }
+
+        fn set_quirks_mode(&mut self, _mode: QuirksMode) {}
+
+        fn add_attrs_if_missing(&mut self, _target: &Self::Handle, _attrs: Vec<Attribute>) {}
+
+        fn remove_from_parent(&mut self, _target: &Self::Handle) {}
+
+        fn reparent_children(&mut self, _node: &Self::Handle, _new_parent: &Self::Handle) {}
+    }
 }
 
 #[cfg(test)]
