@@ -5,10 +5,13 @@ use diesel::serialize::{self, ToSql};
 use diesel::sql_types::Integer;
 use diesel::sqlite::Sqlite;
 
+#[derive(Clone, Copy, Debug, AsExpression, FromSqlRow)]
+#[diesel(sql_type = Integer)]
+#[repr(transparent)]
+pub struct Events(i32);
+
 bitflags::bitflags! {
-    #[derive(Clone, Copy, Debug, AsExpression, FromSqlRow)]
-    #[diesel(sql_type = Integer)]
-    pub struct Events: i32 {
+    impl Events: i32 {
         const NEW = 0b0001;
         const UPD = 0b0010;
         const ALL = Self::NEW.bits() | Self::UPD.bits();
@@ -30,7 +33,7 @@ impl FromSql<Integer, Sqlite> for Events {
 
 impl ToSql<Integer, Sqlite> for Events {
     fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
-        out.set_value(self.bits());
+        out.set_value(self.0);
         Ok(serialize::IsNull::No)
     }
 }

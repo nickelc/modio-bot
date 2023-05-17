@@ -12,7 +12,7 @@ rust-version = "1.65.0"
 include = ["src/**/*.rs", "src/**/*.md", "LICENSE-*", "README.md", "build.rs", "migrations"]
 
 [dependencies]
-bitflags = "2.0"
+bitflags = "2.3.1"
 bytesize = "1"
 csv = "1.1"
 dashmap = "5.4"
