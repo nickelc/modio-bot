@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops::Deref;
 
-use diesel::backend::RawValue;
+use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::serialize::{self, ToSql};
@@ -103,7 +103,7 @@ impl fmt::Debug for UserId {
 }
 
 impl FromSql<Integer, Sqlite> for GameId {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let id = i32::from_sql(bytes)?;
         Ok(Self(u32::try_from(id)?))
     }
@@ -117,7 +117,7 @@ impl ToSql<Integer, Sqlite> for GameId {
 }
 
 impl FromSql<Integer, Sqlite> for ModId {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let id = i32::from_sql(bytes)?;
         Ok(Self(u32::try_from(id)?))
     }
@@ -131,7 +131,7 @@ impl ToSql<Integer, Sqlite> for ModId {
 }
 
 impl FromSql<BigInt, Sqlite> for ChannelId {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let id = i64::from_sql(bytes)?;
         Ok(Self(Id::try_from(id)?))
     }
@@ -145,7 +145,7 @@ impl ToSql<BigInt, Sqlite> for ChannelId {
 }
 
 impl FromSql<BigInt, Sqlite> for GuildId {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let id = i64::from_sql(bytes)?;
         Ok(Self(Id::try_from(id)?))
     }
@@ -159,7 +159,7 @@ impl ToSql<BigInt, Sqlite> for GuildId {
 }
 
 impl FromSql<BigInt, Sqlite> for UserId {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let id = i64::from_sql(bytes)?;
         Ok(Self(Id::try_from(id)?))
     }

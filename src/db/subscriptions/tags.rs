@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Deref;
 
-use diesel::backend::RawValue;
+use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::serialize::{self, ToSql};
@@ -66,7 +66,7 @@ impl Deref for Tags {
 }
 
 impl FromSql<Text, Sqlite> for Tags {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let tags = <String as FromSql<Text, Sqlite>>::from_sql(bytes)?;
         Ok(Tags::from_str(&tags))
     }

@@ -1,4 +1,4 @@
-use diesel::backend::RawValue;
+use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::serialize::{self, ToSql};
@@ -25,7 +25,7 @@ impl Default for Events {
 }
 
 impl FromSql<Integer, Sqlite> for Events {
-    fn from_sql(bytes: RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let bits = i32::from_sql(bytes)?;
         Ok(Self::from_bits_truncate(bits))
     }
