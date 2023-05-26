@@ -91,13 +91,6 @@ async fn try_main() -> CliResult {
     tokio::spawn(metrics::serve(&config.metrics, metrics));
     tokio::spawn(tasks::events::task(context.clone()));
 
-    if let Some(token) = config.bot.dbl_token {
-        tracing::info!("Spawning DBL task");
-        let bot = context.application.id.get();
-        let metrics = context.metrics.clone();
-        tokio::spawn(tasks::dbl::task(bot, metrics, &token)?);
-    }
-
     let (tx, mut rx) = tokio::sync::watch::channel(false);
 
     let handle = tokio::spawn(async move {

@@ -201,17 +201,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dbl-rs"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a9433d0fa72264a5313de33dc26fdc9c4305399c908dd5bed537d50d1d35537"
-dependencies = [
- "reqwest",
- "serde",
- "url",
-]
-
-[[package]]
 name = "diesel"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -748,7 +737,6 @@ dependencies = [
  "bytesize",
  "csv",
  "dashmap",
- "dbl-rs",
  "diesel",
  "diesel_migrations",
  "dotenv",

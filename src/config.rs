@@ -6,8 +6,6 @@ use serde::Deserialize;
 
 use crate::Result;
 
-pub const DBL_OVERRIDE_BOT_ID: &str = "DBL_OVERRIDE_BOT_ID";
-
 const DEFAULT_METRICS_SOCKET_ADDR: ([u8; 4], u16) = ([127, 0, 0, 1], 8080);
 
 const DEFAULT_MODIO_HOST: &str = "https://api.mod.io/v1";
@@ -29,7 +27,6 @@ pub struct MetricsConfig {
 #[derive(Deserialize)]
 pub struct BotConfig {
     pub token: String,
-    pub dbl_token: Option<String>,
     pub database_url: String,
 }
 

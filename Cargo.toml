@@ -16,7 +16,6 @@ bitflags = "2.3.1"
 bytesize = "1"
 csv = "1.1"
 dashmap = "5.4"
-dbl-rs = "0.3"
 dotenv = "0.15"
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
