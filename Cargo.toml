@@ -14,7 +14,7 @@ include = ["src/**/*.rs", "src/**/*.md", "LICENSE-*", "README.md", "build.rs", "
 [dependencies]
 bitflags = "2.3.1"
 bytesize = "1"
-csv = "1.1"
+csv = "1.2"
 dashmap = "5.4"
 dotenv = "0.15"
 futures-core = { version = "0.3", default-features = false }
@@ -22,12 +22,12 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 hyper = { version = "0.14", features = ["server"] }
 pico-args = "0.5"
 prometheus = { version = "0.13", default-features = false }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0.160", features = ["derive"] }
 serde_urlencoded = "0.7"
 time = { version = "0.3", features = ["formatting", "macros"] }
-tokio = { version = "1.22", features = ["macros", "rt-multi-thread", "signal", "sync", "time" ] }
+tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread", "signal", "sync", "time" ] }
 tokio-stream = "0.1"
-toml = "0.5"
+toml = "0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 
@@ -53,7 +53,7 @@ default-features = false
 features = ["rustls-tls"]
 
 [build-dependencies]
-git2 = { version = "0.16", default-features = false }
+git2 = { version = "0.17.1", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
