@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use futures_util::{Stream, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStreamExt};
 use modio::filter::prelude::*;
 use modio::games::Game;
 use twilight_model::application::command::{Command, CommandType};
@@ -55,7 +55,7 @@ pub async fn games(
 
     defer_response(ctx, interaction).await?;
 
-    let mut games = ctx.modio.games().search(filter).iter().await?;
+    let mut games = ctx.modio.games().search(filter).iter().await?.take(100);
 
     match games.size_hint() {
         (0, _) => update_response_content(ctx, interaction, "No games found.").await,
