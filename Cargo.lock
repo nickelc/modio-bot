@@ -776,11 +776,11 @@ dependencies = [
 
 [[package]]
 name = "modio"
-version = "0.7.3"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6a2282c0980e27b4c2a904054602231bb2284e0ecebd0a65b3fcd7d80e08a6c"
+checksum = "60defec46470113202f5c7f3ba9f9378f28b7593a905d2c7f5ac688be1a78a81"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.3.1",
  "bytes",
  "futures-core",
  "futures-util",
