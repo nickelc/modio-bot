@@ -180,7 +180,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
         for (game_id, tags, evts) in subs {
             if let Some(game) = games.get(&game_id) {
-                _ = write!(&mut content, "{game_id}. {game}");
+                _ = write!(&mut content, "`{game_id}.` {game}");
             } else {
                 _ = write!(&mut content, "{game_id}");
             }
@@ -236,7 +236,7 @@ where
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
         for (game_id, items) in entries {
             if let Some(game) = games.get(&game_id) {
-                _ = write!(&mut content, "{game_id}. {game}: ");
+                _ = write!(&mut content, "`{game_id}.` {game}: ");
             } else {
                 _ = write!(&mut content, "{game_id}: ");
             }
@@ -276,7 +276,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
         let Some(name) = games.get(&game_id) else {
             continue;
         };
-        _ = write!(&mut content, "{game_id}. {name}");
+        _ = write!(&mut content, "`{game_id}.` {name}");
 
         content.push_str(evts.to_suffix());
 
@@ -506,7 +506,7 @@ async fn mods_muted(
                 .iter()
                 .await?
                 .try_fold(ContentBuilder::new(4000), |mut buf, m| {
-                    _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                    _ = writeln!(&mut buf, "`{}.` {}", m.id, m.name);
                     async { Ok(buf) }
                 })
                 .await?
@@ -525,7 +525,7 @@ async fn mods_muted(
                 .try_fold(ContentBuilder::new(4000), |mut buf, (game, mods)| {
                     _ = writeln!(&mut buf, "**{}**", game.name);
                     for m in mods {
-                        _ = writeln!(&mut buf, "{}. {}", m.id, m.name);
+                        _ = writeln!(&mut buf, "`{}.` {}", m.id, m.name);
                     }
                     _ = writeln!(&mut buf);
                     async { Ok(buf) }
@@ -673,7 +673,7 @@ async fn users_muted(
 
             let mut muted = ContentBuilder::new(4000);
             for (i, name) in users.iter().enumerate() {
-                _ = writeln!(&mut muted, "{}. {name}", i + 1);
+                _ = writeln!(&mut muted, "`{}.` {name}", i + 1);
             }
             muted
         }
@@ -687,7 +687,7 @@ async fn users_muted(
                 .try_fold(ContentBuilder::new(4000), |mut buf, (game, users)| {
                     _ = writeln!(&mut buf, "**{}**", game.name);
                     for (i, name) in users.iter().enumerate() {
-                        _ = writeln!(&mut buf, "{}. {name}", i + 1);
+                        _ = writeln!(&mut buf, "`{}.` {name}", i + 1);
                     }
                     _ = writeln!(&mut buf);
                     async { Ok(buf) }

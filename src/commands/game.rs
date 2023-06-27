@@ -78,7 +78,7 @@ pub async fn games(
         _ => {
             let games = games
                 .try_fold(ContentBuilder::new(4000), |mut buf, game| {
-                    _ = writeln!(&mut buf, "{}. {}", game.id, game.name);
+                    _ = writeln!(&mut buf, "`{}.` {}", game.id, game.name);
                     async { Ok(buf) }
                 })
                 .await?;

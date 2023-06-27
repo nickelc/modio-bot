@@ -299,7 +299,7 @@ pub async fn popular(
 fn create_list_embed(mods: &[Mod], title: &str, page: usize, page_count: usize) -> Embed {
     let mut content = String::new();
     for mod_ in mods {
-        _ = writeln!(content, "{}. {}", mod_.id, mod_.name);
+        _ = writeln!(content, "`{}.` {}", mod_.id, mod_.name);
     }
     EmbedBuilder::new()
         .title(title)
