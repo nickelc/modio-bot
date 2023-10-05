@@ -95,7 +95,7 @@ async fn try_main() -> CliResult {
 
     let handle = tokio::spawn(async move {
         tokio::select! {
-            _ = gateway_runner(context, shards.iter_mut()) => {},
+            () = gateway_runner(context, shards.iter_mut()) => {},
             _ = rx.changed() => {
                 future::join_all(shards.iter_mut().map(|shard| async move {
                     shard.close(CloseFrame::NORMAL).await

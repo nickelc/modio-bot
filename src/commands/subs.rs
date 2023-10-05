@@ -378,7 +378,7 @@ async fn subscribe(
         .add(GameId(game.id), channel_id, sub_tags, guild_id, evts);
 
     let content: Cow<'_, str> = match ret {
-        Ok(_) => format!("Subscribed to '{}'.", game.name).into(),
+        Ok(()) => format!("Subscribed to '{}'.", game.name).into(),
         Err(e) => {
             tracing::error!("{e}");
 
@@ -455,7 +455,7 @@ async fn unsubscribe(
         .remove(GameId(game.id), channel_id, sub_tags, evts);
 
     let content: Cow<'_, str> = match ret {
-        Ok(_) => format!("Unsubscribed from '{}'.", game.name).into(),
+        Ok(()) => format!("Unsubscribed from '{}'.", game.name).into(),
         Err(e) => {
             tracing::error!("{e}");
 
