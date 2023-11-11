@@ -5,18 +5,18 @@ use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::serialize::{self, ToSql};
-use diesel::sql_types::{BigInt, Integer};
+use diesel::sql_types::BigInt;
 use diesel::sqlite::Sqlite;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker, UserMarker};
 use twilight_model::id::Id;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
-#[diesel(sql_type = Integer)]
-pub struct GameId(pub u32);
+#[diesel(sql_type = BigInt)]
+pub struct GameId(pub u64);
 
 #[derive(Debug, Eq, Hash, PartialEq, AsExpression, FromSqlRow)]
-#[diesel(sql_type = Integer)]
-pub struct ModId(pub u32);
+#[diesel(sql_type = BigInt)]
+pub struct ModId(pub u64);
 
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
 #[diesel(sql_type = BigInt)]
@@ -31,7 +31,7 @@ pub struct GuildId(pub Id<GuildMarker>);
 pub struct UserId(pub Id<UserMarker>);
 
 impl Deref for GameId {
-    type Target = u32;
+    type Target = u64;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -39,7 +39,7 @@ impl Deref for GameId {
 }
 
 impl Deref for ModId {
-    type Target = u32;
+    type Target = u64;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -102,30 +102,30 @@ impl fmt::Debug for UserId {
     }
 }
 
-impl FromSql<Integer, Sqlite> for GameId {
+impl FromSql<BigInt, Sqlite> for GameId {
     fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
-        let id = i32::from_sql(bytes)?;
-        Ok(Self(u32::try_from(id)?))
+        let id = i64::from_sql(bytes)?;
+        Ok(Self(u64::try_from(id)?))
     }
 }
 
-impl ToSql<Integer, Sqlite> for GameId {
+impl ToSql<BigInt, Sqlite> for GameId {
     fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
-        out.set_value(i32::try_from(self.0)?);
+        out.set_value(i64::try_from(self.0)?);
         Ok(serialize::IsNull::No)
     }
 }
 
-impl FromSql<Integer, Sqlite> for ModId {
+impl FromSql<BigInt, Sqlite> for ModId {
     fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
-        let id = i32::from_sql(bytes)?;
-        Ok(Self(u32::try_from(id)?))
+        let id = i64::from_sql(bytes)?;
+        Ok(Self(u64::try_from(id)?))
     }
 }
 
-impl ToSql<Integer, Sqlite> for ModId {
+impl ToSql<BigInt, Sqlite> for ModId {
     fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
-        out.set_value(i32::try_from(self.0)?);
+        out.set_value(i64::try_from(self.0)?);
         Ok(serialize::IsNull::No)
     }
 }

@@ -102,7 +102,7 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 
     defer_response(ctx, interaction).await?;
 
-    let game = ctx.modio.game(game_id).get().await?;
+    let game = ctx.modio.game(game_id as u32).get().await?;
 
     let embed = create_embed(game);
 

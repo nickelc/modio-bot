@@ -83,7 +83,7 @@ pub async fn list(
 
     let game_id = match (game_id, interaction.guild_id()) {
         (Some(game_id), _) => Some(game_id),
-        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0),
+        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0 as u32),
         _ => None,
     };
 
@@ -245,7 +245,7 @@ pub async fn popular(
 
     let game_id = match (game_id, interaction.guild_id()) {
         (Some(game_id), _) => Some(game_id),
-        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0),
+        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0 as u32),
         _ => None,
     };
 

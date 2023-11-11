@@ -14,7 +14,7 @@ diesel::table! {
 
 diesel::table! {
     games (id) {
-        id -> Integer,
+        id -> BigInt,
         name -> Text,
         name_id -> Text,
         api_access_options -> Integer,
@@ -25,13 +25,13 @@ diesel::table! {
 diesel::table! {
     settings (guild) {
         guild -> BigInt,
-        game -> Nullable<Integer>,
+        game -> Nullable<BigInt>,
     }
 }
 
 diesel::table! {
     subscriptions (game, channel, tags) {
-        game -> Integer,
+        game -> BigInt,
         channel -> BigInt,
         tags -> Text,
         guild -> BigInt,
@@ -41,16 +41,16 @@ diesel::table! {
 
 diesel::table! {
     subscriptions_exclude_mods (game, channel, mod_id) {
-        game -> Integer,
+        game -> BigInt,
         channel -> BigInt,
         guild -> BigInt,
-        mod_id -> Integer,
+        mod_id -> BigInt,
     }
 }
 
 diesel::table! {
     subscriptions_exclude_users (game, channel, user) {
-        game -> Integer,
+        game -> BigInt,
         channel -> BigInt,
         guild -> BigInt,
         user -> Text,
