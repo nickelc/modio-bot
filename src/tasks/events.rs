@@ -6,9 +6,10 @@ use std::time::Duration;
 use dashmap::DashSet;
 use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
-use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::events::EventType as EventTypeFilter;
-use modio::mods::{EventType, Mod};
+use modio::types::games::{ApiAccessOptions, Game};
+use modio::types::id;
+use modio::types::mods::{EventType, Mod};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
 use tokio_stream::{self as stream, StreamExt};
@@ -96,10 +97,10 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
             let filter = DateAdded::gt(tstamp)
                 .and(EventTypeFilter::_in(vec![
-                    EventType::ModfileChanged,
-                    EventType::ModDeleted,
-                    EventType::ModAvailable,
-                    EventType::ModUnavailable,
+                    EventType::MODFILE_CHANGED,
+                    EventType::MOD_DELETED,
+                    EventType::MOD_AVAILABLE,
+                    EventType::MOD_UNAVAILABLE,
                 ]))
                 .order_by(Id::asc());
 
@@ -119,14 +120,14 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 let subscriptions = ctx.subscriptions.clone();
                 let unknown_channels = unknown_channels2.clone();
                 let filter = filter.clone();
-                let game = ctx.modio.game(*game_id as u32);
-                let mods = ctx.modio.game(*game_id as u32).mods();
-                let events = ctx.modio.game(*game_id as u32).mods().events(filter);
+                let game = ctx.modio.game(id::Id::new(*game_id));
+                let mods = ctx.modio.game(id::Id::new(*game_id)).mods();
+                let events = ctx.modio.game(id::Id::new(*game_id)).mods().events(filter);
                 let excluded_mods = Arc::clone(&excluded_mods);
                 let excluded_users = Arc::clone(&excluded_users);
 
                 let task = async move {
-                    type Events = BTreeMap<u32, Vec<(u32, EventType)>>;
+                    type Events = BTreeMap<id::ModId, Vec<(id::EventId, EventType)>>;
 
                     debug!("polling events at {tstamp} for game={game_id} subs: {subs:?}");
 
@@ -169,9 +170,10 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
                     // Filter `MODFILE_CHANGED` events for new mods
                     for evt in &mut events.values_mut() {
-                        use EventType::{ModAvailable, ModfileChanged};
-                        if evt.iter().any(|(_, t)| t == &ModAvailable) {
-                            let pos = evt.iter().position(|(_, t)| t == &ModfileChanged);
+                        if evt.iter().any(|(_, t)| t == &EventType::MOD_AVAILABLE) {
+                            let pos = evt
+                                .iter()
+                                .position(|(_, t)| t == &EventType::MODFILE_CHANGED);
                             if let Some(pos) = pos {
                                 evt.remove(pos);
                             }
@@ -210,9 +212,9 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                 debug!("event ignored #{channel}: unknown channel");
                                 continue;
                             }
-                            if *evt == EventType::ModAvailable
+                            if *evt == EventType::MOD_AVAILABLE
                                 && !evts.contains(crate::db::Events::NEW)
-                                || *evt == EventType::ModfileChanged
+                                || *evt == EventType::MODFILE_CHANGED
                                     && !evts.contains(crate::db::Events::UPD)
                             {
                                 debug!("event ignored #{channel}: {evt} for {:?}", m.name);
@@ -230,7 +232,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                 }
                             }
                             if let Some(mods) = excluded_mods.get(&(game_id, *channel)) {
-                                if mods.contains(&ModId(u64::from(m.id))) {
+                                if mods.contains(&ModId(m.id.get())) {
                                     debug!("mod ignored #{channel}: {evt} for {:?}", m.name);
                                     continue;
                                 }
@@ -284,16 +286,18 @@ fn create_mod_message(game: &Game, mod_: &Mod, event_type: &EventType) -> (Optio
         .api_access_options
         .contains(ApiAccessOptions::ALLOW_DIRECT_DOWNLOAD);
 
-    let embed = match event_type {
-        EventType::ModEdited => create_embed(game, mod_, "The mod has been edited.", false),
-        EventType::ModAvailable => {
+    let embed = match *event_type {
+        EventType::MOD_EDITED => create_embed(game, mod_, "The mod has been edited.", false),
+        EventType::MOD_AVAILABLE => {
             let content = "A new mod is available. :tada:".to_owned();
             let embed = create_embed(game, mod_, &mod_.summary, true);
             let embed = create_fields(embed, mod_, true, with_ddl).build();
             return (Some(content), embed);
         }
-        EventType::ModUnavailable => create_embed(game, mod_, "The mod is now unavailable.", false),
-        EventType::ModfileChanged => {
+        EventType::MOD_UNAVAILABLE => {
+            create_embed(game, mod_, "The mod is now unavailable.", false)
+        }
+        EventType::MODFILE_CHANGED => {
             let (download, changelog) = mod_
                 .modfile
                 .as_ref()
@@ -346,7 +350,7 @@ fn create_mod_message(game: &Game, mod_: &Mod, event_type: &EventType) -> (Optio
             }
             embed
         }
-        EventType::ModDeleted => {
+        EventType::MOD_DELETED => {
             create_embed(game, mod_, "The mod has been permanently deleted.", false)
         }
         _ => create_embed(game, mod_, "event ignored", false),

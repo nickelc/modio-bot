@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use modio::games::ApiAccessOptions;
+use modio::types::games::ApiAccessOptions;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -138,7 +138,7 @@ pub async fn settings(
             .api_access_options
             .contains(ApiAccessOptions::ALLOW_THIRD_PARTY)
         {
-            let game_id = GameId(u64::from(game.id));
+            let game_id = GameId(game.id.get());
             ctx.settings.set_game(GuildId(guild_id), game_id)?;
             format!("Game is set to '{}'.", game.name).into()
         } else {

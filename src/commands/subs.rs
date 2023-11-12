@@ -5,8 +5,9 @@ use std::fmt::{Display, Write};
 use futures_util::stream::FuturesUnordered;
 use futures_util::{future, TryStreamExt};
 use modio::filter::prelude::*;
-use modio::games::{ApiAccessOptions, Game};
-use modio::mods::Mod;
+use modio::types::games::{ApiAccessOptions, Game};
+use modio::types::id;
+use modio::types::mods::Mod;
 use modio::Modio;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -170,7 +171,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let list = ctx.modio.games().search(filter).collect().await?;
     let games = list
         .into_iter()
-        .map(|g| (g.id, g.name))
+        .map(|g| (g.id.get(), g.name))
         .collect::<HashMap<_, _>>();
 
     let mut embed = EmbedBuilder::new().title("Subscriptions");
@@ -179,7 +180,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     for (channel_id, subs) in subs {
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
         for (game_id, tags, evts) in subs {
-            if let Some(game) = games.get(&(*game_id as u32)) {
+            if let Some(game) = games.get(&game_id) {
                 _ = write!(&mut content, "`{game_id}.` {game}");
             } else {
                 _ = write!(&mut content, "{game_id}");
@@ -217,7 +218,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     Ok(())
 }
 
-fn to_content<I, E, D>(games: &HashMap<u32, String>, excluded: I) -> String
+fn to_content<I, E, D>(games: &HashMap<u64, String>, excluded: I) -> String
 where
     I: IntoIterator<Item = ((GameId, ChannelId), E)>,
     E: IntoIterator<Item = D>,
@@ -235,7 +236,7 @@ where
     for (channel_id, entries) in excluded {
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
         for (game_id, items) in entries {
-            if let Some(game) = games.get(&(*game_id as u32)) {
+            if let Some(game) = games.get(&game_id) {
                 _ = write!(&mut content, "`{game_id}.` {game}: ");
             } else {
                 _ = write!(&mut content, "{game_id}: ");
@@ -268,12 +269,12 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     let list = ctx.modio.games().search(filter).collect().await?;
     let games = list
         .into_iter()
-        .map(|g| (g.id, g.name))
+        .map(|g| (g.id.get(), g.name))
         .collect::<HashMap<_, _>>();
 
     let mut content = String::new();
     for (game_id, tags, evts) in subs {
-        let Some(name) = games.get(&(*game_id as u32)) else {
+        let Some(name) = games.get(&game_id) else {
             continue;
         };
         _ = write!(&mut content, "`{game_id}.` {name}");
@@ -373,7 +374,7 @@ async fn subscribe(
     }
     sub_tags.extend(hidden);
 
-    let game_id = GameId(u64::from(game.id));
+    let game_id = GameId(game.id.get());
     let ret = ctx
         .subscriptions
         .add(game_id, channel_id, sub_tags, guild_id, evts);
@@ -451,7 +452,7 @@ async fn unsubscribe(
     }
     sub_tags.extend(hidden);
 
-    let game_id = GameId(u64::from(game.id));
+    let game_id = GameId(game.id.get());
     let ret = ctx
         .subscriptions
         .remove(game_id, channel_id, sub_tags, evts);
@@ -502,7 +503,7 @@ async fn mods_muted(
             let (GameId(game), mods) = excluded.into_iter().next().unwrap();
             let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
             ctx.modio
-                .game(game as u32)
+                .game(id::Id::new(game))
                 .mods()
                 .search(filter)
                 .iter()
@@ -519,8 +520,12 @@ async fn mods_muted(
                 .map(|(GameId(game), mods)| {
                     let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
                     future::try_join(
-                        ctx.modio.game(game as u32).get(),
-                        ctx.modio.game(game as u32).mods().search(filter).collect(),
+                        ctx.modio.game(id::Id::new(game)).get(),
+                        ctx.modio
+                            .game(id::Id::new(game))
+                            .mods()
+                            .search(filter)
+                            .collect(),
                     )
                 })
                 .collect::<FuturesUnordered<_>>()
@@ -571,8 +576,8 @@ async fn mods_mute(
             let channel_id = interaction.channel_id().unwrap();
             let guild_id = interaction.guild_id().unwrap();
 
-            let game_id = GameId(u64::from(game.id));
-            let mod_id = ModId(u64::from(mod_.id));
+            let game_id = GameId(game.id.get());
+            let mod_id = ModId(mod_.id.get());
             let ret = ctx
                 .subscriptions
                 .mute_mod(game_id, channel_id, guild_id, mod_id);
@@ -623,8 +628,8 @@ async fn mods_unmute(
         (Some(game), Some(mod_)) => {
             let channel_id = interaction.channel_id().unwrap();
 
-            let game_id = GameId(u64::from(game.id));
-            let mod_id = ModId(u64::from(mod_.id));
+            let game_id = GameId(game.id.get());
+            let mod_id = ModId(mod_.id.get());
             let ret = ctx.subscriptions.unmute_mod(game_id, channel_id, mod_id);
 
             let content = if let Err(e) = ret {
@@ -685,7 +690,7 @@ async fn users_muted(
             excluded
                 .into_iter()
                 .map(|(GameId(game), users)| {
-                    future::try_join(ctx.modio.game(game as u32).get(), async { Ok(users) })
+                    future::try_join(ctx.modio.game(id::Id::new(game)).get(), async { Ok(users) })
                 })
                 .collect::<FuturesUnordered<_>>()
                 .try_fold(ContentBuilder::new(4000), |mut buf, (game, users)| {
@@ -732,7 +737,7 @@ async fn users_mute(
             let guild_id = interaction.guild_id().unwrap();
             let channel_id = interaction.channel_id().unwrap();
 
-            let game_id = GameId(u64::from(game.id));
+            let game_id = GameId(game.id.get());
             let ret = ctx
                 .subscriptions
                 .mute_user(game_id, channel_id, guild_id, name);
@@ -781,7 +786,7 @@ async fn users_unmute(
         Some(game) => {
             let channel_id = interaction.channel_id().unwrap();
 
-            let game_id = GameId(u64::from(game.id));
+            let game_id = GameId(game.id.get());
             let ret = ctx.subscriptions.unmute_user(game_id, channel_id, name);
 
             let content = if let Err(e) = ret {

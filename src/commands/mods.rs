@@ -3,9 +3,10 @@ use std::fmt::Write;
 
 use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
-use modio::games::{ApiAccessOptions, Game};
 use modio::mods::filters::Popular;
-use modio::mods::{Mod, Statistics};
+use modio::types::games::{ApiAccessOptions, Game};
+use modio::types::id::{GameId, ModId};
+use modio::types::mods::{Mod, Statistics};
 use serde::{Deserialize, Serialize};
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -83,7 +84,7 @@ pub async fn list(
 
     let game_id = match (game_id, interaction.guild_id()) {
         (Some(game_id), _) => Some(game_id),
-        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0 as u32),
+        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| GameId::new(id.0)),
         _ => None,
     };
 
@@ -93,7 +94,7 @@ pub async fn list(
     };
 
     let (filter, title): (Filter, Cow<'_, _>) = if let Some(search) = search {
-        match (search.strip_prefix('@'), search.parse::<u32>()) {
+        match (search.strip_prefix('@'), search.parse::<ModId>()) {
             (Some(name_id), _) => (NameId::eq(name_id), "Mods".into()),
             (_, Ok(id)) => (Id::eq(id), "Mods".into()),
             (_, Err(_)) => (
@@ -157,7 +158,7 @@ struct CustomId<'a> {
     #[serde(rename = "b")]
     button: &'a str,
     #[serde(rename = "g")]
-    game_id: u32,
+    game_id: GameId,
     #[serde(rename = "q")]
     search: Option<&'a str>,
     #[serde(rename = "o")]
@@ -245,7 +246,7 @@ pub async fn popular(
 
     let game_id = match (game_id, interaction.guild_id()) {
         (Some(game_id), _) => Some(game_id),
-        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| id.0 as u32),
+        (_, Some(guild_id)) => ctx.settings.game(guild_id)?.map(|id| GameId::new(id.0)),
         _ => None,
     };
 
@@ -311,7 +312,7 @@ fn create_list_embed(mods: &[Mod], title: &str, page: usize, page_count: usize) 
 }
 
 fn create_browse_buttons(
-    game_id: u32,
+    game_id: GameId,
     search: Option<&'_ str>,
     offset: usize,
     limit: usize,

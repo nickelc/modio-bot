@@ -72,8 +72,9 @@ impl<T: AsRef<str>> IntoFilter for T {
     fn into_filter(self) -> Filter {
         fn search_filter(value: &str) -> Filter {
             use modio::filter::prelude::*;
+            use modio::types::id::ResourceId;
 
-            match value.parse::<u32>() {
+            match value.parse::<ResourceId>() {
                 Ok(id) => Id::eq(id),
                 Err(_) => value
                     .strip_prefix('@')

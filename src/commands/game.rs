@@ -2,7 +2,8 @@ use std::fmt::Write;
 
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use modio::filter::prelude::*;
-use modio::games::Game;
+use modio::types::games::Game;
+use modio::types::id::GameId;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -90,7 +91,7 @@ pub async fn games(
 
 pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     let game_id = match interaction.guild_id() {
-        Some(guild_id) => ctx.settings.game(guild_id)?.map(|id| id.0),
+        Some(guild_id) => ctx.settings.game(guild_id)?.map(|id| GameId::new(id.0)),
         _ => None,
     };
 
@@ -102,7 +103,7 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 
     defer_response(ctx, interaction).await?;
 
-    let game = ctx.modio.game(game_id as u32).get().await?;
+    let game = ctx.modio.game(game_id).get().await?;
 
     let embed = create_embed(game);
 

@@ -48,7 +48,7 @@ twilight-util = { version = "0.15", features = ["builder"] }
 twilight-validate = "0.15"
 
 [dependencies.modio]
-version = "0.8.2"
+version = "0.9.1"
 default-features = false
 features = ["rustls-tls"]
 
