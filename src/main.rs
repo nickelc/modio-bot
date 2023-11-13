@@ -9,7 +9,8 @@
 use std::path::PathBuf;
 
 use dotenv::dotenv;
-use futures_util::{future, StreamExt};
+use futures_util::future;
+use tokio_stream::StreamExt;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 

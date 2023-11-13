@@ -3,12 +3,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Write};
 
 use futures_util::stream::FuturesUnordered;
-use futures_util::{future, TryStreamExt};
 use modio::filter::prelude::*;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id;
 use modio::types::mods::Mod;
 use modio::Modio;
+use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -502,24 +502,26 @@ async fn mods_muted(
         1 => {
             let (GameId(game), mods) = excluded.into_iter().next().unwrap();
             let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
-            ctx.modio
+            let mut st = ctx
+                .modio
                 .game(id::Id::new(game))
                 .mods()
                 .search(filter)
                 .iter()
-                .await?
-                .try_fold(ContentBuilder::new(4000), |mut buf, m| {
-                    _ = writeln!(&mut buf, "`{}.` {}", m.id, m.name);
-                    async { Ok(buf) }
-                })
-                .await?
+                .await?;
+
+            let mut buf = ContentBuilder::new(4000);
+            while let Some(mod_) = st.try_next().await? {
+                _ = writeln!(&mut buf, "`{}.` {}", mod_.id, mod_.name);
+            }
+            buf
         }
         _ => {
-            excluded
+            let mut st = excluded
                 .into_iter()
-                .map(|(GameId(game), mods)| {
+                .map(|(GameId(game), mods)| async move {
                     let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
-                    future::try_join(
+                    tokio::try_join!(
                         ctx.modio.game(id::Id::new(game)).get(),
                         ctx.modio
                             .game(id::Id::new(game))
@@ -528,16 +530,17 @@ async fn mods_muted(
                             .collect(),
                     )
                 })
-                .collect::<FuturesUnordered<_>>()
-                .try_fold(ContentBuilder::new(4000), |mut buf, (game, mods)| {
-                    _ = writeln!(&mut buf, "**{}**", game.name);
-                    for m in mods {
-                        _ = writeln!(&mut buf, "`{}.` {}", m.id, m.name);
-                    }
-                    _ = writeln!(&mut buf);
-                    async { Ok(buf) }
-                })
-                .await?
+                .collect::<FuturesUnordered<_>>();
+
+            let mut buf = ContentBuilder::new(4000);
+            while let Some((game, mods)) = st.try_next().await? {
+                _ = writeln!(&mut buf, "**{}**", game.name);
+                for m in mods {
+                    _ = writeln!(&mut buf, "`{}.` {}", m.id, m.name);
+                }
+                _ = writeln!(&mut buf);
+            }
+            buf
         }
     };
 
@@ -687,21 +690,23 @@ async fn users_muted(
             muted
         }
         _ => {
-            excluded
+            let mut st = excluded
                 .into_iter()
-                .map(|(GameId(game), users)| {
-                    future::try_join(ctx.modio.game(id::Id::new(game)).get(), async { Ok(users) })
+                .map(|(GameId(game), users)| async move {
+                    let game = ctx.modio.game(id::Id::new(game)).get().await?;
+                    Ok::<_, Error>((game, users))
                 })
-                .collect::<FuturesUnordered<_>>()
-                .try_fold(ContentBuilder::new(4000), |mut buf, (game, users)| {
-                    _ = writeln!(&mut buf, "**{}**", game.name);
-                    for (i, name) in users.iter().enumerate() {
-                        _ = writeln!(&mut buf, "`{}.` {name}", i + 1);
-                    }
-                    _ = writeln!(&mut buf);
-                    async { Ok(buf) }
-                })
-                .await?
+                .collect::<FuturesUnordered<_>>();
+
+            let mut buf = ContentBuilder::new(4000);
+            while let Some((game, users)) = st.try_next().await? {
+                _ = writeln!(&mut buf, "**{}**", game.name);
+                for (i, name) in users.iter().enumerate() {
+                    _ = writeln!(&mut buf, "`{}.` {name}", i + 1);
+                }
+                _ = writeln!(&mut buf);
+            }
+            buf
         }
     };
 

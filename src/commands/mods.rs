@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 
-use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
 use modio::mods::filters::Popular;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id::{GameId, ModId};
 use modio::types::mods::{Mod, Statistics};
 use serde::{Deserialize, Serialize};
+use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,

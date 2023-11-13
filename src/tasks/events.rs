@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashSet;
-use futures_util::TryStreamExt;
 use modio::filter::prelude::*;
 use modio::mods::filters::events::EventType as EventTypeFilter;
 use modio::types::games::{ApiAccessOptions, Game};
@@ -152,17 +151,14 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     // - Filter `MODFILE_CHANGED` events for new mods
                     // - Ungroup the events ordered by event id
 
-                    let mut events = events
-                        .iter()
-                        .await?
-                        .try_fold(Events::new(), |mut events, e| async move {
-                            events
-                                .entry(e.mod_id)
-                                .or_default()
-                                .push((e.id, e.event_type));
-                            Ok(events)
-                        })
-                        .await?;
+                    let mut st = events.iter().await?;
+                    let mut events = Events::new();
+                    while let Some(event) = st.try_next().await? {
+                        events
+                            .entry(event.mod_id)
+                            .or_default()
+                            .push((event.id, event.event_type));
+                    }
 
                     if events.is_empty() {
                         return Ok(());
@@ -182,14 +178,16 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
                     // Load the mods for the events
                     let filter = Id::_in(events.keys().collect::<Vec<_>>());
-                    let events = mods
-                        .search(filter)
-                        .iter()
-                        .await?
-                        .map_ok(|m| events.get(&m.id).map(|evt| (m, evt)))
-                        .try_filter_map(|e| async { Ok(e) })
-                        .try_collect::<Vec<_>>()
-                        .await?;
+                    let mut st = mods.search(filter).iter().await?;
+                    let events = {
+                        let mut evts = Vec::new();
+                        while let Some(Ok(mod_)) = st.next().await {
+                            if let Some(evt) = events.get(&mod_.id) {
+                                evts.push((mod_, evt));
+                            }
+                        }
+                        evts
+                    };
 
                     // Ungroup the events ordered by event id
                     let mut updates = BTreeMap::new();

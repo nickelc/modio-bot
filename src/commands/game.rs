@@ -1,9 +1,9 @@
 use std::fmt::Write;
 
-use futures_util::{Stream, StreamExt, TryStreamExt};
 use modio::filter::prelude::*;
 use modio::types::games::Game;
 use modio::types::id::GameId;
+use tokio_stream::{Stream, StreamExt};
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -77,14 +77,12 @@ pub async fn games(
             }
         }
         _ => {
-            let games = games
-                .try_fold(ContentBuilder::new(4000), |mut buf, game| {
-                    _ = writeln!(&mut buf, "`{}.` {}", game.id, game.name);
-                    async { Ok(buf) }
-                })
-                .await?;
+            let mut buf = ContentBuilder::new(4000);
+            while let Some(game) = games.try_next().await? {
+                _ = writeln!(&mut buf, "`{}.` {}", game.id, game.name);
+            }
 
-            update_response_from_content(ctx, interaction, "Games", &games.content).await
+            update_response_from_content(ctx, interaction, "Games", &buf.content).await
         }
     }
 }
