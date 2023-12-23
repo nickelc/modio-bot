@@ -60,36 +60,41 @@ mod server {
 
     use hyper::header::CONTENT_TYPE;
     use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Method, Response, Server, StatusCode};
+    use hyper::{Body, Method, Server, StatusCode};
     use prometheus::{Encoder, TextEncoder};
 
     use crate::config::MetricsConfig;
     use crate::Metrics;
 
+    type Request = hyper::Request<Body>;
+    type Response = hyper::Response<Body>;
+
+    fn request(req: &Request, metrics: &Metrics) -> Response {
+        if let (&Method::GET, "/metrics") = (req.method(), req.uri().path()) {
+            let mut buffer = vec![];
+            let encoder = TextEncoder::new();
+            let metric_families = metrics.registry.gather();
+            encoder.encode(&metric_families, &mut buffer).unwrap();
+
+            hyper::Response::builder()
+                .header(CONTENT_TYPE, encoder.format_type())
+                .body(Body::from(buffer))
+                .unwrap()
+        } else {
+            let mut not_found = Response::default();
+            *not_found.status_mut() = StatusCode::NOT_FOUND;
+            not_found
+        }
+    }
+
     pub fn serve(config: &MetricsConfig, metrics: Metrics) -> impl Future<Output = ()> {
         let service = make_service_fn(move |_| {
             let metrics = metrics.clone();
-            async move {
-                Ok::<_, Infallible>(service_fn(move |req| {
-                    let response =
-                        if let (&Method::GET, "/metrics") = (req.method(), req.uri().path()) {
-                            let mut buffer = vec![];
-                            let encoder = TextEncoder::new();
-                            let metric_families = metrics.registry.gather();
-                            encoder.encode(&metric_families, &mut buffer).unwrap();
-
-                            Response::builder()
-                                .header(CONTENT_TYPE, encoder.format_type())
-                                .body(Body::from(buffer))
-                                .unwrap()
-                        } else {
-                            let mut not_found = Response::default();
-                            *not_found.status_mut() = StatusCode::NOT_FOUND;
-                            not_found
-                        };
-                    async move { Ok::<_, Infallible>(response) }
-                }))
-            }
+            let service = service_fn(move |req| {
+                let resp = request(&req, &metrics);
+                async { Ok::<_, Infallible>(resp) }
+            });
+            async { Ok::<_, Infallible>(service) }
         });
         tracing::info!("Metrics server listening on http://{}/metrics", config.addr);
 
