@@ -71,15 +71,24 @@ mod server {
 
     fn request(req: &Request, metrics: &Metrics) -> Response {
         if let (&Method::GET, "/metrics") = (req.method(), req.uri().path()) {
+            let internal_error = || {
+                let mut resp = Response::default();
+                *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                resp
+            };
+
             let mut buffer = vec![];
             let encoder = TextEncoder::new();
             let metric_families = metrics.registry.gather();
-            encoder.encode(&metric_families, &mut buffer).unwrap();
+
+            if encoder.encode(&metric_families, &mut buffer).is_err() {
+                return internal_error();
+            }
 
             hyper::Response::builder()
                 .header(CONTENT_TYPE, encoder.format_type())
                 .body(Body::from(buffer))
-                .unwrap()
+                .unwrap_or_else(|_| internal_error())
         } else {
             let mut not_found = Response::default();
             *not_found.status_mut() = StatusCode::NOT_FOUND;
