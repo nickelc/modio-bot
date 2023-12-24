@@ -89,7 +89,7 @@ async fn try_main() -> CliResult {
         std::process::exit(0);
     }
 
-    tokio::spawn(metrics::serve(&config.metrics, metrics));
+    tokio::spawn(metrics::serve(config.metrics, metrics));
     tokio::spawn(tasks::events::task(context.clone()));
 
     let (tx, mut rx) = tokio::sync::watch::channel(false);
