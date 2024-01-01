@@ -489,7 +489,7 @@ async fn mods(
 async fn mods_muted(
     ctx: &Context,
     interaction: &Interaction,
-    _opts: &[CommandDataOption],
+    _: &[CommandDataOption],
 ) -> Result<(), Error> {
     let channel_id = interaction.channel_id().unwrap();
     let excluded = ctx.subscriptions.list_excluded_mods(channel_id)?;
@@ -670,7 +670,7 @@ async fn users(
 async fn users_muted(
     ctx: &Context,
     interaction: &Interaction,
-    _opts: &[CommandDataOption],
+    _: &[CommandDataOption],
 ) -> Result<(), Error> {
     let channel_id = interaction.channel_id().unwrap();
     let excluded = ctx.subscriptions.list_excluded_users(channel_id)?;

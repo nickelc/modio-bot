@@ -6,6 +6,7 @@
     clippy::wildcard_imports
 )]
 
+use std::convert::Infallible;
 use std::path::PathBuf;
 
 use dotenv::dotenv;
@@ -65,7 +66,7 @@ async fn try_main() -> CliResult {
     }
 
     let path = args
-        .opt_value_from_os_str("-c", |s| PathBuf::try_from(s))?
+        .opt_value_from_os_str("-c", |s| Ok::<_, Infallible>(PathBuf::from(s)))?
         .unwrap_or_else(|| PathBuf::from("bot.toml"));
 
     let config = config::load_from_file(&path)
