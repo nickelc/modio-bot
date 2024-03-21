@@ -75,7 +75,7 @@ pub async fn about(ctx: &Context, interaction: &Interaction) -> Result<(), Error
         .field(
             EmbedFieldBuilder::new(
                 "modbot Discord",
-                "[discord.gg/XNX9665](https://discord.gg/XNX9665)",
+                "[discord/XNX9665](https://discord.gg/XNX9665)",
             )
             .inline(),
         )
