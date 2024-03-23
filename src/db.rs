@@ -4,7 +4,6 @@ use std::fmt;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 use diesel::result::Error as QueryError;
-use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{
     embed_migrations, EmbeddedMigrations, HarnessWithOutput, MigrationHarness,
 };
