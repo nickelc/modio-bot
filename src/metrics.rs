@@ -18,6 +18,13 @@ pub struct Commands {
     pub errored: IntCounter,
 }
 
+impl Commands {
+    pub fn inc(&self, cmd: &str) {
+        self.total.inc();
+        self.counts.with_label_values(&[cmd]).inc();
+    }
+}
+
 impl Metrics {
     pub fn new() -> Result<Self> {
         let guilds = GenericGauge::<AtomicU64>::new("guilds", "Current guilds")?;

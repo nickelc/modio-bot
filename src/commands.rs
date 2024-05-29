@@ -42,6 +42,8 @@ pub async fn register(client: &InteractionClient<'_>) -> Result<(), Error> {
 }
 
 pub async fn handle_command(ctx: &Context, interaction: &Interaction, command: &CommandData) {
+    ctx.metrics.commands.inc(&command.name);
+
     let res = match command.name.as_str() {
         "about" => basic::about(ctx, interaction).await,
         "help" => help::help(ctx, interaction, command).await,
