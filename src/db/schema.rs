@@ -1,18 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    blocked_guilds (guild) {
-        guild -> BigInt,
-    }
-}
-
-diesel::table! {
-    blocked_users (user) {
-        user -> BigInt,
-    }
-}
-
-diesel::table! {
     games (id) {
         id -> BigInt,
         name -> Text,
@@ -58,8 +46,6 @@ diesel::table! {
 }
 
 diesel::allow_tables_to_appear_in_same_query!(
-    blocked_guilds,
-    blocked_users,
     games,
     settings,
     subscriptions,

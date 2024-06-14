@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fmt;
 
 use diesel::prelude::*;
@@ -20,7 +19,6 @@ pub mod types;
 
 pub use settings::Settings;
 pub use subscriptions::{Events, Subscription, Subscriptions, Tags};
-use types::{GuildId, UserId};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -39,12 +37,6 @@ pub enum Error {
 
 impl std::error::Error for Error {}
 
-#[derive(Default, Debug, Clone)]
-pub struct Blocked {
-    pub guilds: HashSet<GuildId>,
-    pub users: HashSet<UserId>,
-}
-
 pub fn init_db(database_url: &str) -> Result<DbPool, InitError> {
     block_in_place(|| {
         let mgr = ConnectionManager::new(database_url);
@@ -56,27 +48,6 @@ pub fn init_db(database_url: &str) -> Result<DbPool, InitError> {
             .map_err(InitError::Migrations)?;
 
         Ok(pool)
-    })
-}
-
-#[allow(dead_code)]
-pub fn load_blocked(pool: &DbPool) -> Result<Blocked> {
-    use schema::blocked_guilds::dsl::*;
-    use schema::blocked_users::dsl::*;
-
-    block_in_place(|| {
-        let conn = &mut pool.get()?;
-        let guilds = blocked_guilds
-            .load::<(GuildId,)>(conn)
-            .map(|ids| ids.into_iter().map(|(id,)| id).collect())
-            .ok()
-            .unwrap_or_default();
-        let users = blocked_users
-            .load::<(UserId,)>(conn)
-            .map(|ids| ids.into_iter().map(|(id,)| id).collect())
-            .ok()
-            .unwrap_or_default();
-        Ok(Blocked { guilds, users })
     })
 }
 
