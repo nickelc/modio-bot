@@ -190,6 +190,7 @@ pub fn strip_html_tags<S: AsRef<str>>(input: S) -> String {
 
 mod sink {
     use std::borrow::Cow;
+    use std::cell::RefCell;
     use std::rc::Rc;
 
     use html5ever::tendril::StrTendril;
@@ -198,7 +199,7 @@ mod sink {
 
     #[derive(Default)]
     pub struct TextOnly {
-        text: String,
+        text: RefCell<String>,
     }
 
     pub struct Node {
@@ -222,20 +223,20 @@ mod sink {
 
     impl TreeSink for TextOnly {
         type Handle = Handle;
-
+        type ElemName<'a> = ExpandedName<'a>;
         type Output = String;
 
         fn finish(self) -> Self::Output {
-            self.text
+            self.text.into_inner()
         }
 
-        fn parse_error(&mut self, _msg: Cow<'static, str>) {}
+        fn parse_error(&self, _msg: Cow<'static, str>) {}
 
-        fn get_document(&mut self) -> Self::Handle {
+        fn get_document(&self) -> Self::Handle {
             Node::new(NodeData::Document)
         }
 
-        fn elem_name<'a>(&'a self, target: &'a Self::Handle) -> ExpandedName<'a> {
+        fn elem_name<'a>(&'a self, target: &'a Self::Handle) -> Self::ElemName<'a> {
             match &target.data {
                 NodeData::Element { name } => name.expanded(),
                 _ => panic!("not an element!"),
@@ -243,7 +244,7 @@ mod sink {
         }
 
         fn create_element(
-            &mut self,
+            &self,
             name: QualName,
             _attrs: Vec<Attribute>,
             _flags: ElementFlags,
@@ -251,41 +252,41 @@ mod sink {
             Node::new(NodeData::Element { name })
         }
 
-        fn create_comment(&mut self, _text: StrTendril) -> Self::Handle {
+        fn create_comment(&self, _text: StrTendril) -> Self::Handle {
             Node::new(NodeData::Comment)
         }
 
-        fn create_pi(&mut self, _target: StrTendril, _data: StrTendril) -> Self::Handle {
+        fn create_pi(&self, _target: StrTendril, _data: StrTendril) -> Self::Handle {
             Node::new(NodeData::ProcessingInformation)
         }
 
         fn append_doctype_to_document(
-            &mut self,
+            &self,
             _name: StrTendril,
             _public_id: StrTendril,
             _system_id: StrTendril,
         ) {
         }
 
-        fn append(&mut self, _parent: &Self::Handle, child: NodeOrText<Self::Handle>) {
+        fn append(&self, _parent: &Self::Handle, child: NodeOrText<Self::Handle>) {
             if let NodeOrText::AppendText(text) = &child {
-                self.text.push_str(text);
+                self.text.borrow_mut().push_str(text);
             }
         }
 
         fn append_based_on_parent_node(
-            &mut self,
+            &self,
             _element: &Self::Handle,
             _prev_element: &Self::Handle,
             child: NodeOrText<Self::Handle>,
         ) {
             if let NodeOrText::AppendText(text) = &child {
-                self.text.push_str(text);
+                self.text.borrow_mut().push_str(text);
             }
         }
 
         fn append_before_sibling(
-            &mut self,
+            &self,
             _sibling: &Self::Handle,
             _new_node: NodeOrText<Self::Handle>,
         ) {
@@ -294,7 +295,7 @@ mod sink {
             unimplemented!()
         }
 
-        fn get_template_contents(&mut self, _target: &Self::Handle) -> Self::Handle {
+        fn get_template_contents(&self, _target: &Self::Handle) -> Self::Handle {
             Node::new(NodeData::Document)
         }
 
@@ -302,13 +303,13 @@ mod sink {
             Rc::ptr_eq(x, y)
         }
 
-        fn set_quirks_mode(&mut self, _mode: QuirksMode) {}
+        fn set_quirks_mode(&self, _mode: QuirksMode) {}
 
-        fn add_attrs_if_missing(&mut self, _target: &Self::Handle, _attrs: Vec<Attribute>) {}
+        fn add_attrs_if_missing(&self, _target: &Self::Handle, _attrs: Vec<Attribute>) {}
 
-        fn remove_from_parent(&mut self, _target: &Self::Handle) {}
+        fn remove_from_parent(&self, _target: &Self::Handle) {}
 
-        fn reparent_children(&mut self, _node: &Self::Handle, _new_parent: &Self::Handle) {}
+        fn reparent_children(&self, _node: &Self::Handle, _new_parent: &Self::Handle) {}
     }
 }
 
