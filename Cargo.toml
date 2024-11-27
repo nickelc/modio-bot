@@ -20,7 +20,8 @@ dotenv = "0.15"
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 pico-args = "0.5"
 prometheus = { version = "0.13", default-features = false }
-serde = { version = "1.0.160", features = ["derive"] }
+serde = "1.0.215"
+serde_derive = "1.0.215"
 serde_urlencoded = "0.7"
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio = { version = "1.38.0", features = ["macros", "rt-multi-thread", "signal", "sync", "time" ] }

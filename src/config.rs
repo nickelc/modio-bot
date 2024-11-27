@@ -2,7 +2,7 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
 
-use serde::Deserialize;
+use serde_derive::Deserialize;
 
 use crate::Result;
 

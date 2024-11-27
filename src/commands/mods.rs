@@ -6,7 +6,7 @@ use modio::mods::filters::Popular;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id::{GameId, ModId};
 use modio::types::mods::{Mod, Statistics};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
