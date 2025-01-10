@@ -122,9 +122,9 @@ fn create_embed(game: Game) -> Embed {
         .field(EmbedField {
             name: "Info".into(),
             value: format!(
-                r#"**Id:** {}
+                r"**Id:** {}
 **Name-Id:** {}
-**Profile:** {}"#,
+**Profile:** {}",
                 game.id, game.name_id, game.profile_url,
             ),
             inline: true,
@@ -134,9 +134,9 @@ fn create_embed(game: Game) -> Embed {
         embed = embed.field(EmbedField {
             name: "Stats".into(),
             value: format!(
-                r#"**Mods:** {}
+                r"**Mods:** {}
 **Subscribers:** {}
-**Downloads:** {}"#,
+**Downloads:** {}",
                 stats.mods_total, stats.subscribers_total, stats.downloads.total,
             ),
             inline: true,

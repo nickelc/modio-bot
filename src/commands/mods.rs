@@ -389,10 +389,10 @@ pub fn create_fields(
         EmbedField {
             name: "Rating".to_owned(),
             value: format!(
-                r#"Rank: {}/{}
+                r"Rank: {}/{}
 Downloads: {}
 Subscribers: {}
-Votes: +{}/-{}"#,
+Votes: +{}/-{}",
                 stats.popularity.rank_position,
                 stats.popularity.rank_total,
                 stats.downloads_total,
