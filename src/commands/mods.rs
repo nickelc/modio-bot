@@ -174,13 +174,18 @@ pub async fn list_component(
     interaction: &Interaction,
     component: &MessageComponentInteractionData,
 ) -> Result<(), Error> {
+    let custom_id = component
+        .custom_id
+        .strip_prefix("mods:")
+        .unwrap_or(&component.custom_id);
+
     let CustomId {
         game_id,
         search,
         offset,
         limit,
         ..
-    } = serde_urlencoded::from_str(&component.custom_id).unwrap();
+    } = serde_urlencoded::from_str(custom_id).unwrap();
 
     let (filter, title): (Filter, Cow<'_, _>) = if let Some(search) = search {
         (
@@ -319,6 +324,9 @@ fn create_browse_buttons(
     page: usize,
     page_count: usize,
 ) -> Component {
+    fn create_custom_id(id: &CustomId<'_>) -> String {
+        String::from("mods:") + &serde_urlencoded::to_string(id).unwrap()
+    }
     let custom_id = CustomId {
         button: "prev",
         game_id,
@@ -328,7 +336,7 @@ fn create_browse_buttons(
         sort: None,
     };
     let prev = Button {
-        custom_id: Some(serde_urlencoded::to_string(&custom_id).unwrap()),
+        custom_id: Some(create_custom_id(&custom_id)),
         style: ButtonStyle::Primary,
         label: Some("prev".to_owned()),
         disabled: page == 1,
@@ -342,7 +350,7 @@ fn create_browse_buttons(
         ..custom_id
     };
     let next = Button {
-        custom_id: Some(serde_urlencoded::to_string(custom_id).unwrap()),
+        custom_id: Some(create_custom_id(&custom_id)),
         style: ButtonStyle::Primary,
         label: Some("next".to_owned()),
         disabled: page == page_count,

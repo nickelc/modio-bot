@@ -65,16 +65,10 @@ pub async fn handle_component(
     interaction: &Interaction,
     component: &MessageComponentInteractionData,
 ) {
-    let res = match interaction
-        .message
-        .as_ref()
-        .and_then(|m| m.interaction.as_ref())
-    {
-        Some(msg) if msg.name == "mods" => mods::list_component(ctx, interaction, component).await,
-        _ => Ok(()),
-    };
-    if let Err(e) = res {
-        tracing::error!("{e}");
+    if component.custom_id.starts_with("mods:") {
+        if let Err(e) = mods::list_component(ctx, interaction, component).await {
+            tracing::error!("{e}");
+        }
     }
 }
 
