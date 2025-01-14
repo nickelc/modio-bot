@@ -5,7 +5,7 @@ use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
-use twilight_model::application::interaction::Interaction;
+use twilight_model::application::interaction::{Interaction, InteractionContextType};
 use twilight_model::guild::Permissions;
 use twilight_util::builder::command::{CommandBuilder, StringBuilder, SubCommandBuilder};
 use twilight_util::builder::embed::{
@@ -28,7 +28,7 @@ pub fn commands() -> Vec<Command> {
             "Guild specific settings",
             CommandType::ChatInput,
         )
-        .dm_permission(false)
+        .contexts([InteractionContextType::Guild])
         .default_member_permissions(Permissions::MANAGE_GUILD)
         .option(
             SubCommandBuilder::new("default-game", "Set the default game for `/mods` command")

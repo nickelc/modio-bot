@@ -8,12 +8,13 @@
 
 use std::convert::Infallible;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use dotenv::dotenv;
 use futures_util::future;
-use tokio_stream::StreamExt;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
+use twilight_gateway::{CloseFrame, Event, Shard, StreamExt as _};
 
 mod bot;
 mod commands;
@@ -27,8 +28,6 @@ mod util;
 use bot::Context;
 use db::init_db;
 use metrics::Metrics;
-use twilight_gateway::stream::ShardEventStream;
-use twilight_gateway::{CloseFrame, Shard};
 use util::*;
 
 const HELP: &str = "\
@@ -43,6 +42,8 @@ OPTIONS:
 ENV:
   MODBOT_DEBUG_TIMESTAMP        Start time as Unix timestamp for polling the mod events
 ";
+
+static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 #[tokio::main]
 async fn main() {
@@ -76,7 +77,7 @@ async fn try_main() -> CliResult {
     let pool = init_db(&config.bot.database_url)?;
     let modio = init_modio(&config)?;
 
-    let (mut shards, context) = bot::initialize(&config, modio, pool, metrics.clone()).await?;
+    let (shards, context) = bot::initialize(&config, modio, pool, metrics.clone()).await?;
 
     if let Some(cmd) = args.subcommand()? {
         match cmd {
@@ -93,43 +94,37 @@ async fn try_main() -> CliResult {
     tokio::spawn(metrics::serve(config.metrics, metrics));
     tokio::spawn(tasks::events::task(context.clone()));
 
-    let (tx, mut rx) = tokio::sync::watch::channel(false);
+    let mut senders = Vec::with_capacity(shards.len());
+    let mut tasks = Vec::with_capacity(shards.len());
 
-    let handle = tokio::spawn(async move {
-        tokio::select! {
-            () = gateway_runner(context, shards.iter_mut()) => {},
-            _ = rx.changed() => {
-                future::join_all(shards.iter_mut().map(|shard| async move {
-                    shard.close(CloseFrame::NORMAL).await
-                })).await;
-            }
-        }
-    });
+    for shard in shards {
+        senders.push(shard.sender());
+        tasks.push(tokio::spawn(runner(context.clone(), shard)));
+    }
 
     tokio::signal::ctrl_c().await?;
 
     tracing::info!("Shutting down");
-    tx.send(true)?;
+    SHUTDOWN.store(true, Ordering::Relaxed);
 
-    handle.await?;
+    for sender in senders {
+        let _ = sender.close(CloseFrame::NORMAL);
+    }
+
+    future::join_all(tasks).await;
+
     Ok(())
 }
 
-async fn gateway_runner(context: Context, shards: impl Iterator<Item = &mut Shard>) {
-    let mut stream = ShardEventStream::new(shards);
-
-    loop {
-        let event = match stream.next().await {
-            Some((_, Ok(event))) => event,
-            Some((_, Err(source))) => {
+async fn runner(context: Context, mut shard: Shard) {
+    while let Some(event) = shard.next_event(bot::EVENTS).await {
+        let event = match event {
+            Ok(Event::GatewayClose(_)) if SHUTDOWN.load(Ordering::Relaxed) => break,
+            Ok(event) => event,
+            Err(source) => {
                 tracing::warn!(?source, "error receiving event");
-
-                if source.is_fatal() {
-                    break;
-                }
                 continue;
             }
-            None => break,
         };
 
         let context = context.clone();

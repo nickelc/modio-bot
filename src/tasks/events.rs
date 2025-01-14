@@ -51,9 +51,9 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                         }
                     })
                     .map(|id| {
-                        let mut msg = ctx.client.create_message(*id).embeds(&embeds).unwrap();
+                        let mut msg = ctx.client.create_message(*id).embeds(&embeds);
                         if let Some(content) = &content {
-                            msg = msg.content(content).unwrap();
+                            msg = msg.content(content);
                         }
                         async move { (id, msg.await) }
                     });

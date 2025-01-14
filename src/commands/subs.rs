@@ -13,7 +13,7 @@ use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
-use twilight_model::application::interaction::Interaction;
+use twilight_model::application::interaction::{Interaction, InteractionContextType};
 use twilight_model::guild::Permissions;
 use twilight_util::builder::command::{
     CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder, SubCommandGroupBuilder,
@@ -118,7 +118,7 @@ pub fn commands() -> Vec<Command> {
                     .option(StringBuilder::new("name", "username").required(true)),
             ]),
     )
-    .dm_permission(false)
+    .contexts([InteractionContextType::Guild])
     .default_member_permissions(Permissions::MANAGE_CHANNELS)
     .build()]
 }
@@ -212,7 +212,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     }
     ctx.interaction()
         .update_response(&interaction.token)
-        .embeds(Some(&[embed.build()]))?
+        .embeds(Some(&[embed.build()]))
         .await?;
 
     Ok(())
@@ -295,7 +295,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
 
     ctx.interaction()
         .update_response(&interaction.token)
-        .embeds(Some(&[embed]))?
+        .embeds(Some(&[embed]))
         .await?;
 
     Ok(())

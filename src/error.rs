@@ -36,15 +36,9 @@ pub enum DatabaseErrorInner {
 
 #[derive(Debug)]
 pub enum TwilightError {
-    Start(twilight_gateway::stream::StartRecommendedError),
+    Start(twilight_gateway::error::StartRecommendedError),
     Http(twilight_http::Error),
-    Validation(TwilightValidation),
     Deserialization(twilight_http::response::DeserializeBodyError),
-}
-
-#[derive(Debug)]
-pub enum TwilightValidation {
-    Message(twilight_validate::message::MessageValidationError),
 }
 
 impl fmt::Display for Error {
@@ -57,9 +51,6 @@ impl fmt::Display for Error {
             Error::Tokio(TokioError::WatchSend(e)) => e.fmt(fmt),
             Error::Twilight(TwilightError::Start(e)) => e.fmt(fmt),
             Error::Twilight(TwilightError::Http(e)) => e.fmt(fmt),
-            Error::Twilight(TwilightError::Validation(TwilightValidation::Message(e))) => {
-                e.fmt(fmt)
-            }
             Error::Twilight(TwilightError::Deserialization(e)) => e.fmt(fmt),
             Error::Database(DatabaseErrorInner::Init(e)) => e.fmt(fmt),
             Error::Database(DatabaseErrorInner::Query(e)) => e.fmt(fmt),
@@ -124,8 +115,8 @@ impl From<tokio::sync::watch::error::SendError<bool>> for Error {
     }
 }
 
-impl From<twilight_gateway::stream::StartRecommendedError> for Error {
-    fn from(e: twilight_gateway::stream::StartRecommendedError) -> Self {
+impl From<twilight_gateway::error::StartRecommendedError> for Error {
+    fn from(e: twilight_gateway::error::StartRecommendedError) -> Self {
         Error::Twilight(TwilightError::Start(e))
     }
 }
@@ -139,12 +130,6 @@ impl From<twilight_http::Error> for Error {
 impl From<twilight_http::response::DeserializeBodyError> for Error {
     fn from(e: twilight_http::response::DeserializeBodyError) -> Self {
         Error::Twilight(TwilightError::Deserialization(e))
-    }
-}
-
-impl From<twilight_validate::message::MessageValidationError> for Error {
-    fn from(e: twilight_validate::message::MessageValidationError) -> Self {
-        Error::Twilight(TwilightError::Validation(TwilightValidation::Message(e)))
     }
 }
 

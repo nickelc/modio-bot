@@ -8,7 +8,7 @@ use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
-use twilight_model::application::interaction::Interaction;
+use twilight_model::application::interaction::{Interaction, InteractionContextType};
 use twilight_model::channel::message::embed::EmbedField;
 use twilight_model::channel::message::Embed;
 use twilight_util::builder::command::{CommandBuilder, StringBuilder};
@@ -32,7 +32,7 @@ pub fn commands() -> Vec<Command> {
         .option(StringBuilder::new("search", "ID or search").autocomplete(true))
         .build(),
         CommandBuilder::new("game", "Display the default game.", CommandType::ChatInput)
-            .dm_permission(false)
+            .contexts([InteractionContextType::Guild])
             .build(),
     ]
 }
@@ -67,8 +67,8 @@ pub async fn games(
 
                 ctx.interaction()
                     .update_response(&interaction.token)
-                    .content(Some("Found 1 game."))?
-                    .embeds(Some(&[embed]))?
+                    .content(Some("Found 1 game."))
+                    .embeds(Some(&[embed]))
                     .await?;
 
                 Ok(())
@@ -107,7 +107,7 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 
     ctx.interaction()
         .update_response(&interaction.token)
-        .embeds(Some(&[embed]))?
+        .embeds(Some(&[embed]))
         .await?;
 
     Ok(())

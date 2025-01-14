@@ -13,7 +13,7 @@ use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
-use twilight_model::application::interaction::Interaction;
+use twilight_model::application::interaction::{Interaction, InteractionContextType};
 use twilight_model::channel::message::component::{ActionRow, Button, ButtonStyle, Component};
 use twilight_model::channel::message::embed::{Embed, EmbedField};
 use twilight_util::builder::command::{CommandBuilder, StringBuilder};
@@ -36,12 +36,12 @@ pub fn commands() -> Vec<Command> {
             "List mods or show the details for a single mod.",
             CommandType::ChatInput,
         )
-        .dm_permission(false)
+        .contexts([InteractionContextType::Guild])
         .option(StringBuilder::new("mod", "ID or search"))
         .option(StringBuilder::new("game", "ID or search").autocomplete(true))
         .build(),
         CommandBuilder::new("popular", "List popular mods.", CommandType::ChatInput)
-            .dm_permission(false)
+            .contexts([InteractionContextType::Guild])
             .option(
                 StringBuilder::new("game", "ID or search game instead of the default game.")
                     .autocomplete(true),
@@ -146,8 +146,8 @@ pub async fn list(
     };
     ctx.interaction()
         .update_response(&interaction.token)
-        .embeds(embeds.as_deref())?
-        .components(components.as_deref())?
+        .embeds(embeds.as_deref())
+        .components(components.as_deref())
         .await?;
 
     Ok(())
@@ -210,8 +210,8 @@ pub async fn list_component(
         );
         ctx.interaction()
             .update_response(&interaction.token)
-            .embeds(Some(&[embed]))?
-            .components(Some(&[components]))?
+            .embeds(Some(&[embed]))
+            .components(Some(&[components]))
             .await?;
     }
 
@@ -291,7 +291,7 @@ pub async fn popular(
 
     ctx.interaction()
         .update_response(&interaction.token)
-        .embeds(Some(&[embed]))?
+        .embeds(Some(&[embed]))
         .await?;
 
     Ok(())
@@ -334,6 +334,7 @@ fn create_browse_buttons(
         disabled: page == 1,
         emoji: None,
         url: None,
+        sku_id: None,
     };
     let custom_id = CustomId {
         button: "next",
@@ -347,6 +348,7 @@ fn create_browse_buttons(
         disabled: page == page_count,
         emoji: None,
         url: None,
+        sku_id: None,
     };
     let row = ActionRow {
         components: vec![prev.into(), next.into()],

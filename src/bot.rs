@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use modio::Modio;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
-use twilight_gateway::{stream, ConfigBuilder, EventTypeFlags, Intents, Shard};
+use twilight_gateway::{create_recommended, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::client::InteractionClient;
 use twilight_http::Client;
 use twilight_model::application::interaction::InteractionData;
@@ -17,6 +17,13 @@ use crate::db::types::GuildId;
 use crate::db::{DbPool, Settings, Subscriptions};
 use crate::error::Error;
 use crate::metrics::Metrics;
+
+pub const EVENTS: EventTypeFlags = EventTypeFlags::from_bits_retain(
+    EventTypeFlags::READY.bits()
+        | EventTypeFlags::GUILD_CREATE.bits()
+        | EventTypeFlags::GUILD_DELETE.bits()
+        | EventTypeFlags::INTERACTION_CREATE.bits(),
+);
 
 #[derive(Clone)]
 pub struct Context {
@@ -62,16 +69,10 @@ pub async fn initialize(
     .expect("required activity is provided");
 
     let config = ConfigBuilder::new(config.bot.token.clone(), Intents::GUILDS)
-        .event_types(
-            EventTypeFlags::READY
-                | EventTypeFlags::GUILD_CREATE
-                | EventTypeFlags::GUILD_DELETE
-                | EventTypeFlags::INTERACTION_CREATE,
-        )
         .presence(presence)
         .build();
 
-    let shards = stream::create_recommended(&client, config, |_, config| config.build())
+    let shards = create_recommended(&client, config, |_, config| config.build())
         .await?
         .collect::<Vec<_>>();
 

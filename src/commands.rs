@@ -249,7 +249,7 @@ async fn update_response_content(
 ) -> Result<(), Error> {
     ctx.interaction()
         .update_response(&interaction.token)
-        .content(Some(content))?
+        .content(Some(content))
         .await?;
     Ok(())
 }
@@ -269,7 +269,7 @@ async fn update_response_from_content(
 
         ctx.interaction()
             .update_response(&interaction.token)
-            .embeds(Some(&[embed]))?
+            .embeds(Some(&[embed]))
             .await?;
 
         for content in contents {
@@ -280,7 +280,7 @@ async fn update_response_from_content(
 
             ctx.interaction()
                 .create_followup(&interaction.token)
-                .embeds(&[embed])?
+                .embeds(&[embed])
                 .await?;
         }
     }
