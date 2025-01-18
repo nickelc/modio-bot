@@ -899,9 +899,9 @@ dependencies = [
 
 [[package]]
 name = "modio"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcd28d2ca0404690eb0af5d2cf1a30ffaf8934233a3d8f15030894886473a36f"
+checksum = "3a7fe5314a76d29542944a9d06a76f50b31946011621024c428f8efef92cb477"
 dependencies = [
  "bitflags",
  "bytes",
@@ -911,6 +911,7 @@ dependencies = [
  "pin-project-lite",
  "reqwest",
  "serde",
+ "serde_derive",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -2152,7 +2153,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]

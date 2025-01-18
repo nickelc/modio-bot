@@ -415,8 +415,8 @@ Votes: +{}/-{}",
     }
     #[allow(clippy::cast_possible_wrap)]
     fn dates(m: &Mod) -> EmbedField {
-        let added = format_timestamp(m.date_added as i64);
-        let updated = format_timestamp(m.date_updated as i64);
+        let added = format_timestamp(m.date_added.as_secs());
+        let updated = format_timestamp(m.date_updated.as_secs());
         EmbedField {
             name: "Dates".to_owned(),
             value: format!("Created: {added}\nUpdated: {updated}"),
