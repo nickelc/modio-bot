@@ -2,7 +2,6 @@ use std::fmt::Write;
 
 use modio::filter::prelude::*;
 use modio::types::games::Game;
-use modio::types::id::GameId;
 use tokio_stream::{Stream, StreamExt};
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -89,7 +88,7 @@ pub async fn games(
 
 pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     let game_id = match interaction.guild_id() {
-        Some(guild_id) => ctx.settings.game(guild_id)?.map(|id| GameId::new(id.0)),
+        Some(guild_id) => ctx.settings.game(guild_id)?.map(|id| id.0),
         _ => None,
     };
 

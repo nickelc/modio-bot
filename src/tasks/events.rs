@@ -119,9 +119,9 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 let subscriptions = ctx.subscriptions.clone();
                 let unknown_channels = unknown_channels2.clone();
                 let filter = filter.clone();
-                let game = ctx.modio.game(id::Id::new(*game_id));
-                let mods = ctx.modio.game(id::Id::new(*game_id)).mods();
-                let events = ctx.modio.game(id::Id::new(*game_id)).mods().events(filter);
+                let game = ctx.modio.game(*game_id);
+                let mods = ctx.modio.game(*game_id).mods();
+                let events = ctx.modio.game(*game_id).mods().events(filter);
                 let excluded_mods = Arc::clone(&excluded_mods);
                 let excluded_users = Arc::clone(&excluded_users);
 
@@ -230,7 +230,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                 }
                             }
                             if let Some(mods) = excluded_mods.get(&(game_id, *channel)) {
-                                if mods.contains(&ModId(m.id.get())) {
+                                if mods.contains(&ModId(m.id)) {
                                     debug!("mod ignored #{channel}: {evt} for {:?}", m.name);
                                     continue;
                                 }
