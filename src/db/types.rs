@@ -5,7 +5,7 @@ use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::expression::AsExpression;
 use diesel::serialize::{self, ToSql};
-use diesel::sql_types::BigInt;
+use diesel::sql_types::{BigInt, Integer};
 use diesel::sqlite::Sqlite;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker, UserMarker};
 use twilight_model::id::Id;
@@ -29,6 +29,10 @@ pub struct GuildId(pub Id<GuildMarker>);
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
 #[diesel(sql_type = BigInt)]
 pub struct UserId(pub Id<UserMarker>);
+
+#[derive(Copy, Clone, Eq, PartialEq, AsExpression, FromSqlRow)]
+#[diesel(sql_type = Integer)]
+pub struct ApiAccessOptions(pub modio::types::games::ApiAccessOptions);
 
 impl Deref for GameId {
     type Target = modio::types::id::GameId;
@@ -114,6 +118,18 @@ impl fmt::Debug for UserId {
     }
 }
 
+impl fmt::Debug for ApiAccessOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Display for ApiAccessOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
 impl FromSql<BigInt, Sqlite> for GameId {
     fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let id = i64::from_sql(bytes)?;
@@ -180,6 +196,13 @@ impl FromSql<BigInt, Sqlite> for UserId {
 impl ToSql<BigInt, Sqlite> for UserId {
     fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
         out.set_value(i64::try_from(self.0.get())?);
+        Ok(serialize::IsNull::No)
+    }
+}
+
+impl ToSql<Integer, Sqlite> for ApiAccessOptions {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
+        out.set_value(i32::from(self.0.bits()));
         Ok(serialize::IsNull::No)
     }
 }

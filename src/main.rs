@@ -93,6 +93,7 @@ async fn try_main() -> CliResult {
 
     tokio::spawn(metrics::serve(config.metrics, metrics));
     tokio::spawn(tasks::events::task(context.clone()));
+    tokio::spawn(tasks::games::task(context.clone()));
 
     let mut senders = Vec::with_capacity(shards.len());
     let mut tasks = Vec::with_capacity(shards.len());
