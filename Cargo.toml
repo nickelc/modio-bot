@@ -34,14 +34,14 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter", "time"] }
 html5ever = "0.29.0"
 
 # metrics
-hyper = { version = "1.5.2", features = ["http1", "server"] }
+hyper = { version = "1.6.0", features = ["http1", "server"] }
 hyper-util = { version = "0.1.10", features = ["tokio"] }
 http-body-util = "0.1.2"
 
 # diesel
-diesel = { version = "2.2.6", default-features = false, features = ["r2d2", "sqlite"] }
+diesel = { version = "2.2.7", default-features = false, features = ["r2d2", "sqlite"] }
 diesel_migrations = "2.2.0"
-libsqlite3-sys = { version = ">=0.17.2, <0.31.0", optional = true }
+libsqlite3-sys = { version = ">=0.17.2, <0.32.0", optional = true }
 
 # twilight
 twilight-gateway = "0.16.0"
@@ -51,7 +51,7 @@ twilight-cache-inmemory = "0.16.0"
 twilight-util = { version = "0.16.0", features = ["builder"] }
 
 [dependencies.modio]
-version = "0.12.0"
+version = "0.12.1"
 default-features = false
 features = ["rustls-tls"]
 
