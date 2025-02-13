@@ -139,7 +139,7 @@ impl fmt::Write for ContentBuilder {
             None => {
                 self.content.push(String::from(s));
             }
-        };
+        }
         Ok(())
     }
 
@@ -153,7 +153,7 @@ impl fmt::Write for ContentBuilder {
                 }
             }
             None => self.content.push(c.to_string()),
-        };
+        }
         Ok(())
     }
 }
