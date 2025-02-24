@@ -439,7 +439,8 @@ Votes: +{}/-{}",
             if let Some(version) = &f.version {
                 _ = writeln!(info, "Version: {version}");
             }
-            _ = writeln!(info, "Size: {}", bytesize::to_string(f.filesize, false));
+            let size = bytesize::ByteSize::b(f.filesize).display().si_short();
+            _ = writeln!(info, "Size: {size}");
         }
         if info.len() > 7 {
             Some(EmbedField {
