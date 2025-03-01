@@ -1,4 +1,5 @@
 use modio::types::games::Game;
+use modio::util::DataFromRequest;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::command::{
     Command, CommandOptionChoice, CommandOptionChoiceValue,
@@ -314,7 +315,7 @@ async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error>
 
     let filter = search.into_filter().limit(1);
 
-    let games = ctx.modio.get_games().filter(filter).await?.data().await?;
+    let games = ctx.modio.get_games().filter(filter).data().await?;
     let game = games.data.into_iter().next();
     Ok(game)
 }

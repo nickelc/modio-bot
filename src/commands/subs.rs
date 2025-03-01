@@ -6,6 +6,7 @@ use futures_util::stream::FuturesUnordered;
 use modio::request::filter::prelude::*;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::mods::Mod;
+use modio::util::DataFromRequest;
 use modio::Client as Modio;
 use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
@@ -600,7 +601,7 @@ async fn mods_muted(
                     let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
                     tokio::try_join!(
                         async {
-                            let game = ctx.modio.get_game(game).await?.data().await?;
+                            let game = ctx.modio.get_game(game).data().await?;
                             Ok::<_, Error>(game)
                         },
                         async {
@@ -801,7 +802,7 @@ async fn users_muted(
             let mut st = excluded
                 .into_iter()
                 .map(|(GameId(game), users)| async move {
-                    let game = ctx.modio.get_game(game).await?.data().await?;
+                    let game = ctx.modio.get_game(game).data().await?;
                     Ok::<_, Error>((game, users))
                 })
                 .collect::<FuturesUnordered<_>>();
@@ -848,7 +849,6 @@ async fn users_mute(
         .modio
         .get_games()
         .filter(game_filter.limit(1))
-        .await?
         .data()
         .await?;
     let game = games.data.into_iter().next();
@@ -906,7 +906,6 @@ async fn users_unmute(
         .modio
         .get_games()
         .filter(game_filter.limit(1))
-        .await?
         .data()
         .await?;
     let game = games.data.into_iter().next();
@@ -940,18 +939,13 @@ async fn find_game_mod(
     mod_filter: Filter,
 ) -> Result<(Option<Game>, Option<Mod>), Error> {
     let game_filter = game_filter.limit(1);
-    let games = modio.get_games().filter(game_filter).await?.data().await?;
+    let games = modio.get_games().filter(game_filter).data().await?;
     let Some(game) = games.data.into_iter().next() else {
         return Ok((None, None));
     };
 
     let mod_filter = mod_filter.limit(1);
-    let mods = modio
-        .get_mods(game.id)
-        .filter(mod_filter)
-        .await?
-        .data()
-        .await?;
+    let mods = modio.get_mods(game.id).filter(mod_filter).data().await?;
     let mod_ = mods.data.into_iter().next();
 
     Ok((Some(game), mod_))

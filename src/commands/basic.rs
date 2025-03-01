@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use modio::types::games::ApiAccessOptions;
+use modio::util::DataFromRequest;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -131,7 +132,7 @@ pub async fn settings(
     defer_ephemeral(ctx, interaction).await?;
 
     let filter = filter.limit(1);
-    let games = ctx.modio.get_games().filter(filter).await?.data().await?;
+    let games = ctx.modio.get_games().filter(filter).data().await?;
     let game = games.data.into_iter().next();
     let guild_id = interaction.guild_id.expect("guild only command");
 

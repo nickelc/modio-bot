@@ -7,6 +7,7 @@ use modio::request::mods::filters::Popular;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id::{GameId, ModId};
 use modio::types::mods::{Mod, Statistics};
+use modio::util::DataFromRequest;
 use serde_derive::{Deserialize, Serialize};
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -110,7 +111,6 @@ pub async fn list(
         .modio
         .get_mods(game_id)
         .filter(filter.limit(20))
-        .await?
         .data()
         .await?;
 
@@ -121,7 +121,7 @@ pub async fn list(
 
     let (embeds, components) = match page.data.as_slice() {
         [mod_] => {
-            let game = ctx.modio.get_game(game_id).await?.data().await?;
+            let game = ctx.modio.get_game(game_id).data().await?;
             let embed = create_mod_embed(&game, mod_).build();
             (Some(vec![embed]), None)
         }
@@ -198,13 +198,7 @@ pub async fn list_component(
 
     defer_component_response(ctx, interaction).await?;
 
-    let page = ctx
-        .modio
-        .get_mods(game_id)
-        .filter(filter)
-        .await?
-        .data()
-        .await?;
+    let page = ctx.modio.get_mods(game_id).filter(filter).data().await?;
 
     if !page.is_empty() {
         let embed = create_list_embed(&page.data, &title, page.current(), page.page_count());
@@ -264,13 +258,7 @@ pub async fn popular(
     };
 
     let filter = with_limit(10).order_by(Popular::desc());
-    let mods = ctx
-        .modio
-        .get_mods(game_id)
-        .filter(filter)
-        .await?
-        .data()
-        .await?;
+    let mods = ctx.modio.get_mods(game_id).filter(filter).data().await?;
 
     if mods.data.is_empty() {
         let content = "No mods founds.";
@@ -291,7 +279,7 @@ pub async fn popular(
         );
     }
 
-    let game = ctx.modio.get_game(game_id).await?.data().await?;
+    let game = ctx.modio.get_game(game_id).data().await?;
 
     let embed = EmbedBuilder::new()
         .title("Popular Mods")

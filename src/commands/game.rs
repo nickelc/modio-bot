@@ -2,6 +2,7 @@ use std::fmt::Write;
 
 use modio::request::filter::prelude::*;
 use modio::types::games::Game;
+use modio::util::DataFromRequest;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -54,7 +55,7 @@ pub async fn games(
 
     defer_response(ctx, interaction).await?;
 
-    let games = ctx.modio.get_games().filter(filter).await?.data().await?;
+    let games = ctx.modio.get_games().filter(filter).data().await?;
     let mut games = games.data.into_iter();
 
     match games.size_hint() {
@@ -100,7 +101,7 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 
     defer_response(ctx, interaction).await?;
 
-    let game = ctx.modio.get_game(game_id).await?.data().await?;
+    let game = ctx.modio.get_game(game_id).data().await?;
 
     let embed = create_embed(game);
 

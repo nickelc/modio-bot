@@ -2,6 +2,7 @@ use std::fmt;
 use std::io::Error as IoError;
 
 use modio::response::BodyError;
+use modio::util::DataError;
 use modio::Error as ModioError;
 use pico_args::Error as ArgsError;
 use prometheus::Error as PrometheusError;
@@ -103,6 +104,15 @@ impl From<ModioError> for Error {
 impl From<BodyError> for Error {
     fn from(e: BodyError) -> Error {
         Error::ModioBody(e)
+    }
+}
+
+impl From<DataError> for Error {
+    fn from(value: DataError) -> Self {
+        match value {
+            DataError::Request(e) => Self::Modio(e),
+            DataError::Body(e) => Self::ModioBody(e),
+        }
     }
 }
 
