@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::Error as IoError;
 
 use modio::response::BodyError;
-use modio::util::DataError;
+use modio::util::{DataError, PaginateError};
 use modio::Error as ModioError;
 use pico_args::Error as ArgsError;
 use prometheus::Error as PrometheusError;
@@ -112,6 +112,15 @@ impl From<DataError> for Error {
         match value {
             DataError::Request(e) => Self::Modio(e),
             DataError::Body(e) => Self::ModioBody(e),
+        }
+    }
+}
+
+impl From<PaginateError> for Error {
+    fn from(value: PaginateError) -> Self {
+        match value {
+            PaginateError::Request(e) => Self::Modio(e),
+            PaginateError::Body(e) => Self::ModioBody(e),
         }
     }
 }

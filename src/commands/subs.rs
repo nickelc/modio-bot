@@ -6,7 +6,7 @@ use futures_util::stream::FuturesUnordered;
 use modio::request::filter::prelude::*;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::mods::Mod;
-use modio::util::DataFromRequest;
+use modio::util::{DataFromRequest, Paginate};
 use modio::Client as Modio;
 use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
@@ -29,7 +29,7 @@ use crate::bot::Context;
 use crate::db::types::{ChannelId, GameId, ModId};
 use crate::db::{Events, Tags};
 use crate::error::Error;
-use crate::util::{ContentBuilder, IntoFilter, Page};
+use crate::util::{ContentBuilder, IntoFilter};
 
 pub fn commands() -> Vec<Command> {
     vec![CommandBuilder::new(
@@ -169,33 +169,19 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     game_ids.sort_unstable();
     game_ids.dedup();
 
-    let filter = Id::_in(game_ids);
-    let first_page = ctx
-        .modio
-        .get_games()
-        .filter(filter.clone())
-        .await?
-        .data()
-        .await?;
-    let mut games = first_page
-        .data
-        .into_iter()
-        .map(|g| (g.id.get(), g.name))
-        .collect::<HashMap<_, _>>();
+    let games = {
+        let filter = Id::_in(game_ids);
+        let games = ctx.modio.get_games().filter(filter);
+        let mut paged = games.paged();
 
-    loop {
-        let filter = filter
-            .clone()
-            .offset((first_page.offset + first_page.limit) as usize);
-
-        let next_page = ctx.modio.get_games().filter(filter).await?.data().await?;
-
-        if next_page.is_empty() {
-            break;
+        let mut games = HashMap::new();
+        while let Some(page) = paged.next().await? {
+            for g in page {
+                games.insert(g.id.get(), g.name);
+            }
         }
-
-        games.extend(next_page.data.into_iter().map(|g| (g.id.get(), g.name)));
-    }
+        games
+    };
 
     let mut embed = EmbedBuilder::new().title("Subscriptions");
 
@@ -291,33 +277,19 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
 
     defer_ephemeral(ctx, interaction).await?;
 
-    let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
-    let first_page = ctx
-        .modio
-        .get_games()
-        .filter(filter.clone())
-        .await?
-        .data()
-        .await?;
-    let mut games = first_page
-        .data
-        .into_iter()
-        .map(|g| (g.id, g.name))
-        .collect::<HashMap<_, _>>();
+    let games = {
+        let filter = Id::_in(subs.iter().map(|(s, _, _, _)| s).collect::<Vec<_>>());
+        let games = ctx.modio.get_games().filter(filter);
+        let mut paged = games.paged();
 
-    loop {
-        let filter = filter
-            .clone()
-            .offset((first_page.offset + first_page.limit) as usize);
-
-        let next_page = ctx.modio.get_games().filter(filter).await?.data().await?;
-
-        if next_page.is_empty() {
-            break;
+        let mut games = HashMap::new();
+        while let Some(page) = paged.next().await? {
+            for g in page {
+                games.insert(g.id, g.name);
+            }
         }
-
-        games.extend(next_page.data.into_iter().map(|g| (g.id, g.name)));
-    }
+        games
+    };
 
     let mut content = String::new();
     for (game_id, tags, evts, explicit) in subs {
@@ -557,36 +529,18 @@ async fn mods_muted(
         }
         1 => {
             let (GameId(game), mods) = excluded.into_iter().next().unwrap();
-            let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
-            let first_page = ctx
-                .modio
-                .get_mods(game)
-                .filter(filter.clone())
-                .await?
-                .data()
-                .await?;
 
-            let mut mods = first_page.data;
+            let mods = {
+                let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
+                let mods = ctx.modio.get_mods(game).filter(filter);
+                let mut paged = mods.paged();
 
-            loop {
-                let filter = filter
-                    .clone()
-                    .offset((first_page.offset + first_page.limit) as usize);
-
-                let next_page = ctx
-                    .modio
-                    .get_mods(game)
-                    .filter(filter)
-                    .await?
-                    .data()
-                    .await?;
-
-                if next_page.is_empty() {
-                    break;
+                let mut mods = Vec::new();
+                while let Some(page) = paged.next().await? {
+                    mods.extend(page);
                 }
-
-                mods.extend(next_page.data);
-            }
+                mods
+            };
 
             let mut buf = ContentBuilder::new(4000);
             for mod_ in mods {
@@ -598,42 +552,23 @@ async fn mods_muted(
             let mut st = excluded
                 .into_iter()
                 .map(|(GameId(game), mods)| async move {
-                    let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
                     tokio::try_join!(
                         async {
                             let game = ctx.modio.get_game(game).data().await?;
                             Ok::<_, Error>(game)
                         },
                         async {
-                            let first_page = ctx
-                                .modio
-                                .get_mods(game)
-                                .filter(filter.clone())
-                                .await?
-                                .data()
-                                .await?;
+                            let mods = {
+                                let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
+                                let mods = ctx.modio.get_mods(game).filter(filter);
+                                let mut paged = mods.paged();
 
-                            let mut mods = first_page.data;
-
-                            loop {
-                                let filter = filter
-                                    .clone()
-                                    .offset((first_page.offset + first_page.limit) as usize);
-
-                                let next_page = ctx
-                                    .modio
-                                    .get_mods(game)
-                                    .filter(filter)
-                                    .await?
-                                    .data()
-                                    .await?;
-
-                                if next_page.is_empty() {
-                                    break;
+                                let mut mods = Vec::new();
+                                while let Some(page) = paged.next().await? {
+                                    mods.extend(page);
                                 }
-
-                                mods.extend(next_page.data);
-                            }
+                                mods
+                            };
 
                             Ok(mods)
                         },

@@ -9,6 +9,7 @@ use modio::request::mods::events::filters::EventType as EventTypeFilter;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id;
 use modio::types::mods::{EventType, MaturityOption, Mod};
+use modio::util::Paginate;
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
 use tokio_stream::{self as stream, StreamExt};
@@ -23,7 +24,7 @@ use crate::commands::mods::create_fields;
 use crate::db::types::{ChannelId, ModId};
 use crate::db::Subscription;
 use crate::error::Error;
-use crate::{util, Page};
+use crate::util;
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
@@ -150,34 +151,14 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     // - Filter `MODFILE_CHANGED` events for new mods
                     // - Ungroup the events ordered by event id
                     let events = {
-                        let first_page = modio
-                            .get_mods_events(*game_id)
-                            .filter(filter.clone())
-                            .await?
-                            .data()
-                            .await?;
+                        let events = modio.get_mods_events(*game_id).filter(filter);
+                        let mut paged = events.paged();
 
-                        let mut evts = first_page.data;
-
-                        loop {
-                            let filter = filter
-                                .clone()
-                                .offset((first_page.offset + first_page.limit) as usize);
-
-                            let next_page = modio
-                                .get_mods_events(*game_id)
-                                .filter(filter)
-                                .await?
-                                .data()
-                                .await?;
-
-                            if next_page.is_empty() {
-                                break;
-                            }
-
-                            evts.extend(next_page.data);
+                        let mut events = Vec::new();
+                        while let Some(page) = paged.next().await? {
+                            events.extend(page);
                         }
-                        evts
+                        events
                     };
 
                     let mut events = {
@@ -207,34 +188,17 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     }
 
                     // Load the mods for the events
-                    let filter = Id::_in(events.keys().collect::<Vec<_>>());
-                    let first_page = modio
-                        .get_mods(*game_id)
-                        .filter(filter.clone())
-                        .await?
-                        .data()
-                        .await?;
+                    let mods = {
+                        let filter = Id::_in(events.keys().collect::<Vec<_>>());
+                        let mods = modio.get_mods(*game_id).filter(filter);
+                        let mut paged = mods.paged();
 
-                    let mut mods = first_page.data;
-
-                    loop {
-                        let filter = filter
-                            .clone()
-                            .offset((first_page.offset + first_page.limit) as usize);
-
-                        let next_page = modio
-                            .get_mods(*game_id)
-                            .filter(filter)
-                            .await?
-                            .data()
-                            .await?;
-
-                        if next_page.is_empty() {
-                            break;
+                        let mut mods = Vec::new();
+                        while let Some(page) = paged.next().await? {
+                            mods.extend(page);
                         }
-
-                        mods.extend(next_page.data);
-                    }
+                        mods
+                    };
 
                     let events = {
                         let mut evts = Vec::new();
