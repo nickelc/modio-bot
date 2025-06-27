@@ -71,7 +71,7 @@ async fn try_main() -> CliResult {
         .unwrap_or_else(|| PathBuf::from("bot.toml"));
 
     let config = config::load_from_file(&path)
-        .map_err(|e| format!("Failed to load config {path:?}: {e}"))?;
+        .map_err(|e| format!("Failed to load config \"{}\": {e}", path.display()))?;
 
     let metrics = Metrics::new()?;
     let pool = init_db(&config.bot.database_url)?;

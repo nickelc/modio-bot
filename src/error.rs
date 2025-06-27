@@ -37,7 +37,7 @@ pub enum DatabaseErrorInner {
 #[derive(Debug)]
 pub enum TwilightError {
     Start(twilight_gateway::error::StartRecommendedError),
-    Http(twilight_http::Error),
+    Http(Box<twilight_http::Error>),
     Deserialization(twilight_http::response::DeserializeBodyError),
 }
 
@@ -123,7 +123,7 @@ impl From<twilight_gateway::error::StartRecommendedError> for Error {
 
 impl From<twilight_http::Error> for Error {
     fn from(e: twilight_http::Error) -> Self {
-        Error::Twilight(TwilightError::Http(e))
+        Error::Twilight(TwilightError::Http(Box::new(e)))
     }
 }
 
