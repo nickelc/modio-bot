@@ -289,7 +289,7 @@ fn create_mod_message(game: &Game, mod_: &Mod, event_type: &EventType) -> (Optio
         EventType::MOD_AVAILABLE => {
             let content = "A new mod is available. :tada:".to_owned();
             let embed = create_embed(game, mod_, &mod_.summary, true);
-            let embed = create_fields(embed, mod_, true, with_ddl).build();
+            let embed = create_fields(embed, game, mod_, true, with_ddl).build();
             return (Some(content), embed);
         }
         EventType::MOD_UNAVAILABLE => {

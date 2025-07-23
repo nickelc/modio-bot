@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::fmt::Write;
 
 use modio::filter::prelude::*;
@@ -386,11 +387,13 @@ fn create_mod_embed(game: &Game, mod_: &Mod) -> EmbedBuilder {
         )
         .footer(footer);
 
-    create_fields(builder, mod_, false, with_ddl)
+    create_fields(builder, game, mod_, false, with_ddl)
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn create_fields(
     mut builder: EmbedBuilder,
+    g: &Game,
     m: &Mod,
     is_new: bool,
     with_ddl: bool,
@@ -452,16 +455,31 @@ Votes: +{}/-{}",
             None
         }
     }
-    fn tags(m: &Mod) -> Option<EmbedField> {
+    fn tags(g: &Game, m: &Mod) -> Option<EmbedField> {
         if m.tags.is_empty() {
             return None;
         }
+
+        // Collect all non hidden tags from game.
+        let game_tags = g
+            .tag_options
+            .iter()
+            .filter(|t| !t.hidden)
+            .flat_map(|t| &t.tags)
+            .collect::<HashSet<_>>();
+
         let tags = m
             .tags
             .iter()
+            .filter(|t| game_tags.contains(&t.name))
             .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
+
+        if tags.is_empty() {
+            return None;
+        }
+
         Some(EmbedField {
             name: "Tags".to_owned(),
             value: tags,
@@ -473,7 +491,7 @@ Votes: +{}/-{}",
         if let Some(field) = info(m, with_ddl) {
             builder = builder.field(field);
         }
-        if let Some(field) = tags(m) {
+        if let Some(field) = tags(g, m) {
             builder = builder.field(field);
         }
     } else {
@@ -482,7 +500,7 @@ Votes: +{}/-{}",
             builder = builder.field(field);
         }
         builder = builder.field(dates(m));
-        if let Some(field) = tags(m) {
+        if let Some(field) = tags(g, m) {
             builder = builder.field(field);
         }
     }
