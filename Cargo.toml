@@ -24,9 +24,9 @@ serde = "1.0.217"
 serde_derive = "1.0.217"
 serde_urlencoded = "0.7.1"
 time = { version = "0.3.37", features = ["formatting", "macros"] }
-tokio = { version = "1.46.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-stream = "0.1.17"
-toml = "0.9.1"
+toml = "0.9.5"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "time"] }
 
@@ -51,7 +51,7 @@ twilight-cache-inmemory = "0.16.0"
 twilight-util = { version = "0.16.0", features = ["builder"] }
 
 [dependencies.modio]
-version = "0.13.0"
+version = "0.13.1"
 default-features = false
 features = ["rustls-tls"]
 
