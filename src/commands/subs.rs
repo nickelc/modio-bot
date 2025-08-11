@@ -15,7 +15,8 @@ use twilight_model::application::interaction::application_command::{
 use twilight_model::application::interaction::{Interaction, InteractionContextType};
 use twilight_model::guild::Permissions;
 use twilight_util::builder::command::{
-    CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder, SubCommandGroupBuilder,
+    BooleanBuilder, CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder,
+    SubCommandGroupBuilder,
 };
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
@@ -57,7 +58,8 @@ pub fn commands() -> Vec<Command> {
                 ("Updated mods", i64::from(Events::UPD.bits())),
                 ("All", i64::from(Events::ALL.bits())),
             ]),
-        ),
+        )
+        .option(BooleanBuilder::new("explicit", "Allow explicit content")),
     )
     .option(
         SubCommandBuilder::new(
@@ -158,7 +160,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let mut game_ids = subs
         .values()
         .flatten()
-        .map(|(g, _, _)| g)
+        .map(|(g, _, _, _)| g)
         .chain(excluded_mods.keys().map(|(g, _)| g))
         .chain(excluded_users.keys().map(|(g, _)| g))
         .collect::<Vec<_>>();
@@ -178,7 +180,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let mut content = String::new();
     for (channel_id, subs) in subs {
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
-        for (game_id, tags, evts) in subs {
+        for (game_id, tags, evts, explicit) in subs {
             if let Some(game) = games.get(&game_id.get()) {
                 _ = write!(&mut content, "`{game_id}.` {game}");
             } else {
@@ -189,6 +191,9 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
             if !tags.is_empty() {
                 content.push_str(" | Tags: ");
                 push_tags(&mut content, tags.iter());
+            }
+            if !explicit {
+                content.push_str(" :underage:");
             }
             content.push('\n');
         }
@@ -272,7 +277,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
         .collect::<HashMap<_, _>>();
 
     let mut content = String::new();
-    for (game_id, tags, evts) in subs {
+    for (game_id, tags, evts, explicit) in subs {
         let Some(name) = games.get(&game_id) else {
             continue;
         };
@@ -283,6 +288,9 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
         if !tags.is_empty() {
             content.push_str(" | Tags: ");
             push_tags(&mut content, tags.iter());
+        }
+        if !explicit {
+            content.push_str(" :underage:");
         }
         content.push('\n');
     }
@@ -308,6 +316,7 @@ async fn subscribe(
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
+    let mut explicit = None;
 
     defer_ephemeral(ctx, interaction).await?;
 
@@ -331,6 +340,9 @@ async fn subscribe(
                 } else {
                     Events::ALL
                 };
+            }
+            CommandOptionValue::Boolean(v) if opt.name == "explicit" => {
+                explicit = Some(*v);
             }
             _ => {}
         }
@@ -373,10 +385,12 @@ async fn subscribe(
     }
     sub_tags.extend(hidden);
 
+    let explicit = explicit.unwrap_or(true);
+
     let game_id = GameId(game.id);
     let ret = ctx
         .subscriptions
-        .add(game_id, channel_id, sub_tags, guild_id, evts);
+        .add(game_id, channel_id, sub_tags, guild_id, evts, explicit);
 
     let content: Cow<'_, str> = match ret {
         Ok(()) => format!("Subscribed to '{}'.", game.name).into(),

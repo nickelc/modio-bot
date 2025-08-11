@@ -1,0 +1,1 @@
+ALTER TABLE subscriptions ADD COLUMN explicit BOOLEAN NOT NULL DEFAULT 1;

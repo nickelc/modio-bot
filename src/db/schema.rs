@@ -24,6 +24,7 @@ diesel::table! {
         tags -> Text,
         guild -> BigInt,
         events -> Integer,
+        explicit -> Bool,
     }
 }
 

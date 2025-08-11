@@ -13,7 +13,7 @@ pub type ExcludedMods = HashSet<ModId>;
 pub type ExcludedUsers = HashSet<String>;
 pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
 pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
-pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Tags, Events)>>;
+pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Tags, Events, bool)>>;
 
 pub use events::Events;
 pub use tags::Tags;
@@ -24,6 +24,7 @@ pub struct Subscription {
     pub channel: ChannelId,
     pub tags: Tags,
     pub events: Events,
+    pub explicit: bool,
 }
 
 #[derive(Clone)]
@@ -212,9 +213,9 @@ impl Subscriptions {
             let conn = &mut self.pool.get()?;
 
             let subs = subscriptions
-                .select((channel, game, tags, events))
+                .select((channel, game, tags, events, explicit))
                 .filter(guild.eq(guild_id))
-                .load::<(ChannelId, GameId, Tags, Events)>(conn)?;
+                .load::<(ChannelId, GameId, Tags, Events, bool)>(conn)?;
 
             let excluded_mods = {
                 use schema::subscriptions_exclude_mods::dsl::*;
@@ -238,10 +239,10 @@ impl Subscriptions {
 
         let subs = subs.into_iter().fold(
             GroupedSubscriptions::new(),
-            |mut map, (channel_id, game_id, tags, events)| {
+            |mut map, (channel_id, game_id, tags, events, allow_explicit)| {
                 map.entry(channel_id)
                     .or_default()
-                    .push((game_id, tags, events));
+                    .push((game_id, tags, events, allow_explicit));
                 map
             },
         );
@@ -265,16 +266,19 @@ impl Subscriptions {
         Ok((subs, excluded_mods, excluded_users))
     }
 
-    pub fn list_for_channel(&self, channel_id: ChannelId) -> Result<Vec<(GameId, Tags, Events)>> {
+    pub fn list_for_channel(
+        &self,
+        channel_id: ChannelId,
+    ) -> Result<Vec<(GameId, Tags, Events, bool)>> {
         use schema::subscriptions::dsl::*;
 
         let records = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
 
             let records = subscriptions
-                .select((game, tags, events))
+                .select((game, tags, events, explicit))
                 .filter(channel.eq(channel_id))
-                .load::<(GameId, Tags, Events)>(conn)?;
+                .load::<(GameId, Tags, Events, bool)>(conn)?;
             Ok(records)
         })?;
 
@@ -336,6 +340,7 @@ impl Subscriptions {
         sub_tags: Tags,
         guild_id: GuildId,
         evts: Events,
+        allow_explicit: bool,
     ) -> Result<()> {
         use diesel::result::Error;
         use operators::BitwiseExtensions;
@@ -351,6 +356,7 @@ impl Subscriptions {
                     tags.eq(sub_tags),
                     guild.eq(guild_id),
                     events.eq(evts),
+                    explicit.eq(allow_explicit),
                 );
                 diesel::insert_into(subscriptions)
                     .values(values)
@@ -375,7 +381,7 @@ impl Subscriptions {
         use diesel::result::Error;
         use schema::subscriptions::dsl::*;
 
-        type Record = (GameId, ChannelId, Tags, GuildId, Events);
+        type Record = (GameId, ChannelId, Tags, GuildId, Events, bool);
 
         let pk = (game_id, channel_id, sub_tags.to_string());
 
@@ -385,7 +391,8 @@ impl Subscriptions {
             conn.transaction::<_, Error, _>(|conn| {
                 let first = subscriptions.find(pk).first::<Record>(conn);
 
-                if let Ok((game_id, channel_id, sub_tags, guild_id, old_evts)) = first {
+                if let Ok((game_id, channel_id, sub_tags, guild_id, old_evts, old_explicit)) = first
+                {
                     let mut new_evts = old_evts;
                     new_evts.remove(evts);
 
@@ -423,6 +430,7 @@ impl Subscriptions {
                             tags.eq(sub_tags),
                             guild.eq(guild_id),
                             events.eq(new_evts),
+                            explicit.eq(old_explicit),
                         );
                         diesel::replace_into(subscriptions)
                             .values(values)

@@ -6,6 +6,7 @@ use std::time::Duration;
 use dashmap::DashSet;
 use modio::filter::prelude::*;
 use modio::mods::filters::events::EventType as EventTypeFilter;
+use modio::mods::MaturityOption;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id;
 use modio::types::mods::{EventType, Mod};
@@ -204,6 +205,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             channel,
                             tags,
                             events: evts,
+                            explicit,
                         } in &subs
                         {
                             if unknown_channels.contains(channel) {
@@ -249,6 +251,10 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                     trace!("mod tags: {mod_tags:?}; sub tags: {tags:?}");
                                     continue;
                                 }
+                            }
+                            if !explicit && m.maturity_option.contains(MaturityOption::EXPLICIT) {
+                                debug!("mod ignored based on maturiy options #{channel}: {evt} for {:?}", m.name);
+                                continue;
                             }
                             effected_channels.insert(*channel);
                         }
