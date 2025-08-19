@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use modio::Modio;
+use modio::Client as Modio;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_gateway::{create_recommended, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::client::InteractionClient;
@@ -30,7 +30,7 @@ pub struct Context {
     pub application: Application,
     pub client: Arc<Client>,
     pub cache: Arc<InMemoryCache>,
-    pub modio: Modio,
+    pub modio: Arc<Modio>,
     pub pool: DbPool,
     pub settings: Settings,
     pub subscriptions: Subscriptions,
@@ -84,7 +84,7 @@ pub async fn initialize(
         application,
         client,
         cache: Arc::new(cache),
-        modio,
+        modio: Arc::new(modio),
         pool: pool.clone(),
         settings: Settings { pool: pool.clone() },
         subscriptions: Subscriptions { pool },

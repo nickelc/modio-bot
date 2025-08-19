@@ -8,7 +8,7 @@ use crate::Result;
 
 const DEFAULT_METRICS_SOCKET_ADDR: ([u8; 4], u16) = ([127, 0, 0, 1], 8080);
 
-const DEFAULT_MODIO_HOST: &str = "https://api.mod.io/v1";
+const DEFAULT_MODIO_HOST: &str = modio::client::DEFAULT_HOST;
 
 #[derive(Deserialize)]
 pub struct Config {

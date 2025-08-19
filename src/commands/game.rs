@@ -1,8 +1,7 @@
 use std::fmt::Write;
 
-use modio::filter::prelude::*;
+use modio::request::filter::prelude::*;
 use modio::types::games::Game;
-use tokio_stream::{Stream, StreamExt};
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -55,12 +54,13 @@ pub async fn games(
 
     defer_response(ctx, interaction).await?;
 
-    let mut games = ctx.modio.games().search(filter).iter().await?.take(100);
+    let games = ctx.modio.get_games().filter(filter).await?.data().await?;
+    let mut games = games.data.into_iter();
 
     match games.size_hint() {
         (0, _) => update_response_content(ctx, interaction, "No games found.").await,
         (1, _) => {
-            let game = games.try_next().await?;
+            let game = games.next();
             if let Some(game) = game {
                 let embed = create_embed(game);
 
@@ -77,7 +77,7 @@ pub async fn games(
         }
         _ => {
             let mut buf = ContentBuilder::new(4000);
-            while let Some(game) = games.try_next().await? {
+            for game in games {
                 _ = writeln!(&mut buf, "`{}.` {}", game.id, game.name);
             }
 
@@ -100,7 +100,7 @@ pub async fn game(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
 
     defer_response(ctx, interaction).await?;
 
-    let game = ctx.modio.game(game_id).get().await?;
+    let game = ctx.modio.get_game(game_id).await?.data().await?;
 
     let embed = create_embed(game);
 

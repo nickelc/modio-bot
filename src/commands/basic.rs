@@ -130,7 +130,9 @@ pub async fn settings(
 
     defer_ephemeral(ctx, interaction).await?;
 
-    let game = ctx.modio.games().search(filter).first().await?;
+    let filter = filter.limit(1);
+    let games = ctx.modio.get_games().filter(filter).await?.data().await?;
+    let game = games.data.into_iter().next();
     let guild_id = interaction.guild_id.expect("guild only command");
 
     let content: Cow<'_, str> = if let Some(game) = game {

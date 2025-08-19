@@ -2,13 +2,12 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Write;
 
-use modio::filter::prelude::*;
-use modio::mods::filters::Popular;
+use modio::request::filter::prelude::*;
+use modio::request::mods::filters::Popular;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id::{GameId, ModId};
 use modio::types::mods::{Mod, Statistics};
 use serde_derive::{Deserialize, Serialize};
-use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -28,7 +27,7 @@ use super::{
 };
 use crate::bot::Context;
 use crate::error::Error;
-use crate::util::format_timestamp;
+use crate::util::{format_timestamp, Page};
 
 pub fn commands() -> Vec<Command> {
     vec![
@@ -106,24 +105,23 @@ pub async fn list(
     } else {
         (Filter::default(), "Mods".into())
     };
-    let game = ctx.modio.game(game_id);
-    let mods = game.mods();
 
-    let first_page = mods
-        .search(filter.limit(20))
-        .paged()
+    let page = ctx
+        .modio
+        .get_mods(game_id)
+        .filter(filter.limit(20))
         .await?
-        .try_next()
+        .data()
         .await?;
 
-    let Some(page) = first_page else {
+    if page.is_empty() {
         let content = "No mods found.";
         return update_response_content(ctx, interaction, content).await;
-    };
+    }
 
-    let (embeds, components) = match page.as_slice() {
+    let (embeds, components) = match page.data.as_slice() {
         [mod_] => {
-            let game = game.get().await?;
+            let game = ctx.modio.get_game(game_id).await?.data().await?;
             let embed = create_mod_embed(&game, mod_).build();
             (Some(vec![embed]), None)
         }
@@ -197,15 +195,19 @@ pub async fn list_component(
         (Filter::default(), "Mods".into())
     };
     let filter = filter.offset(offset).limit(20);
-    let game = ctx.modio.game(game_id);
-    let mods = game.mods();
 
     defer_component_response(ctx, interaction).await?;
 
-    let page = mods.search(filter).paged().await?.try_next().await?;
+    let page = ctx
+        .modio
+        .get_mods(game_id)
+        .filter(filter)
+        .await?
+        .data()
+        .await?;
 
-    if let Some(page) = page {
-        let embed = create_list_embed(&page, &title, page.current(), page.page_count());
+    if !page.is_empty() {
+        let embed = create_list_embed(&page.data, &title, page.current(), page.page_count());
         let components = create_browse_buttons(
             game_id,
             search,
@@ -262,17 +264,21 @@ pub async fn popular(
     };
 
     let filter = with_limit(10).order_by(Popular::desc());
-    let game = ctx.modio.game(game_id);
-    let mods = game.mods().search(filter).first_page().await?;
-    let game = game.get().await?;
+    let mods = ctx
+        .modio
+        .get_mods(game_id)
+        .filter(filter)
+        .await?
+        .data()
+        .await?;
 
-    if mods.is_empty() {
+    if mods.data.is_empty() {
         let content = "No mods founds.";
         return update_response_content(ctx, interaction, content).await;
     }
 
     let mut content = String::new();
-    for mod_ in mods {
+    for mod_ in mods.data {
         _ = writeln!(
             content,
             "{:02}. [{}]({}) ({}) +{}/-{}",
@@ -284,6 +290,8 @@ pub async fn popular(
             mod_.stats.ratings.negative,
         );
     }
+
+    let game = ctx.modio.get_game(game_id).await?.data().await?;
 
     let embed = EmbedBuilder::new()
         .title("Popular Mods")

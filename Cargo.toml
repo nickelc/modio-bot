@@ -51,9 +51,9 @@ twilight-cache-inmemory = "0.16.0"
 twilight-util = { version = "0.16.0", features = ["builder"] }
 
 [dependencies.modio]
-version = "0.13.3"
+version = "0.14.0"
 default-features = false
-features = ["rustls-tls"]
+features = ["rustls-native-roots"]
 
 [build-dependencies]
 git2 = { version = "0.20.2", default-features = false }

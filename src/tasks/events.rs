@@ -4,12 +4,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashSet;
-use modio::filter::prelude::*;
-use modio::mods::filters::events::EventType as EventTypeFilter;
-use modio::mods::MaturityOption;
+use modio::request::filter::prelude::*;
+use modio::request::mods::events::filters::EventType as EventTypeFilter;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::id;
-use modio::types::mods::{EventType, Mod};
+use modio::types::mods::{EventType, MaturityOption, Mod};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
 use tokio_stream::{self as stream, StreamExt};
@@ -23,7 +22,8 @@ use crate::bot::Context;
 use crate::commands::mods::create_fields;
 use crate::db::types::{ChannelId, ModId};
 use crate::db::Subscription;
-use crate::util;
+use crate::error::Error;
+use crate::{util, Page};
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
@@ -116,13 +116,11 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 if subs.is_empty() {
                     continue;
                 }
+                let modio = ctx.modio.clone();
                 let sender = sender.clone();
                 let subscriptions = ctx.subscriptions.clone();
                 let unknown_channels = unknown_channels2.clone();
                 let filter = filter.clone();
-                let game = ctx.modio.game(*game_id);
-                let mods = ctx.modio.game(*game_id).mods();
-                let events = ctx.modio.game(*game_id).mods().events(filter);
                 let excluded_mods = Arc::clone(&excluded_mods);
                 let excluded_users = Arc::clone(&excluded_users);
 
@@ -131,8 +129,8 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
                     debug!("polling events at {tstamp} for game={game_id} subs: {subs:?}");
 
-                    let game = match game.get().await {
-                        Ok(game) => game,
+                    let game = match modio.get_game(*game_id).await {
+                        Ok(game) => game.data().await?,
                         Err(e) => {
                             tracing::warn!(
                                 "skipping polling: can't retrieve game (id={game_id}): {e}"
@@ -151,15 +149,46 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                     // - Group the events by mod
                     // - Filter `MODFILE_CHANGED` events for new mods
                     // - Ungroup the events ordered by event id
+                    let events = {
+                        let first_page = modio
+                            .get_mods_events(*game_id)
+                            .filter(filter.clone())
+                            .await?
+                            .data()
+                            .await?;
 
-                    let mut st = events.iter().await?;
-                    let mut events = Events::new();
-                    while let Some(event) = st.try_next().await? {
-                        events
-                            .entry(event.mod_id)
-                            .or_default()
-                            .push((event.id, event.event_type));
-                    }
+                        let mut evts = first_page.data;
+
+                        loop {
+                            let filter = filter
+                                .clone()
+                                .offset((first_page.offset + first_page.limit) as usize);
+
+                            let next_page = modio
+                                .get_mods_events(*game_id)
+                                .filter(filter)
+                                .await?
+                                .data()
+                                .await?;
+
+                            if next_page.is_empty() {
+                                break;
+                            }
+
+                            evts.extend(next_page.data);
+                        }
+                        evts
+                    };
+
+                    let mut events = {
+                        let mut evts = Events::new();
+                        for event in events {
+                            evts.entry(event.mod_id)
+                                .or_default()
+                                .push((event.id, event.event_type));
+                        }
+                        evts
+                    };
 
                     if events.is_empty() {
                         return Ok(());
@@ -179,10 +208,37 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
 
                     // Load the mods for the events
                     let filter = Id::_in(events.keys().collect::<Vec<_>>());
-                    let mut st = mods.search(filter).iter().await?;
+                    let first_page = modio
+                        .get_mods(*game_id)
+                        .filter(filter.clone())
+                        .await?
+                        .data()
+                        .await?;
+
+                    let mut mods = first_page.data;
+
+                    loop {
+                        let filter = filter
+                            .clone()
+                            .offset((first_page.offset + first_page.limit) as usize);
+
+                        let next_page = modio
+                            .get_mods(*game_id)
+                            .filter(filter)
+                            .await?
+                            .data()
+                            .await?;
+
+                        if next_page.is_empty() {
+                            break;
+                        }
+
+                        mods.extend(next_page.data);
+                    }
+
                     let events = {
                         let mut evts = Vec::new();
-                        while let Some(Ok(mod_)) = st.next().await {
+                        for mod_ in mods {
                             if let Some(evt) = events.get(&mod_.id) {
                                 evts.push((mod_, evt));
                             }
@@ -272,7 +328,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             error!("{e}");
                         }
                     }
-                    Ok::<_, modio::Error>(())
+                    Ok::<_, Error>(())
                 };
 
                 tokio::spawn(async {

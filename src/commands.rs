@@ -1,4 +1,4 @@
-use modio::games::Game;
+use modio::types::games::Game;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::command::{
     Command, CommandOptionChoice, CommandOptionChoiceValue,
@@ -312,7 +312,9 @@ async fn autocomplete_games(
 async fn search_game(ctx: &Context, search: &str) -> Result<Option<Game>, Error> {
     use crate::util::IntoFilter;
 
-    let filter = search.into_filter();
-    let game = ctx.modio.games().search(filter).first().await?;
+    let filter = search.into_filter().limit(1);
+
+    let games = ctx.modio.get_games().filter(filter).await?.data().await?;
+    let game = games.data.into_iter().next();
     Ok(game)
 }

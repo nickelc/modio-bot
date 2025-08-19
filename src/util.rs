@@ -1,8 +1,9 @@
 use std::fmt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use modio::filter::Filter;
-use modio::{Credentials, Modio};
+use modio::request::filter::Filter;
+use modio::types::List;
+use modio::Client;
 use tokio_stream::{self as stream, StreamExt};
 use twilight_http::api_error::ApiError;
 use twilight_http::error::ErrorType;
@@ -15,14 +16,14 @@ use crate::error::Error;
 pub type CliResult = std::result::Result<(), Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn init_modio(config: &Config) -> Result<Modio> {
-    let credentials = match (&config.modio.api_key, &config.modio.token) {
-        (key, None) => Credentials::new(key),
-        (key, Some(token)) => Credentials::with_token(key, token),
+pub fn init_modio(config: &Config) -> Result<Client> {
+    let builder = match (&config.modio.api_key, &config.modio.token) {
+        (key, None) => Client::builder(key.clone()),
+        (key, Some(token)) => Client::builder(key.clone()).token(token.clone()),
     };
 
-    let modio = Modio::builder(credentials)
-        .host(&config.modio.host)
+    let modio = builder
+        .host(config.modio.host.clone())
         .user_agent("modbot")
         .build()?;
     Ok(modio)
@@ -71,7 +72,7 @@ pub trait IntoFilter {
 impl<T: AsRef<str>> IntoFilter for T {
     fn into_filter(self) -> Filter {
         fn search_filter(value: &str) -> Filter {
-            use modio::filter::prelude::*;
+            use modio::request::filter::prelude::*;
             use modio::types::id::ResourceId;
 
             match value.parse::<ResourceId>() {
@@ -84,6 +85,45 @@ impl<T: AsRef<str>> IntoFilter for T {
 
         search_filter(self.as_ref())
     }
+}
+
+/// Helper trait as replacement for the old `Page<T>` type of the query loader.
+pub trait Page {
+    fn current(&self) -> usize;
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn page_count(&self) -> usize;
+    fn page_size(&self) -> usize;
+    fn total(&self) -> usize;
+    //fn map_data(&self) -> impl Iterator;
+}
+
+impl<T> Page for List<T> {
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    fn current(&self) -> usize {
+        self.offset as usize / self.page_size() + 1
+    }
+
+    fn page_count(&self) -> usize {
+        (self.total() - 1) / self.page_size() + 1
+    }
+
+    fn page_size(&self) -> usize {
+        self.limit as usize
+    }
+
+    fn total(&self) -> usize {
+        self.total as usize
+    }
+
+    //fn map_data(&self) -> impl Iterator {}
 }
 
 pub async fn check_subscriptions(ctx: &Context) -> Result<()> {

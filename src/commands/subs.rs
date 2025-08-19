@@ -3,10 +3,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Write};
 
 use futures_util::stream::FuturesUnordered;
-use modio::filter::prelude::*;
+use modio::request::filter::prelude::*;
 use modio::types::games::{ApiAccessOptions, Game};
 use modio::types::mods::Mod;
-use modio::Modio;
+use modio::Client as Modio;
 use tokio_stream::StreamExt;
 use twilight_model::application::command::{Command, CommandType};
 use twilight_model::application::interaction::application_command::{
@@ -28,7 +28,7 @@ use crate::bot::Context;
 use crate::db::types::{ChannelId, GameId, ModId};
 use crate::db::{Events, Tags};
 use crate::error::Error;
-use crate::util::{ContentBuilder, IntoFilter};
+use crate::util::{ContentBuilder, IntoFilter, Page};
 
 pub fn commands() -> Vec<Command> {
     vec![CommandBuilder::new(
@@ -169,11 +169,32 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     game_ids.dedup();
 
     let filter = Id::_in(game_ids);
-    let list = ctx.modio.games().search(filter).collect().await?;
-    let games = list
+    let first_page = ctx
+        .modio
+        .get_games()
+        .filter(filter.clone())
+        .await?
+        .data()
+        .await?;
+    let mut games = first_page
+        .data
         .into_iter()
         .map(|g| (g.id.get(), g.name))
         .collect::<HashMap<_, _>>();
+
+    loop {
+        let filter = filter
+            .clone()
+            .offset((first_page.offset + first_page.limit) as usize);
+
+        let next_page = ctx.modio.get_games().filter(filter).await?.data().await?;
+
+        if next_page.is_empty() {
+            break;
+        }
+
+        games.extend(next_page.data.into_iter().map(|g| (g.id.get(), g.name)));
+    }
 
     let mut embed = EmbedBuilder::new().title("Subscriptions");
 
@@ -270,11 +291,32 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     defer_ephemeral(ctx, interaction).await?;
 
     let filter = Id::_in(subs.iter().map(|s| s.0).collect::<Vec<_>>());
-    let list = ctx.modio.games().search(filter).collect().await?;
-    let games = list
+    let first_page = ctx
+        .modio
+        .get_games()
+        .filter(filter.clone())
+        .await?
+        .data()
+        .await?;
+    let mut games = first_page
+        .data
         .into_iter()
         .map(|g| (g.id, g.name))
         .collect::<HashMap<_, _>>();
+
+    loop {
+        let filter = filter
+            .clone()
+            .offset((first_page.offset + first_page.limit) as usize);
+
+        let next_page = ctx.modio.get_games().filter(filter).await?.data().await?;
+
+        if next_page.is_empty() {
+            break;
+        }
+
+        games.extend(next_page.data.into_iter().map(|g| (g.id, g.name)));
+    }
 
     let mut content = String::new();
     for (game_id, tags, evts, explicit) in subs {
@@ -515,10 +557,38 @@ async fn mods_muted(
         1 => {
             let (GameId(game), mods) = excluded.into_iter().next().unwrap();
             let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
-            let mut st = ctx.modio.game(game).mods().search(filter).iter().await?;
+            let first_page = ctx
+                .modio
+                .get_mods(game)
+                .filter(filter.clone())
+                .await?
+                .data()
+                .await?;
+
+            let mut mods = first_page.data;
+
+            loop {
+                let filter = filter
+                    .clone()
+                    .offset((first_page.offset + first_page.limit) as usize);
+
+                let next_page = ctx
+                    .modio
+                    .get_mods(game)
+                    .filter(filter)
+                    .await?
+                    .data()
+                    .await?;
+
+                if next_page.is_empty() {
+                    break;
+                }
+
+                mods.extend(next_page.data);
+            }
 
             let mut buf = ContentBuilder::new(4000);
-            while let Some(mod_) = st.try_next().await? {
+            for mod_ in mods {
                 _ = writeln!(&mut buf, "`{}.` {}", mod_.id, mod_.name);
             }
             buf
@@ -529,8 +599,43 @@ async fn mods_muted(
                 .map(|(GameId(game), mods)| async move {
                     let filter = Id::_in(mods.into_iter().collect::<Vec<_>>());
                     tokio::try_join!(
-                        ctx.modio.game(game).get(),
-                        ctx.modio.game(game).mods().search(filter).collect(),
+                        async {
+                            let game = ctx.modio.get_game(game).await?.data().await?;
+                            Ok::<_, Error>(game)
+                        },
+                        async {
+                            let first_page = ctx
+                                .modio
+                                .get_mods(game)
+                                .filter(filter.clone())
+                                .await?
+                                .data()
+                                .await?;
+
+                            let mut mods = first_page.data;
+
+                            loop {
+                                let filter = filter
+                                    .clone()
+                                    .offset((first_page.offset + first_page.limit) as usize);
+
+                                let next_page = ctx
+                                    .modio
+                                    .get_mods(game)
+                                    .filter(filter)
+                                    .await?
+                                    .data()
+                                    .await?;
+
+                                if next_page.is_empty() {
+                                    break;
+                                }
+
+                                mods.extend(next_page.data);
+                            }
+
+                            Ok(mods)
+                        },
                     )
                 })
                 .collect::<FuturesUnordered<_>>();
@@ -696,7 +801,7 @@ async fn users_muted(
             let mut st = excluded
                 .into_iter()
                 .map(|(GameId(game), users)| async move {
-                    let game = ctx.modio.game(game).get().await?;
+                    let game = ctx.modio.get_game(game).await?.data().await?;
                     Ok::<_, Error>((game, users))
                 })
                 .collect::<FuturesUnordered<_>>();
@@ -739,7 +844,15 @@ async fn users_mute(
     let game_filter = game_filter.expect("required option");
     let name = name.expect("required option");
 
-    let game = ctx.modio.games().search(game_filter).first().await?;
+    let games = ctx
+        .modio
+        .get_games()
+        .filter(game_filter.limit(1))
+        .await?
+        .data()
+        .await?;
+    let game = games.data.into_iter().next();
+
     let content: Cow<'_, str> = match game {
         Some(game) => {
             let guild_id = interaction.guild_id().unwrap();
@@ -789,7 +902,15 @@ async fn users_unmute(
     let game_filter = game_filter.expect("required option");
     let name = name.expect("required option");
 
-    let game = ctx.modio.games().search(game_filter).first().await?;
+    let games = ctx
+        .modio
+        .get_games()
+        .filter(game_filter.limit(1))
+        .await?
+        .data()
+        .await?;
+    let game = games.data.into_iter().next();
+
     let content: Cow<'_, str> = match game {
         Some(game) => {
             let channel_id = interaction.channel_id().unwrap();
@@ -818,16 +939,20 @@ async fn find_game_mod(
     game_filter: Filter,
     mod_filter: Filter,
 ) -> Result<(Option<Game>, Option<Mod>), Error> {
-    let Some(game) = modio.games().search(game_filter).first().await? else {
+    let game_filter = game_filter.limit(1);
+    let games = modio.get_games().filter(game_filter).await?.data().await?;
+    let Some(game) = games.data.into_iter().next() else {
         return Ok((None, None));
     };
 
-    let mod_ = modio
-        .game(game.id)
-        .mods()
-        .search(mod_filter)
-        .first()
+    let mod_filter = mod_filter.limit(1);
+    let mods = modio
+        .get_mods(game.id)
+        .filter(mod_filter)
+        .await?
+        .data()
         .await?;
+    let mod_ = mods.data.into_iter().next();
 
     Ok((Some(game), mod_))
 }

@@ -1,6 +1,7 @@
 use std::fmt;
 use std::io::Error as IoError;
 
+use modio::response::BodyError;
 use modio::Error as ModioError;
 use pico_args::Error as ArgsError;
 use prometheus::Error as PrometheusError;
@@ -15,6 +16,7 @@ pub enum Error {
     Message(String),
     Io(IoError),
     Modio(ModioError),
+    ModioBody(BodyError),
     Database(DatabaseErrorInner),
     Tokio(TokioError),
     Twilight(TwilightError),
@@ -55,6 +57,7 @@ impl fmt::Display for Error {
             Error::Database(DatabaseErrorInner::Init(e)) => e.fmt(fmt),
             Error::Database(DatabaseErrorInner::Query(e)) => e.fmt(fmt),
             Error::Modio(e) => e.fmt(fmt),
+            Error::ModioBody(e) => e.fmt(fmt),
             Error::Config(e) => e.fmt(fmt),
             Error::Metrics(e) => e.fmt(fmt),
         }
@@ -94,6 +97,12 @@ impl From<TomlError> for Error {
 impl From<ModioError> for Error {
     fn from(e: ModioError) -> Error {
         Error::Modio(e)
+    }
+}
+
+impl From<BodyError> for Error {
+    fn from(e: BodyError) -> Error {
+        Error::ModioBody(e)
     }
 }
 

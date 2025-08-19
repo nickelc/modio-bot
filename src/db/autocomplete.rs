@@ -7,14 +7,14 @@ use super::{schema, DbPool, Result};
 
 #[derive(Debug, Insertable)]
 #[diesel(table_name = schema::games)]
-pub struct Game<'a> {
+pub struct Game {
     pub id: GameId,
-    pub name: &'a str,
-    pub name_id: &'a str,
+    pub name: String,
+    pub name_id: String,
     pub api_access_options: ApiAccessOptions,
 }
 
-pub fn replace_games(pool: &DbPool, records: &[Game<'_>]) -> Result<()> {
+pub fn replace_games(pool: &DbPool, records: &[Game]) -> Result<()> {
     let conn = &mut pool.get()?;
 
     block_in_place(|| {
