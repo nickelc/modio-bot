@@ -9,7 +9,7 @@ use twilight_http::api_error::ApiError;
 use twilight_http::error::ErrorType;
 
 use crate::bot::Context;
-use crate::config::Config;
+use crate::config::{Config, Host};
 use crate::db::types::ChannelId;
 use crate::error::Error;
 
@@ -22,10 +22,14 @@ pub fn init_modio(config: &Config) -> Result<Client> {
         (key, Some(token)) => Client::builder(key.clone()).token(token.clone()),
     };
 
-    let modio = builder
-        .host(config.modio.host.clone())
-        .user_agent("modbot")
-        .build()?;
+    let builder = match &config.modio.host {
+        Some(Host::Default) => builder.use_default_env(),
+        Some(Host::Test) => builder.use_test_env(),
+        Some(Host::Dynamic) | None => builder.dynamic_game_host(),
+        Some(Host::DynamicWithCustom(host)) => builder.dynamic_game_host_with_custom(&**host),
+        Some(Host::Custom(host)) => builder.host(&**host),
+    };
+    let modio = builder.user_agent("modbot").build()?;
     Ok(modio)
 }
 

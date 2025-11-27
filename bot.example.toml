@@ -10,7 +10,11 @@ api_key="your mod.io api key"
 # token="your mod.io token"
 
 # Alternative mod.io host
-# host="https://api.test.mod.io/v1"
+# host="default"
+# host="test"
+# host="dynamic"
+# host="dynamic:custom-fallback.com"
+# host="modapi.example.com"
 
 [metrics] # Optional
 addr = "127.0.0.1:3000" # defaults to 127.0.0.1:8080
