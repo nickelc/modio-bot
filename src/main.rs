@@ -8,10 +8,10 @@
 
 use std::convert::Infallible;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use dotenv::dotenv;
 use futures_util::future;
+use tokio::sync::watch;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 use twilight_gateway::{CloseFrame, Event, Shard, StreamExt as _};
@@ -42,8 +42,6 @@ OPTIONS:
 ENV:
   MODBOT_DEBUG_TIMESTAMP        Start time as Unix timestamp for polling the mod events
 ";
-
-static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 #[tokio::main]
 async fn main() {
@@ -95,40 +93,44 @@ async fn try_main() -> CliResult {
     tokio::spawn(tasks::events::task(context.clone()));
     tokio::spawn(tasks::games::task(context.clone()));
 
-    let mut senders = Vec::with_capacity(shards.len());
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let mut tasks = Vec::with_capacity(shards.len());
 
     for shard in shards {
-        senders.push(shard.sender());
-        tasks.push(tokio::spawn(runner(context.clone(), shard)));
+        tasks.push(tokio::spawn(runner(
+            context.clone(),
+            shard,
+            shutdown_rx.clone(),
+        )));
     }
 
     tokio::signal::ctrl_c().await?;
 
     tracing::info!("Shutting down");
-    SHUTDOWN.store(true, Ordering::Relaxed);
-
-    for sender in senders {
-        let _ = sender.close(CloseFrame::NORMAL);
-    }
+    _ = shutdown_tx.send(true);
 
     future::join_all(tasks).await;
 
     Ok(())
 }
 
-async fn runner(context: Context, mut shard: Shard) {
-    while let Some(event) = shard.next_event(bot::EVENTS).await {
-        let event = match event {
-            Ok(Event::GatewayClose(_)) if SHUTDOWN.load(Ordering::Relaxed) => break,
-            Ok(event) => event,
-            Err(source) => {
-                tracing::warn!(?source, "error receiving event");
-                continue;
-            }
-        };
+async fn runner(context: Context, mut shard: Shard, mut shutdown: watch::Receiver<bool>) {
+    loop {
+        tokio::select! {
+            _ = shutdown.changed() => shard.close(CloseFrame::NORMAL),
+            Some(event) = shard.next_event(bot::EVENTS) => {
+                let event = match event {
+                    Ok(Event::GatewayClose(_)) if *shutdown.borrow() => break,
+                    Ok(event) => event,
+                    Err(source) => {
+                        tracing::warn!(?source, "error receiving event");
+                        continue;
+                    }
+                };
 
-        let context = context.clone();
-        tokio::spawn(bot::handle_event(event, context));
+                let context = context.clone();
+                tokio::spawn(bot::handle_event(event, context));
+            }
+        }
     }
 }
