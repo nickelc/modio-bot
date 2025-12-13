@@ -333,6 +333,7 @@ fn create_browse_buttons(
         sort: None,
     };
     let prev = Button {
+        id: None,
         custom_id: Some(create_custom_id(&custom_id)),
         style: ButtonStyle::Primary,
         label: Some("prev".to_owned()),
@@ -347,6 +348,7 @@ fn create_browse_buttons(
         ..custom_id
     };
     let next = Button {
+        id: None,
         custom_id: Some(create_custom_id(&custom_id)),
         style: ButtonStyle::Primary,
         label: Some("next".to_owned()),
@@ -356,6 +358,7 @@ fn create_browse_buttons(
         sku_id: None,
     };
     let row = ActionRow {
+        id: None,
         components: vec![prev.into(), next.into()],
     };
     row.into()
