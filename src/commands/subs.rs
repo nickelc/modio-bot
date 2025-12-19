@@ -29,7 +29,8 @@ use crate::bot::Context;
 use crate::db::types::{ChannelId, GameId, ModId};
 use crate::db::{Events, Tags};
 use crate::error::Error;
-use crate::util::{ContentBuilder, IntoFilter};
+use crate::util::text::ContentBuilder;
+use crate::util::IntoFilter;
 
 pub fn commands() -> Vec<Command> {
     vec![CommandBuilder::new(

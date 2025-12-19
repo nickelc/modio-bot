@@ -19,7 +19,8 @@ use super::{
 };
 use crate::bot::Context;
 use crate::error::Error;
-use crate::util::{ContentBuilder, IntoFilter};
+use crate::util::text::ContentBuilder;
+use crate::util::IntoFilter;
 
 pub fn commands() -> Vec<Command> {
     vec![

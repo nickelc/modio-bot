@@ -24,7 +24,7 @@ use crate::commands::mods::create_fields;
 use crate::db::types::{ChannelId, ModId};
 use crate::db::Subscription;
 use crate::error::Error;
-use crate::util;
+use crate::util::{self, text};
 
 const MIN: Duration = Duration::from_secs(60);
 const INTERVAL_DURATION: Duration = Duration::from_secs(300);
@@ -349,7 +349,7 @@ fn create_mod_message(game: &Game, mod_: &Mod, event_type: &EventType) -> (Optio
                     let changelog = f
                         .changelog
                         .as_ref()
-                        .map(util::strip_html_tags)
+                        .map(text::strip_html_tags)
                         .filter(|c| !c.is_empty())
                         .map(|c| {
                             let it = c.char_indices().rev().scan(c.len(), |state, (pos, _)| {
