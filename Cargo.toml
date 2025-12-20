@@ -12,9 +12,9 @@ rust-version = "1.82.0"
 include = ["src/**/*.rs", "src/**/*.md", "LICENSE-*", "README.md", "build.rs", "migrations"]
 
 [dependencies]
-bitflags = "2.9.4"
-bytesize = "2.1.0"
-csv = "1.3.1"
+bitflags = "2.10.0"
+bytesize = "2.3.1"
+csv = "1.4.0"
 dashmap = "6.1.0"
 dotenv = "0.15.0"
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
@@ -26,20 +26,20 @@ serde_urlencoded = "0.7.1"
 time = { version = "0.3.44", features = ["formatting", "macros"] }
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-stream = "0.1.17"
-toml = "0.9.8"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.20", features = ["env-filter", "time"] }
+toml = "0.9.10"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "time"] }
 
 # strip html tags
-html5ever = "0.35.0"
+html5ever = "0.36.1"
 
 # metrics
-hyper = { version = "1.7.0", features = ["http1", "server"] }
-hyper-util = { version = "0.1.17", features = ["tokio"] }
+hyper = { version = "1.8.1", features = ["http1", "server"] }
+hyper-util = { version = "0.1.19", features = ["tokio"] }
 http-body-util = "0.1.3"
 
 # diesel
-diesel = { version = "2.3.2", default-features = false, features = ["r2d2", "sqlite"] }
+diesel = { version = "2.3.5", default-features = false, features = ["r2d2", "sqlite"] }
 diesel_migrations = "2.3.0"
 libsqlite3-sys = { version = ">=0.17.2, <0.36.0", optional = true }
 
@@ -56,7 +56,7 @@ default-features = false
 features = ["rustls-native-roots"]
 
 [build-dependencies]
-git2 = { version = "0.20.2", default-features = false }
+git2 = { version = "0.20.3", default-features = false }
 
 [features]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
