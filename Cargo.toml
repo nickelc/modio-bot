@@ -51,7 +51,7 @@ twilight-cache-inmemory = "0.17.1"
 twilight-util = { version = "0.17.0", features = ["builder"] }
 
 [dependencies.modio]
-version = "0.14.1"
+version = "0.14.2"
 default-features = false
 features = ["rustls-native-roots"]
 
