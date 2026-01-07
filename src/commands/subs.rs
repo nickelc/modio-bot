@@ -162,7 +162,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let mut game_ids = subs
         .values()
         .flatten()
-        .map(|(g, _, _, _)| g)
+        .map(|(g, _)| g)
         .chain(excluded_mods.keys().map(|(g, _)| g))
         .chain(excluded_users.keys().map(|(g, _)| g))
         .collect::<Vec<_>>();
@@ -189,19 +189,19 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let mut content = String::new();
     for (channel_id, subs) in subs {
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
-        for (game_id, tags, evts, explicit) in subs {
+        for (game_id, sub) in subs {
             if let Some(game) = games.get(&game_id.get()) {
                 _ = write!(&mut content, "`{game_id}.` {game}");
             } else {
                 _ = write!(&mut content, "{game_id}");
             }
-            content.push_str(evts.to_suffix());
+            content.push_str(sub.events.to_suffix());
 
-            if !tags.is_empty() {
+            if !sub.tags.is_empty() {
                 content.push_str(" | Tags: ");
-                push_tags(&mut content, tags.iter());
+                push_tags(&mut content, sub.tags.iter());
             }
-            if !explicit {
+            if !sub.explicit {
                 content.push_str(" :underage:");
             }
             content.push('\n');
@@ -279,7 +279,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     defer_ephemeral(ctx, interaction).await?;
 
     let games = {
-        let filter = Id::_in(subs.iter().map(|(s, _, _, _)| s).collect::<Vec<_>>());
+        let filter = Id::_in(subs.iter().map(|(s, _)| s).collect::<Vec<_>>());
         let games = ctx.modio.get_games().filter(filter);
         let mut paged = games.paged();
 
@@ -293,19 +293,19 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     };
 
     let mut content = String::new();
-    for (game_id, tags, evts, explicit) in subs {
+    for (game_id, sub) in subs {
         let Some(name) = games.get(&game_id) else {
             continue;
         };
         _ = write!(&mut content, "`{game_id}.` {name}");
 
-        content.push_str(evts.to_suffix());
+        content.push_str(sub.events.to_suffix());
 
-        if !tags.is_empty() {
+        if !sub.tags.is_empty() {
             content.push_str(" | Tags: ");
-            push_tags(&mut content, tags.iter());
+            push_tags(&mut content, sub.tags.iter());
         }
-        if !explicit {
+        if !sub.explicit {
             content.push_str(" :underage:");
         }
         content.push('\n');

@@ -13,7 +13,7 @@ pub type ExcludedMods = HashSet<ModId>;
 pub type ExcludedUsers = HashSet<String>;
 pub type ExcludedModsMap = HashMap<(GameId, ChannelId), ExcludedMods>;
 pub type ExcludedUsersMap = HashMap<(GameId, ChannelId), ExcludedUsers>;
-pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Tags, Events, bool)>>;
+pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<(GameId, Subscription)>>;
 
 pub use events::Events;
 pub use tags::Tags;
@@ -213,7 +213,7 @@ impl Subscriptions {
             let conn = &mut self.pool.get()?;
 
             let subs = subscriptions
-                .select((channel, game, tags, events, explicit))
+                .select((game, Subscription::as_select()))
                 .filter(guild.eq(guild_id))
                 .load(conn)?;
 
@@ -237,15 +237,12 @@ impl Subscriptions {
             Ok((subs, excluded_mods, excluded_users))
         })?;
 
-        let subs = subs.into_iter().fold(
-            GroupedSubscriptions::new(),
-            |mut map, (channel_id, game_id, tags, events, allow_explicit)| {
-                map.entry(channel_id)
-                    .or_default()
-                    .push((game_id, tags, events, allow_explicit));
+        let subs = subs
+            .into_iter()
+            .fold(GroupedSubscriptions::new(), |mut map, (game_id, sub)| {
+                map.entry(sub.channel).or_default().push((game_id, sub));
                 map
-            },
-        );
+            });
 
         let excluded_mods = excluded_mods.into_iter().fold(
             ExcludedModsMap::new(),
@@ -266,17 +263,14 @@ impl Subscriptions {
         Ok((subs, excluded_mods, excluded_users))
     }
 
-    pub fn list_for_channel(
-        &self,
-        channel_id: ChannelId,
-    ) -> Result<Vec<(GameId, Tags, Events, bool)>> {
+    pub fn list_for_channel(&self, channel_id: ChannelId) -> Result<Vec<(GameId, Subscription)>> {
         use schema::subscriptions::dsl::*;
 
         let records = block_in_place::<_, Result<_>>(|| {
             let conn = &mut self.pool.get()?;
 
             let records = subscriptions
-                .select((game, tags, events, explicit))
+                .select((game, Subscription::as_select()))
                 .filter(channel.eq(channel_id))
                 .load(conn)?;
             Ok(records)
