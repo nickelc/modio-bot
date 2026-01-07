@@ -215,7 +215,7 @@ impl Subscriptions {
             let subs = subscriptions
                 .select((channel, game, tags, events, explicit))
                 .filter(guild.eq(guild_id))
-                .load::<(ChannelId, GameId, Tags, Events, bool)>(conn)?;
+                .load(conn)?;
 
             let excluded_mods = {
                 use schema::subscriptions_exclude_mods::dsl::*;
@@ -223,7 +223,7 @@ impl Subscriptions {
                 subscriptions_exclude_mods
                     .select((channel, game, mod_id))
                     .filter(guild.eq(guild_id))
-                    .load::<(ChannelId, GameId, ModId)>(conn)?
+                    .load(conn)?
             };
 
             let excluded_users = {
@@ -232,7 +232,7 @@ impl Subscriptions {
                 subscriptions_exclude_users
                     .select((channel, game, user))
                     .filter(guild.eq(guild_id))
-                    .load::<(ChannelId, GameId, String)>(conn)?
+                    .load(conn)?
             };
             Ok((subs, excluded_mods, excluded_users))
         })?;
@@ -278,7 +278,7 @@ impl Subscriptions {
             let records = subscriptions
                 .select((game, tags, events, explicit))
                 .filter(channel.eq(channel_id))
-                .load::<(GameId, Tags, Events, bool)>(conn)?;
+                .load(conn)?;
             Ok(records)
         })?;
 
@@ -297,7 +297,7 @@ impl Subscriptions {
             let records = subscriptions_exclude_mods
                 .select((game, mod_id))
                 .filter(channel.eq(channel_id))
-                .load::<(GameId, ModId)>(conn)?;
+                .load(conn)?;
             Ok(records)
         })?;
 
@@ -321,7 +321,7 @@ impl Subscriptions {
             let records = subscriptions_exclude_users
                 .select((game, user))
                 .filter(channel.eq(channel_id))
-                .load::<(GameId, String)>(conn)?;
+                .load(conn)?;
             Ok(records)
         })?;
 

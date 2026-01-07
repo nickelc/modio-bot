@@ -36,7 +36,7 @@ impl Settings {
         let value = settings
             .select(game)
             .filter(guild.eq(guild_id))
-            .first::<Option<GameId>>(conn)
+            .first(conn)
             .optional()?
             .flatten();
 
