@@ -226,6 +226,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             tags,
                             events: evts,
                             explicit,
+                            ..
                         } in &subs
                         {
                             if unknown_channels.contains(channel) {

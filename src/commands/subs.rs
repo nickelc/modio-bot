@@ -162,7 +162,7 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let mut game_ids = subs
         .values()
         .flatten()
-        .map(|(g, _)| g)
+        .map(|s| &s.game)
         .chain(excluded_mods.keys().map(|(g, _)| g))
         .chain(excluded_users.keys().map(|(g, _)| g))
         .collect::<Vec<_>>();
@@ -189,11 +189,11 @@ async fn overview(ctx: &Context, interaction: &Interaction) -> Result<(), Error>
     let mut content = String::new();
     for (channel_id, subs) in subs {
         _ = writeln!(&mut content, "__Channel:__ <#{channel_id}>");
-        for (game_id, sub) in subs {
-            if let Some(game) = games.get(&game_id.get()) {
-                _ = write!(&mut content, "`{game_id}.` {game}");
+        for sub in subs {
+            if let Some(game) = games.get(&sub.game.get()) {
+                _ = write!(&mut content, "`{game_id}.` {game}", game_id = sub.game);
             } else {
-                _ = write!(&mut content, "{game_id}");
+                _ = write!(&mut content, "{game_id}", game_id = sub.game);
             }
             content.push_str(sub.events.to_suffix());
 
@@ -279,7 +279,7 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     defer_ephemeral(ctx, interaction).await?;
 
     let games = {
-        let filter = Id::_in(subs.iter().map(|(s, _)| s).collect::<Vec<_>>());
+        let filter = Id::_in(subs.iter().map(|sub| sub.game).collect::<Vec<_>>());
         let games = ctx.modio.get_games().filter(filter);
         let mut paged = games.paged();
 
@@ -293,11 +293,11 @@ async fn list(ctx: &Context, interaction: &Interaction) -> Result<(), Error> {
     };
 
     let mut content = String::new();
-    for (game_id, sub) in subs {
-        let Some(name) = games.get(&game_id) else {
+    for sub in subs {
+        let Some(name) = games.get(&sub.game) else {
             continue;
         };
-        _ = write!(&mut content, "`{game_id}.` {name}");
+        _ = write!(&mut content, "`{game_id}.` {name}", game_id = sub.game);
 
         content.push_str(sub.events.to_suffix());
 
