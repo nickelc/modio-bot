@@ -18,7 +18,7 @@ pub type GroupedSubscriptions = BTreeMap<ChannelId, Vec<Subscription>>;
 pub use events::Events;
 pub use tags::Tags;
 
-#[derive(Debug, Queryable, Selectable)]
+#[derive(Debug, Insertable, Queryable, Selectable)]
 #[diesel(table_name = schema::subscriptions)]
 pub struct Subscription {
     pub game: GameId,
@@ -344,16 +344,16 @@ impl Subscriptions {
             let conn = &mut self.pool.get()?;
 
             conn.transaction::<_, Error, _>(|conn| {
-                let values = (
-                    game.eq(game_id),
-                    channel.eq(channel_id),
-                    tags.eq(sub_tags),
-                    guild.eq(guild_id),
-                    events.eq(evts),
-                    explicit.eq(allow_explicit),
-                );
+                let sub = Subscription {
+                    game: game_id,
+                    channel: channel_id,
+                    tags: sub_tags,
+                    guild: guild_id,
+                    events: evts,
+                    explicit: allow_explicit,
+                };
                 diesel::insert_into(subscriptions)
-                    .values(values)
+                    .values(sub)
                     .on_conflict((game, channel, tags))
                     .do_update()
                     .set(events.eq(events.bit_or(evts)))
@@ -415,16 +415,11 @@ impl Subscriptions {
                             }
                         }
                     } else {
-                        let values = (
-                            game.eq(sub.game),
-                            channel.eq(sub.channel),
-                            tags.eq(sub.tags),
-                            guild.eq(sub.guild),
-                            events.eq(new_evts),
-                            explicit.eq(sub.explicit),
-                        );
+                        let mut sub = sub;
+                        sub.events = new_evts;
+
                         diesel::replace_into(subscriptions)
-                            .values(values)
+                            .values(sub)
                             .execute(conn)?;
                     }
                 }
