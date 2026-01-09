@@ -7,7 +7,7 @@ use diesel::expression::AsExpression;
 use diesel::serialize::{self, ToSql};
 use diesel::sql_types::{BigInt, Integer};
 use diesel::sqlite::Sqlite;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, UserMarker};
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
 
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
@@ -25,6 +25,10 @@ pub struct ChannelId(pub Id<ChannelMarker>);
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
 #[diesel(sql_type = BigInt)]
 pub struct GuildId(pub Id<GuildMarker>);
+
+#[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
+#[diesel(sql_type = BigInt)]
+pub struct RoleId(pub Id<RoleMarker>);
 
 #[derive(Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, AsExpression, FromSqlRow)]
 #[diesel(sql_type = BigInt)]
@@ -112,6 +116,18 @@ impl fmt::Debug for GuildId {
     }
 }
 
+impl fmt::Display for RoleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Debug for RoleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0.get(), f)
+    }
+}
+
 impl fmt::Debug for UserId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0.get(), f)
@@ -180,6 +196,20 @@ impl FromSql<BigInt, Sqlite> for GuildId {
 }
 
 impl ToSql<BigInt, Sqlite> for GuildId {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
+        out.set_value(i64::try_from(self.0.get())?);
+        Ok(serialize::IsNull::No)
+    }
+}
+
+impl FromSql<BigInt, Sqlite> for RoleId {
+    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
+        let id = i64::from_sql(bytes)?;
+        Ok(Self(Id::try_from(id)?))
+    }
+}
+
+impl ToSql<BigInt, Sqlite> for RoleId {
     fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
         out.set_value(i64::try_from(self.0.get())?);
         Ok(serialize::IsNull::No)

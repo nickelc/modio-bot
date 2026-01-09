@@ -6,7 +6,7 @@ use tokio::task::block_in_place;
 mod events;
 mod tags;
 
-use super::types::{ChannelId, GameId, GuildId, ModId};
+use super::types::{ChannelId, GameId, GuildId, ModId, RoleId};
 use super::{schema, DbPool, Result};
 
 pub type ExcludedMods = HashSet<ModId>;
@@ -27,6 +27,7 @@ pub struct Subscription {
     pub guild: GuildId,
     pub events: Events,
     pub explicit: bool,
+    pub role: Option<RoleId>,
 }
 
 #[derive(Clone)]

@@ -25,6 +25,7 @@ diesel::table! {
         guild -> BigInt,
         events -> Integer,
         explicit -> Bool,
+        role -> Nullable<BigInt>,
     }
 }
 

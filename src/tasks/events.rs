@@ -24,6 +24,7 @@ use crate::commands::mods::create_fields;
 use crate::db::types::{ChannelId, ModId};
 use crate::db::Subscription;
 use crate::error::Error;
+use crate::util::text::mention::Mention;
 use crate::util::{self, text};
 
 const MIN: Duration = Duration::from_secs(60);
@@ -228,6 +229,7 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                             tags,
                             events: evts,
                             explicit,
+                            role,
                             ..
                         } in &subs
                         {
@@ -279,7 +281,18 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                                 debug!("mod ignored based on maturiy options #{channel}: {evt} for {:?}", m.name);
                                 continue;
                             }
-                            effected_channels.insert(*channel);
+                            if let Some(role) = role {
+                                let channels = BTreeSet::from([*channel]);
+                                let (content, embed) = create_mod_message(&game, m, evt);
+                                let content = content
+                                    .map(|c| format!("{} {c}", role.mention()))
+                                    .or_else(|| Some(role.mention().to_string()));
+                                if let Err(e) = sender.send((channels, content, embed)).await {
+                                    error!("{e}");
+                                }
+                            } else {
+                                effected_channels.insert(*channel);
+                            }
                         }
                         if effected_channels.is_empty() {
                             debug!("no channels left to send to");

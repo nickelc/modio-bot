@@ -62,6 +62,34 @@ impl fmt::Write for ContentBuilder {
     }
 }
 
+pub mod mention {
+    use std::fmt;
+
+    use twilight_model::id::{marker::RoleMarker, Id};
+
+    use crate::db::types::RoleId;
+
+    pub struct Display<T>(T);
+
+    pub trait Mention<T> {
+        fn mention(&self) -> Display<T>;
+    }
+
+    impl Mention<Id<RoleMarker>> for RoleId {
+        fn mention(&self) -> Display<Id<RoleMarker>> {
+            Display(self.0)
+        }
+    }
+
+    impl fmt::Display for Display<Id<RoleMarker>> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("<@&")?;
+            fmt::Display::fmt(&self.0, f)?;
+            f.write_str(">")
+        }
+    }
+}
+
 pub fn strip_html_tags<S: AsRef<str>>(input: S) -> String {
     use html5ever::tendril::TendrilSink;
     use html5ever::{parse_document, ParseOpts};

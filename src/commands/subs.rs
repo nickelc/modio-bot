@@ -16,7 +16,7 @@ use twilight_model::application::interaction::application_command::{
 use twilight_model::application::interaction::{Interaction, InteractionContextType};
 use twilight_model::guild::Permissions;
 use twilight_util::builder::command::{
-    BooleanBuilder, CommandBuilder, IntegerBuilder, StringBuilder, SubCommandBuilder,
+    BooleanBuilder, CommandBuilder, IntegerBuilder, RoleBuilder, StringBuilder, SubCommandBuilder,
     SubCommandGroupBuilder,
 };
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
@@ -26,7 +26,7 @@ use super::{
     update_response_from_content, AutocompleteExt, EphemeralMessage, InteractionExt, SubCommandExt,
 };
 use crate::bot::Context;
-use crate::db::types::{ChannelId, GameId, ModId};
+use crate::db::types::{ChannelId, GameId, ModId, RoleId};
 use crate::db::{Events, Subscription, Tags};
 use crate::error::Error;
 use crate::util::text::ContentBuilder;
@@ -61,6 +61,7 @@ pub fn commands() -> Vec<Command> {
                 ("All", i64::from(Events::ALL.bits())),
             ]),
         )
+        .option(RoleBuilder::new("role", "@role to be notified."))
         .option(BooleanBuilder::new("explicit", "Allow explicit content")),
     )
     .option(
@@ -332,6 +333,7 @@ async fn subscribe(
     let mut game = None;
     let mut tags = None;
     let mut evts = Events::ALL;
+    let mut role = None;
     let mut explicit = None;
 
     defer_ephemeral(ctx, interaction).await?;
@@ -356,6 +358,9 @@ async fn subscribe(
                 } else {
                     Events::ALL
                 };
+            }
+            CommandOptionValue::Role(v) => {
+                role = Some(RoleId(*v));
             }
             CommandOptionValue::Boolean(v) if opt.name == "explicit" => {
                 explicit = Some(*v);
@@ -411,6 +416,7 @@ async fn subscribe(
         guild: guild_id,
         events: evts,
         explicit,
+        role,
     };
     let ret = ctx.subscriptions.add(sub);
 
