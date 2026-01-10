@@ -112,6 +112,7 @@ mod sink {
         text: RefCell<String>,
     }
 
+    #[derive(Clone)]
     pub struct Node {
         data: NodeData,
     }
@@ -122,6 +123,7 @@ mod sink {
         }
     }
 
+    #[derive(Clone)]
     enum NodeData {
         Document,
         Comment,
@@ -220,6 +222,10 @@ mod sink {
         fn remove_from_parent(&self, _target: &Self::Handle) {}
 
         fn reparent_children(&self, _node: &Self::Handle, _new_parent: &Self::Handle) {}
+
+        fn clone_subtree(&self, node: &Self::Handle) -> Self::Handle {
+            Node::new(node.data.clone())
+        }
     }
 }
 

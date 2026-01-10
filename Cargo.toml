@@ -31,7 +31,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "time"] }
 
 # strip html tags
-html5ever = "0.36.1"
+html5ever = "0.37.1"
 
 # metrics
 hyper = { version = "1.8.1", features = ["http1", "server"] }
