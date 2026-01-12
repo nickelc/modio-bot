@@ -27,7 +27,7 @@ use super::{
 };
 use crate::bot::Context;
 use crate::db::types::{ChannelId, GameId, ModId};
-use crate::db::{Events, Tags};
+use crate::db::{Events, Subscription, Tags};
 use crate::error::Error;
 use crate::util::text::ContentBuilder;
 use crate::util::IntoFilter;
@@ -404,9 +404,15 @@ async fn subscribe(
     let explicit = explicit.unwrap_or(true);
 
     let game_id = GameId(game.id);
-    let ret = ctx
-        .subscriptions
-        .add(game_id, channel_id, sub_tags, guild_id, evts, explicit);
+    let sub = Subscription {
+        game: game_id,
+        channel: channel_id,
+        tags: sub_tags,
+        guild: guild_id,
+        events: evts,
+        explicit,
+    };
+    let ret = ctx.subscriptions.add(sub);
 
     let content: Cow<'_, str> = match ret {
         Ok(()) => format!("Subscribed to '{}'.", game.name).into(),

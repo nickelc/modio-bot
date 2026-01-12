@@ -327,31 +327,16 @@ impl Subscriptions {
             }))
     }
 
-    pub fn add(
-        &self,
-        game_id: GameId,
-        channel_id: ChannelId,
-        sub_tags: Tags,
-        guild_id: GuildId,
-        evts: Events,
-        allow_explicit: bool,
-    ) -> Result<()> {
+    pub fn add(&self, sub: Subscription) -> Result<()> {
         use diesel::result::Error;
         use operators::BitwiseExtensions;
         use schema::subscriptions::dsl::*;
 
         block_in_place(|| {
             let conn = &mut self.pool.get()?;
+            let evts = sub.events;
 
             conn.transaction::<_, Error, _>(|conn| {
-                let sub = Subscription {
-                    game: game_id,
-                    channel: channel_id,
-                    tags: sub_tags,
-                    guild: guild_id,
-                    events: evts,
-                    explicit: allow_explicit,
-                };
                 diesel::insert_into(subscriptions)
                     .values(sub)
                     .on_conflict((game, channel, tags))
