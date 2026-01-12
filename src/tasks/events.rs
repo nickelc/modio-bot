@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -105,11 +105,13 @@ pub fn task(ctx: Context) -> impl Future<Output = ()> {
                 ]))
                 .order_by(Id::asc());
 
-            let (subs, excluded_mods, excluded_users) =
-                ctx.subscriptions.load().unwrap_or_else(|e| {
+            let (subs, excluded_mods, excluded_users) = match ctx.subscriptions.load() {
+                Ok(data) => data,
+                Err(e) => {
                     error!("failed to load subscriptions: {e}");
-                    (HashMap::default(), HashMap::default(), HashMap::default())
-                });
+                    continue;
+                }
+            };
             let excluded_mods = Arc::new(excluded_mods);
             let excluded_users = Arc::new(excluded_users);
 
